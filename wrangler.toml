@@ -1,0 +1,21 @@
+name = "football-edge-background-watch"
+main = "worker.js"
+compatibility_date = "2026-09-11"
+
+[vars]
+APISPORTS_BASE = "https://v3.football.api-sports.io"
+TZ = "Asia/Ho_Chi_Minh"
+FOCUS_INTERVAL_MS = "30000"
+SCREEN_INTERVAL_MS = "60000"
+DETAIL_FOCUS_MS = "45000"
+DETAIL_SCREEN_MS = "180000"
+MAX_DETAIL_PER_TICK = "6"
+
+[durable_objects]
+bindings = [
+  { name = "BACKGROUND_WATCHER", class_name = "BackgroundWatcher" }
+]
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["BackgroundWatcher"]
