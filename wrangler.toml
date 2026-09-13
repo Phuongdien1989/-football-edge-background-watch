@@ -7,9 +7,14 @@ APISPORTS_BASE = "https://v3.football.api-sports.io"
 TZ = "Asia/Ho_Chi_Minh"
 FOCUS_INTERVAL_MS = "30000"
 SCREEN_INTERVAL_MS = "60000"
-DETAIL_FOCUS_MS = "45000"
+DETAIL_FOCUS_MS = "60000"
 DETAIL_SCREEN_MS = "180000"
 MAX_DETAIL_PER_TICK = "6"
+MAX_ACTIVE_WATCHES = "120"
+MAX_FOCUS_WATCHES = "16"
+WATCH_PERSIST_HEARTBEAT_MS = "300000"
+LOOKUP_FOCUS_MS = "120000"
+LOOKUP_SCREEN_MS = "300000"
 
 [durable_objects]
 bindings = [
@@ -19,3 +24,7 @@ bindings = [
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["BackgroundWatcher"]
+
+[observability]
+enabled = true
+head_sampling_rate = 1
