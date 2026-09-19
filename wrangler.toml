@@ -1,5 +1,5 @@
 name = "football-edge-background-watch"
-main = "worker_v122.js"
+main = "worker_v123.js"
 compatibility_date = "2026-09-11"
 
 [vars]
@@ -25,7 +25,7 @@ bindings = [
 tag = "v1"
 new_sqlite_classes = ["BackgroundWatcher"]
 
-# V1.23.1 D1 DATABASE (schema unchanged for app release V1.23.2)
+# V1.23.1 core D1 database + V1.23.3 additive history tables
 [[d1_databases]]
 binding = "FOOTBALL_DB"
 database_name = "football-edge-db"
