@@ -26,12 +26,10 @@ tag = "v1"
 new_sqlite_classes = ["BackgroundWatcher"]
 
 # V1.23.1 D1 DATABASE
-# Sau khi chạy: npx wrangler d1 create football-edge-db
-# hãy bỏ dấu # ở 4 dòng dưới và thay REPLACE_WITH_D1_DATABASE_ID bằng database_id Cloudflare trả về.
-# [[d1_databases]]
-# binding = "FOOTBALL_DB"
-# database_name = "football-edge-db"
-# database_id = "REPLACE_WITH_D1_DATABASE_ID"
+[[d1_databases]]
+binding = "FOOTBALL_DB"
+database_name = "football-edge-db"
+database_id = "0d12a7cc-12a9-4c71-b55b-61dfd2dac4d4"
 
 [observability]
 enabled = true
