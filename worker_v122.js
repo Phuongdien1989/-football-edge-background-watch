@@ -93,6 +93,8 @@ export default {
       d.worker_version=WORKER_VERSION;return json(d);
     }
     if(['/api/db/qsig','/api/db/validation','/api/db/export/qsig','/api/db/export/validation'].includes(url.pathname)){
+      // Browser preflight has no bearer token; actual data requests remain authenticated.
+      if(request.method==='OPTIONS')return json(null);
       if(!authorized(request,env))return json({error:'Unauthorized'},401);if(!env.FOOTBALL_DB)return json({ok:false,error:'D1_NOT_CONFIGURED'},503);
       try{
         const isQ=url.pathname.includes('qsig'),table=isQ?'qsig_results':'validation_results',order=isQ?'signal_at':'created_at',rr=await rows(env,table,order,url.searchParams.get('limit')||(url.pathname.includes('/export/')?10000:2000));
