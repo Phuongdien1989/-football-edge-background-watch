@@ -267,7 +267,7 @@ export class BackgroundWatcher extends DurableObject {
     const num=Number(v);
     return Number.isFinite(num)?num:fallback;
   }
-  async api(path,params={}){
+  async api(path,params={},strict=false){
     if(!this.env.APISPORTS_KEY)throw new Error("APISPORTS_KEY secret is not configured");
     const base=String(this.env.APISPORTS_BASE||"https://v3.football.api-sports.io").replace(/\/$/,"");
     const u=new URL(base+path);
@@ -277,7 +277,8 @@ export class BackgroundWatcher extends DurableObject {
       const r=await fetch(u,{headers:{"x-apisports-key":this.env.APISPORTS_KEY,"accept":"application/json"},signal:ctl.signal});
       const txt=await r.text();let data={};try{data=JSON.parse(txt)}catch{}
       if(!r.ok)throw new Error(`API HTTP ${r.status}`);
-      if(data?.errors&&Object.keys(data.errors).length)console.log("api warning",JSON.stringify(data.errors).slice(0,500));
+      if(strict&&!Array.isArray(data?.response))throw new Error('EVIDENCE_PROVIDER_INVALID_RESPONSE');
+      if(data?.errors&&Object.keys(data.errors).length){if(strict)throw new Error('EVIDENCE_PROVIDER_ERROR');console.log("api warning",JSON.stringify(data.errors).slice(0,500))}
       return data.response||[];
     }finally{clearTimeout(timer)}
   }
@@ -287,6 +288,70 @@ export class BackgroundWatcher extends DurableObject {
   }
   async putWatch(w){await this.ctx.storage.put(`watch:${w.fixture_id}`,w)}
   async removeWatch(id){await this.ctx.storage.delete(`watch:${id}`)}
+
+  // Evidence leases are independent of Smart Follow/TOP and never score signals.
+  async evidenceJobs(){return [...(await this.ctx.storage.list({prefix:'evidence:'})).values()]}
+  evidenceWork(fn){const task=(this.evidenceChain||Promise.resolve()).then(fn);this.evidenceChain=task.catch(()=>{});return task}
+  async registerEvidence(body){
+    if(!dbConfigured(this.env))return {ok:false,error:'D1_NOT_CONFIGURED'};
+    if(!this.env.APISPORTS_KEY)return {ok:false,error:'APISPORTS_NOT_CONFIGURED'};
+    const now=Date.now(),jobs=await this.evidenceJobs(),accepted=[],rejected=[];
+    for(const r of (Array.isArray(body?.signals)?body.signals:[]).slice(0,20)){
+      const id=Number(r.fixture_id),t0=Number(r.t0),engine=String(r.engine),signal=String(r.id||'');
+      if(!Number.isSafeInteger(id)||id<=0||!['FT','H1','HC'].includes(engine)||!signal||signal.length>180||!Number.isFinite(t0)||t0>now+60000||t0+10800000<=now){rejected.push({id:signal,reason:'INVALID_OR_EXPIRED'});continue}
+      let job=jobs.find(x=>x.fixture_id===id);
+      if(!job){
+        if(jobs.filter(x=>x.pending||(!x.done&&x.until>now)).length>=20){rejected.push({id:signal,reason:'CAPACITY'});continue}
+        job={fixture_id:id,signals:[],until:0,last_poll:0};jobs.push(job);
+      }
+      const key=`${engine}:${signal}`;
+      if(!job.signals.some(x=>x.key===key)){
+        if(job.signals.length>=100){rejected.push({id:signal,reason:'SIGNAL_CAPACITY'});continue}
+        job.signals.push({key,id:signal,engine,t0});job.until=Math.max(job.until,t0+10800000);job.done=false;
+        // A completed fixture is not restarted by duplicate client registration.
+      }
+      await this.ctx.storage.put(`evidence:${id}`,job);accepted.push(key);
+    }
+    await this.ensureAlarm(1000);
+    return {ok:true,accepted,rejected,tracking:'SOURCE_CAPTURE_ONLY'};
+  }
+  async pollEvidence(){
+    const now=Date.now(),jobs=await this.evidenceJobs();
+    // Oldest-first bounded work; D1 failure retains the exact pending snapshot.
+    const due=jobs.filter(j=>j.pending||(!j.done&&j.until>now&&now-Number(j.last_poll||0)>=60000))
+      .sort((a,b)=>(a.last_poll||0)-(b.last_poll||0)).slice(0,3);
+    for(const j of due){
+      try{
+        if(!j.pending){
+          const fixtures=await this.api('/fixtures',{id:j.fixture_id},true),f=fixtures[0];
+          if(!f)throw new Error('EVIDENCE_FIXTURE_UNAVAILABLE');
+          const health={};
+          const read=async (name,path)=>{try{const rows=await this.api(path,{fixture:j.fixture_id},true);health[name]=rows.length?'OK':'EMPTY';return rows}catch(e){health[name]='ERROR';return []}};
+          const [stats,events,odds]=await Promise.all([read('stats','/fixtures/statistics'),read('events','/fixtures/events'),read('odds','/odds/live')]);
+          const captured=Date.now(),status=String(f.fixture?.status?.short||'');
+          j.pending={id:`EV-${j.fixture_id}-${captured}`,fixture_id:j.fixture_id,source:'EVIDENCE_FOLLOWUP',engine:'EVIDENCE',
+            captured_at:captured,minute:f.fixture?.status?.elapsed,status,score_home:f.goals?.home,score_away:f.goals?.away,
+            snapshot_kind:'SOURCE_DETAIL',persistence_reason:TERMINAL.has(status)?'TERMINAL_EVIDENCE':'QSIG_FOLLOWUP',
+            payload:{fixture:compactFixture(f),stats_raw:compactStats(stats),events_raw:compactEvents(events),odds_raw:compactOdds(odds),
+              signals:j.signals,source_health:health,outcome_status:'NOT_EVALUATED'}};
+          // Persist before D1: alarms can resume safely after crashes/timeouts.
+          await this.ctx.storage.put(`evidence:${j.fixture_id}`,j);
+        }
+        const p=j.pending,stmt=dbFixtureStmt(this.env,p,now);
+        const result=await this.env.FOOTBALL_DB.batch([...(stmt?[stmt]:[]),dbLiveStmt(this.env,p,now)]);
+        if(result.some(x=>x.success===false))throw new Error('EVIDENCE_D1_WRITE_FAILED');
+        j.done=TERMINAL.has(p.status)&&p.payload.source_health.events==='OK';
+        // No events in a finished 0-0 is legitimate; ERROR must still retry.
+        if(TERMINAL.has(p.status)&&p.payload.source_health.events==='EMPTY')j.done=true;
+        j.last_saved=p.captured_at;j.pending=null;j.last_error=null;
+      }catch(e){j.last_error=runtimeMessage(e)}
+      j.last_poll=Date.now();await this.ctx.storage.put(`evidence:${j.fixture_id}`,j);
+    }
+    for(const j of jobs){
+      // Failed writes remain pending (capacity bounded); never discard unsaved evidence.
+      if(!j.pending&&j.until+86400000<now)await this.ctx.storage.delete(`evidence:${j.fixture_id}`);
+    }
+  }
 
   // V2 timeline: fixed rotating slots. One snapshot = one row write, no index row.
   snapshotSlotKey(w,snap){
@@ -325,7 +390,8 @@ export class BackgroundWatcher extends DurableObject {
     const current=await this.ctx.storage.getAlarm();
     if(current!=null)return current;
     const watches=await this.listWatches(),active=watches.filter(x=>!x.ended&&Number(x.expires_at||0)>Date.now());
-    if(!active.length)return null;
+    const evidence=(await this.evidenceJobs()).some(j=>j.pending||(!j.done&&j.until>Date.now()));
+    if(!active.length&&!evidence)return null;
     const focus=active.some(x=>x.level==="focus");
     const delay=delayMs??(focus?this.cfg("FOCUS_INTERVAL_MS",30000):this.cfg("SCREEN_INTERVAL_MS",60000));
     const at=Date.now()+Math.max(10000,delay);
@@ -479,12 +545,13 @@ export class BackgroundWatcher extends DurableObject {
   }
 
   async alarm(){
-    try{await this.poll()}
+    try{await this.evidenceWork(()=>this.pollEvidence());await this.poll()}
     catch(e){console.log("background alarm error",e?.stack||e);throw e}
     finally{
       try{
         const watches=await this.listWatches(),active=watches.filter(x=>!x.ended&&Number(x.expires_at||0)>Date.now());
-        if(active.length){
+        const evidence=(await this.evidenceJobs()).some(j=>j.pending||(!j.done&&j.until>Date.now()));
+        if(active.length||evidence){
           const focus=active.some(x=>x.level==="focus"),delay=focus?this.cfg("FOCUS_INTERVAL_MS",30000):this.cfg("SCREEN_INTERVAL_MS",60000);
           await this.ctx.storage.setAlarm(Date.now()+Math.max(10000,delay));
         }
@@ -495,6 +562,8 @@ export class BackgroundWatcher extends DurableObject {
   async fetch(request){
     if(request.method==="OPTIONS")return json({ok:true});
     const url=new URL(request.url);
+    if(url.pathname==='/api/watch/evidence-register'&&request.method==='POST'){const body=await request.json().catch(()=>({}));return json(await this.evidenceWork(()=>this.registerEvidence(body)))}
+    if(url.pathname==='/api/watch/evidence-status'&&request.method==='GET')return json({ok:true,jobs:(await this.evidenceJobs()).map(({pending,...j})=>({...j,pending:!!pending})),tracking:'SOURCE_CAPTURE_ONLY'});
     if(url.pathname==="/api/watch/register"&&request.method==="POST"){
       return json(await this.register(await request.json().catch(()=>({}))));
     }
