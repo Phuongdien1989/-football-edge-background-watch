@@ -108,11 +108,84 @@ async function handleDbRequest(request,env,url){
   if(url.pathname==='/api/db/stats'&&request.method==='GET')return json(await dbStats(env));
   if(url.pathname==='/api/db/sync'&&request.method==='POST'){const body=await request.json().catch(()=>({}));try{return json(await dbWriteEvents(env,body?.events||[]))}catch(e){return json({ok:false,error:'D1_SYNC_FAILED',message:runtimeMessage(e)},500)}}
   if(!dbConfigured(env))return json({ok:false,error:'D1_NOT_CONFIGURED'},503);
+  if(url.pathname==='/api/db/evidence-review'&&request.method==='GET')return json(await evidenceReviewPage(env,url));
   if(url.pathname==='/api/db/entries'&&request.method==='GET'){const rows=await dbRows(env,'entry_decisions',url.searchParams.get('limit'));return json({ok:true,rows});}
   if(url.pathname==='/api/db/live'&&request.method==='GET'){const rows=await dbRows(env,'live_snapshots',url.searchParams.get('limit'));return json({ok:true,rows});}
   if(url.pathname==='/api/db/export/entries'&&request.method==='GET'){const rows=await dbRows(env,'entry_decisions',url.searchParams.get('limit')||10000);return json({ok:true,schema:'ENTRY_DECISIONS_EXPORT_V1.23.1',exported_at:new Date().toISOString(),rows});}
   if(url.pathname==='/api/db/export/live'&&request.method==='GET'){const rows=await dbRows(env,'live_snapshots',url.searchParams.get('limit')||10000);if(String(url.searchParams.get('format')||'').toLowerCase()==='csv')return new Response(liveRowsCsv(rows),{status:200,headers:{'content-type':'text/csv; charset=utf-8','content-disposition':'attachment; filename="football_edge_live_snapshots.csv"','cache-control':'no-store','access-control-allow-origin':'*'}});return json({ok:true,schema:'LIVE_SNAPSHOTS_EXPORT_V1.23.1',exported_at:new Date().toISOString(),rows});}
   return json({error:'DB route not found'},404);
+}
+// Independent, conservative evidence review. Never mutates QSIG or Validation.
+function reviewQsigEvidence(q,snapshots,now=Date.now()){
+  const engine=String(q.engine||''),windows=engine==='H1'?[3,5,10]:[5,10,15];
+  const out={schema:'FE_EVIDENCE_REVIEW_V1',signal_id:q.id,fixture_id:q.fixture_id,home:q.home||null,away:q.away||null,engine,t0:q.t0,
+    reviewed_at:now,status:'MISSING_DATA',reason:'NO_SOURCE_EVIDENCE',windows:{},legacy:{},conflicts:[],bet_result:false};
+  for(const w of windows){out.windows[w]='UNKNOWN';out.legacy[w]=q[engine==='HC'?`state_${w}m`:`goal_${w}m`]??null}
+  if(engine==='HC'){
+    out.status=windows.every(w=>out.legacy[w]!=null)?'RECORDED_ONLY':'MISSING_DATA';
+    out.reason='HC_REQUIRES_ORIGINAL_LIVE_STATE_REPLAY';return out;
+  }
+  if(!['FT','H1'].includes(engine))return out;
+  const num=x=>x!==null&&x!==undefined&&x!==''&&Number.isFinite(Number(x));
+  if(![q.t0,q.minute,q.start_home,q.start_away].every(num)){out.reason='INVALID_BASELINE';return out}
+  const start=Number(q.minute),g0=Number(q.start_home)+Number(q.start_away);
+  const rows=snapshots.filter(x=>Number(x.captured_at)>=Number(q.t0)&&Number(x.fixture_id)===Number(q.fixture_id)).sort((a,b)=>b.captured_at-a.captured_at);
+  // Latest source wins, including corrected events; never fall back to stale good data.
+  const snap=rows[0];if(!snap){if(now<Number(q.t0)+10800000){out.status='WAITING';out.reason='AWAITING_SOURCE'}return out}
+  out.evidence_id=snap.id;out.evidence_at=snap.captured_at;
+  const p=snap.payload||{},f=p.fixture||{},st=f.fixture?.status?.short||snap.status;
+  if(['CANC','ABD','AWD','WO','PST'].includes(st)){out.status='VOID';out.reason=`FIXTURE_${st}`;return out}
+  const terminal=['FT','AET','PEN'].includes(st),halfDone=['HT','2H','ET','BT','P','FT','AET','PEN'].includes(st);
+  const finished=engine==='H1'?halfDone:terminal;
+  if(!['OK','EMPTY'].includes(p.source_health?.events)||!Array.isArray(p.events_raw)){out.reason='EVENTS_UNAVAILABLE';return out}
+  if(p.source_health?.score!=='OK'||![f.goals?.home,f.goals?.away].every(num)){out.reason='SCORE_UNAVAILABLE';return out}
+  const total=Number(f.goals.home)+Number(f.goals.away);
+  const goals=p.events_raw.filter(e=>String(e.type).toLowerCase()==='goal'&&!/miss|cancel|disallow|shootout/i.test(String(e.detail||'')));
+  if(goals.some(e=>!num(e.time?.elapsed))||goals.length!==total){out.reason='EVENT_SCORE_MISMATCH';return out}
+  if(engine==='H1'&&finished){
+    const ht=f.score?.halftime;
+    if(![ht?.home,ht?.away].every(num)||goals.filter(e=>Number(e.time.elapsed)<=45).length!==Number(ht.home)+Number(ht.away)){out.reason='HALFTIME_LEDGER_UNVERIFIED';return out}
+  }
+  if(goals.filter(e=>Number(e.time.elapsed)<=start).length!==g0){out.reason='BASELINE_EVENT_AMBIGUITY';return out}
+  // elapsed 45/90 plus extra cannot be mapped into the next period's minute scale.
+  const eligible=goals.filter(e=>Number(e.time.elapsed)>start&&Number(e.time.elapsed)<=(engine==='H1'?45:90));
+  const noExtra=eligible.filter(e=>!Number(e.time.extra||0)).map(e=>Number(e.time.elapsed));
+  const current=Number(f.fixture?.status?.elapsed??snap.minute),periodEnd=engine==='H1'?45:90;
+  for(const w of windows){
+    const end=start+w,hit=noExtra.some(m=>m<=end);
+    if(hit)out.windows[w]='HIT';
+    else if(end>periodEnd||(finished&&current<end))out.windows[w]=finished?'CENSORED':'UNKNOWN';
+    else if(eligible.some(e=>Number(e.time.extra||0)&&Number(e.time.elapsed)<=end))out.windows[w]='UNKNOWN';
+    else if(current>=end||finished)out.windows[w]='MISS';
+    if(typeof out.legacy[w]==='boolean'&&['HIT','MISS'].includes(out.windows[w])&&out.legacy[w]!== (out.windows[w]==='HIT'))out.conflicts.push(String(w));
+  }
+  out.period_goal=eligible.length>0?true:(finished&&(engine==='H1'||goals.every(e=>Number(e.time.elapsed)<=90)))?false:null;
+  out.status=out.conflicts.length?'CONFLICT':finished?'CONFIRMED':'OBSERVED';
+  out.reason=out.conflicts.length?'LEGACY_REVIEW_DISAGREE':finished?'EVENTS_RECONCILED_WITH_SCORE':'PROVISIONAL_LIVE_EVIDENCE';
+  if(!out.conflicts.length&&Object.values(out.windows).some(v=>v==='UNKNOWN')){out.status=(finished||now>=Number(q.t0)+10800000)?'MISSING_DATA':'WAITING';out.reason='INCOMPLETE_WINDOWS'}
+  return out;
+}
+async function evidenceReviewPage(env,url){
+  const limit=20,before=Number(url.searchParams.get('before')||Date.now()+60000),afterId=url.searchParams.get('after_id')||'';
+  if(!Number.isFinite(before))throw new Error('INVALID_CURSOR');
+  const q=await env.FOOTBALL_DB.prepare('SELECT * FROM qsig_results WHERE signal_at < ? OR (signal_at = ? AND id > ?) ORDER BY signal_at DESC,id ASC LIMIT ?').bind(before,before,afterId,limit+1).all();
+  if(q.success===false||!Array.isArray(q.results))throw new Error('QSIG_READ_FAILED');
+  const page=(q.results||[]).slice(0,limit),cache=new Map(),reviews=[];
+  for(const row of page){
+    let signal;try{signal=JSON.parse(row.payload_json)}catch{signal={}}
+    if(!signal||typeof signal!=='object'||Array.isArray(signal))signal={};
+    signal={...signal,id:row.id,fixture_id:row.fixture_id,engine:row.engine,t0:signal.t0??row.signal_at};
+    const fid=Number(row.fixture_id);
+    if(!cache.has(fid)){
+      const result=await env.FOOTBALL_DB.prepare("SELECT * FROM live_snapshots WHERE fixture_id = ? AND source = 'EVIDENCE_FOLLOWUP' AND snapshot_kind = 'SOURCE_DETAIL' ORDER BY captured_at DESC LIMIT 400").bind(fid).all();
+      if(result.success===false||!Array.isArray(result.results))throw new Error('SOURCE_READ_FAILED');
+      cache.set(fid,(result.results||[]).map(x=>{let p={};try{p=JSON.parse(x.payload_json)}catch{}return {...x,payload:p}}));
+    }
+    reviews.push(reviewQsigEvidence(signal,cache.get(fid)));
+  }
+  const last=page.at(-1),more=(q.results||[]).length>limit;
+  return {ok:true,schema:'FE_EVIDENCE_REVIEW_EXPORT_V1',read_only:true,exported_at:new Date().toISOString(),rows:reviews,
+    next:more?{before:last.signal_at,after_id:last.id}:null,note:'Independent source review, not betting results. HC recorded states are not independently replayed.'};
 }
 function backgroundMarketSignature(odds){
   try{return JSON.stringify((odds||[]).map(r=>(r.odds||[]).map(b=>[b.name,(b.values||[]).map(v=>[v.value,v.handicap,v.odd,v.suspended])])))}catch{return ''}
@@ -325,7 +398,7 @@ export class BackgroundWatcher extends DurableObject {
         if(!j.pending){
           const fixtures=await this.api('/fixtures',{id:j.fixture_id},true),f=fixtures[0];
           if(!f)throw new Error('EVIDENCE_FIXTURE_UNAVAILABLE');
-          const health={};
+          const health={score:[f.goals?.home,f.goals?.away].every(v=>v!==null&&v!==undefined&&Number.isFinite(Number(v)))?'OK':'ERROR'};
           const read=async (name,path)=>{try{const rows=await this.api(path,{fixture:j.fixture_id},true);health[name]=rows.length?'OK':'EMPTY';return rows}catch(e){health[name]='ERROR';return []}};
           const [stats,events,odds]=await Promise.all([read('stats','/fixtures/statistics'),read('events','/fixtures/events'),read('odds','/odds/live')]);
           const captured=Date.now(),status=String(f.fixture?.status?.short||'');
@@ -340,9 +413,9 @@ export class BackgroundWatcher extends DurableObject {
         const p=j.pending,stmt=dbFixtureStmt(this.env,p,now);
         const result=await this.env.FOOTBALL_DB.batch([...(stmt?[stmt]:[]),dbLiveStmt(this.env,p,now)]);
         if(result.some(x=>x.success===false))throw new Error('EVIDENCE_D1_WRITE_FAILED');
-        j.done=TERMINAL.has(p.status)&&p.payload.source_health.events==='OK';
-        // No events in a finished 0-0 is legitimate; ERROR must still retry.
-        if(TERMINAL.has(p.status)&&p.payload.source_health.events==='EMPTY')j.done=true;
+        const health=p.payload.source_health,goals=p.payload.events_raw.filter(e=>String(e.type).toLowerCase()==='goal'&&!/miss|cancel|disallow|shootout/i.test(String(e.detail||'')));
+        // Terminal scores and event ledger must agree before collection stops.
+        j.done=TERMINAL.has(p.status)&&health.score==='OK'&&['OK','EMPTY'].includes(health.events)&&goals.length===Number(p.score_home)+Number(p.score_away);
         j.last_saved=p.captured_at;j.pending=null;j.last_error=null;
       }catch(e){j.last_error=runtimeMessage(e)}
       j.last_poll=Date.now();await this.ctx.storage.put(`evidence:${j.fixture_id}`,j);
