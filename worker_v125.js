@@ -20,6 +20,81 @@ function n(v,d=null){const x=Number(v);return Number.isFinite(x)?x:d}
 function s(v,max=240){return v==null?null:String(v).slice(0,max)}
 function payload(v){try{return JSON.stringify(v??null)}catch{return null}}
 function authorized(request,env){return !!env.BACKGROUND_TOKEN&&(request.headers.get("authorization")||"")===`Bearer ${env.BACKGROUND_TOKEN}`}
+function qsigOutcome(p){
+  if(p?.outcome!=null)return s(p.outcome,60);
+  const e=String(p?.engine||"").toUpperCase();
+  if(e==="FT"&&typeof p?.goal_10m==="boolean")return p.goal_10m?"HIT":"MISS";
+  if(e==="H1"&&typeof p?.goal_5m==="boolean")return p.goal_5m?"HIT":"MISS";
+  if(e==="HC"&&p?.state_15m!=null)return s(p.state_15m,60);
+  if(p?.data_state==="DATA_MISSING"||p?.background_state==="DATA_MISSING")return "DATA_MISSING";
+  return null;
+}
+function validationResult(p){
+  if(p?.outcome!=null)return s(p.outcome,80);
+  if(typeof p?.hit==="boolean")return p.hit?"HIT":"MISS";
+  return s(p?.resolution||null,80);
+}
+function fixtureStmt(env,p,now){
+  const fid=n(p?.fixture_id);if(!Number.isFinite(fid))return null;
+  return env.FOOTBALL_DB.prepare(`INSERT INTO fixtures (fixture_id,league,home,away,kickoff,status,first_seen_at,last_seen_at)
+    VALUES (?,?,?,?,?,?,?,?)
+    ON CONFLICT(fixture_id) DO UPDATE SET league=COALESCE(excluded.league,fixtures.league),home=COALESCE(excluded.home,fixtures.home),away=COALESCE(excluded.away,fixtures.away),kickoff=COALESCE(excluded.kickoff,fixtures.kickoff),status=COALESCE(excluded.status,fixtures.status),last_seen_at=MAX(fixtures.last_seen_at,excluded.last_seen_at)`)
+    .bind(fid,s(p?.league),s(p?.home),s(p?.away),n(p?.kickoff,null),s(p?.status,20),now,now);
+}
+function safeQsigStmt(env,p,now){
+  const outcome=qsigOutcome(p),resolved=n(p?.resolved_at??p?.closed_at,null);
+  return env.FOOTBALL_DB.prepare(`INSERT INTO qsig_results (id,fixture_id,engine,signal_at,resolved_at,outcome,payload_json)
+    VALUES (?,?,?,?,?,?,?)
+    ON CONFLICT(id) DO UPDATE SET
+      engine=excluded.engine,
+      signal_at=MIN(qsig_results.signal_at,excluded.signal_at),
+      resolved_at=CASE WHEN excluded.resolved_at IS NOT NULL THEN excluded.resolved_at ELSE qsig_results.resolved_at END,
+      outcome=CASE WHEN excluded.outcome IS NOT NULL THEN excluded.outcome ELSE qsig_results.outcome END,
+      payload_json=CASE WHEN excluded.outcome IS NULL AND qsig_results.outcome IS NOT NULL THEN qsig_results.payload_json ELSE excluded.payload_json END`)
+    .bind(s(p?.id,180),n(p?.fixture_id),s(p?.engine,20),n(p?.t0??p?.signal_at??p?.captured_at,now),resolved,outcome,payload(p));
+}
+function safeValidationStmt(env,p,now){
+  const result=validationResult(p);
+  return env.FOOTBALL_DB.prepare(`INSERT INTO validation_results (id,fixture_id,validation_type,created_at,result_key,payload_json)
+    VALUES (?,?,?,?,?,?)
+    ON CONFLICT(id) DO UPDATE SET
+      fixture_id=COALESCE(excluded.fixture_id,validation_results.fixture_id),
+      validation_type=excluded.validation_type,
+      created_at=MIN(validation_results.created_at,excluded.created_at),
+      result_key=CASE
+        WHEN (excluded.result_key IS NULL OR excluded.result_key IN ('OPEN','WAITING'))
+             AND validation_results.result_key IS NOT NULL
+             AND validation_results.result_key NOT IN ('OPEN','WAITING')
+        THEN validation_results.result_key ELSE excluded.result_key END,
+      payload_json=CASE
+        WHEN (excluded.result_key IS NULL OR excluded.result_key IN ('OPEN','WAITING'))
+             AND validation_results.result_key IS NOT NULL
+             AND validation_results.result_key NOT IN ('OPEN','WAITING')
+        THEN validation_results.payload_json ELSE excluded.payload_json END`)
+    .bind(s(p?.id,180),n(p?.fixture_id,null),s(p?.source||p?.sample_type||p?.engine||"VALIDATION",60),n(p?.captured_at??p?.created_at,now),result,payload(p));
+}
+async function safeEvidenceSync(env,events){
+  if(!env.FOOTBALL_DB)return {accepted:0,ignored:(events||[]).length};
+  const now=Date.now();let accepted=0,ignored=0;
+  for(let i=0;i<(events||[]).length;i+=20){
+    const stmts=[];
+    for(const evt of events.slice(i,i+20)){
+      const p=evt?.payload||{},type=String(evt?.type||"");
+      if(type==="QSIG_RESULT"&&p?.id&&Number.isFinite(n(p?.fixture_id))){
+        const fs=fixtureStmt(env,p,now);if(fs)stmts.push(fs);stmts.push(safeQsigStmt(env,p,now));accepted++;
+      }else if(type==="VALIDATION_RESULT"&&p?.id){
+        stmts.push(safeValidationStmt(env,p,now));accepted++;
+      }else ignored++;
+    }
+    if(stmts.length)await env.FOOTBALL_DB.batch(stmts);
+  }
+  return {accepted,ignored};
+}
+async function baseSync(request,env,ctx,events){
+  const u=new URL(request.url);
+  const init={method:"POST",headers:request.headers,body:JSON.stringify({events})};
+  return base.fetch(new Request(u.toString(),init),env,ctx);
+}
 function terminalTask(t){return ["RESOLVED","VOID","DATA_MISSING"].includes(String(t?.state||""))}
 function horizonFor(engine){return engine==="H1"?5:engine==="FT"?10:15}
 function targetFor(engine){return engine==="H1"?"GOAL_5M":engine==="FT"?"GOAL_10M":"STATE_15M"}
@@ -235,7 +310,21 @@ export default {
     const url=new URL(request.url);
     if(url.pathname==="/health"){
       const r=await base.fetch(request,env,ctx),d=await r.json().catch(()=>({}));
-      return json({...d,version:WORKER_VERSION,qsig_continuity:true,qsig_policy:QSIG_POLICY},r.status);
+      return json({...d,version:WORKER_VERSION,qsig_continuity:true,qsig_policy:QSIG_POLICY,monotonic_evidence_sync:true},r.status);
+    }
+    if(url.pathname==="/api/db/sync"&&request.method==="POST"){
+      if(!authorized(request,env))return json({error:"Unauthorized"},401);
+      const body=await request.json().catch(()=>({})),events=Array.isArray(body?.events)?body.events:[],
+            evidence=events.filter(x=>["QSIG_RESULT","VALIDATION_RESULT"].includes(String(x?.type||""))),
+            rest=events.filter(x=>!["QSIG_RESULT","VALIDATION_RESULT"].includes(String(x?.type||"")));
+      const br=await baseSync(request,env,ctx,rest);if(!br.ok)return br;
+      const bd=await br.json().catch(()=>({ok:false}));
+      try{
+        const ev=await safeEvidenceSync(env,evidence);
+        return json({ok:true,accepted:Number(bd.accepted||0)+ev.accepted,ignored:Number(bd.ignored||0)+ev.ignored,
+          schema_version:bd.schema_version||"V1.23.1",history_schema_version:bd.history_schema_version||null,
+          worker_version:WORKER_VERSION,monotonic_evidence_sync:true});
+      }catch(e){return json({ok:false,error:"QSIG_SAFE_SYNC_FAILED",message:String(e?.message||e).slice(0,500)},500)}
     }
     if(url.pathname.startsWith("/api/qsig/")){
       if(request.method==="OPTIONS")return json({ok:true});
