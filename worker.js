@@ -177,7 +177,7 @@ async function evidenceReviewPage(env,url){
     signal={...signal,id:row.id,fixture_id:row.fixture_id,engine:row.engine,t0:signal.t0??row.signal_at};
     const fid=Number(row.fixture_id);
     if(!cache.has(fid)){
-      const result=await env.FOOTBALL_DB.prepare("SELECT * FROM live_snapshots WHERE fixture_id = ? AND source = 'EVIDENCE_FOLLOWUP' AND snapshot_kind = 'SOURCE_DETAIL' ORDER BY captured_at DESC LIMIT 400").bind(fid).all();
+      const result=await env.FOOTBALL_DB.prepare("SELECT * FROM live_snapshots WHERE fixture_id = ? AND source = 'EVIDENCE_FOLLOWUP' AND snapshot_kind = 'SOURCE_DETAIL' ORDER BY captured_at DESC LIMIT 1").bind(fid).all();
       if(result.success===false||!Array.isArray(result.results))throw new Error('SOURCE_READ_FAILED');
       cache.set(fid,(result.results||[]).map(x=>{let p={};try{p=JSON.parse(x.payload_json)}catch{}return {...x,payload:p}}));
     }
