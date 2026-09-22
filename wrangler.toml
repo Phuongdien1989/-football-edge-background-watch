@@ -1,5 +1,5 @@
 name = "football-edge-background-watch"
-main = "worker_v124.js"
+main = "worker_v125.js"
 compatibility_date = "2026-09-11"
 
 [vars]
@@ -25,7 +25,7 @@ bindings = [
 tag = "v1"
 new_sqlite_classes = ["BackgroundWatcher"]
 
-# V1.23.1 core D1 + V1.23.3 history tables; V1.23.4 analytics is read-only and needs no schema migration
+# V1.23.1 core D1 + V1.23.3 history tables; V1.23.5 QSIG continuity uses existing D1 + Durable Object storage
 [[d1_databases]]
 binding = "FOOTBALL_DB"
 database_name = "football-edge-db"
