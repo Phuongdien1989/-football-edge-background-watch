@@ -1,0 +1,350 @@
+[
+  {
+    "name": "watchEvaluate",
+    "sha256": "204404b898f5da08c3c265bd4c9d1f98bd18cc41af4804325d328ebe34e599ab"
+  },
+  {
+    "name": "watchGameStateScore",
+    "sha256": "50ba4718c9fecb5ccf389f2703dbc3ac25fc727ceb01a956dbfd7d07154c4bda"
+  },
+  {
+    "name": "watchClamp",
+    "sha256": "bce5c698e25dc972ad57d73cbd4d228c37ea3504e9fb2cf95639c657cee4bb2f"
+  },
+  {
+    "name": "watchPressureScore",
+    "sha256": "1db59d7e5a9dd8c7f4c3cc7f012277dcfb711dd41cf59bc72c2084a161da10e6"
+  },
+  {
+    "name": "watchWindow",
+    "sha256": "5a3316b0162c7db67671091a1aab6929d02caa51dec85ff6aace3a2e07e989cb"
+  },
+  {
+    "name": "watchFindBaseline",
+    "sha256": "80c5000131f2c64ad730574cdea2c9d6535a0f5286c2e0406084af2dca9a40d5"
+  },
+  {
+    "name": "watchMetricDelta",
+    "sha256": "ef016919f28e96e5172cb43b04b201d832f6597951317825b5e9d822b59aa739"
+  },
+  {
+    "name": "watchMetricAvailable",
+    "sha256": "149b9b4fd249a58b801648a0801cbd5aa6ace3d9ac452ac50bcf74c541044eac"
+  },
+  {
+    "name": "watchChanceScore",
+    "sha256": "57040f2f057f712ac598d0fc22252bf2e77d99aff72a4d44be7085fd5f55a19b"
+  },
+  {
+    "name": "watchMomentum",
+    "sha256": "23b012dc6501e486388ad8638f255259943b72103b64280fe81848628622456a"
+  },
+  {
+    "name": "watchMarketScore",
+    "sha256": "709144500833d1793f88d8535d46ab3b0dd3ee28163c86b777cccc899cb80999"
+  },
+  {
+    "name": "watchContextScore",
+    "sha256": "32f00cf3cf5176e2c890892573b89824d56169aca59a2aa44dbc55a257ab23de"
+  },
+  {
+    "name": "watchQualityScore",
+    "sha256": "6845f31025d06d4fd4185565e16bdda8ce78b2ac0d9225d60b56bf26da5b45ba"
+  },
+  {
+    "name": "watchHistoryAge",
+    "sha256": "1bc1af9c79dfacd00c72d4297c0b8a29f899e7a52b21f902de0f1f7908da3841"
+  },
+  {
+    "name": "watchCore",
+    "sha256": "b453ef98812f802bd319d78c32be7f00a1018424b39f66c6dc000ac5627907ad"
+  },
+  {
+    "name": "grEstimate",
+    "sha256": "418a119530e793ff59a104cf2198c7c2710e40395242990657cfaa326fa3ac6e"
+  },
+  {
+    "name": "grFallback",
+    "sha256": "691630ddb3cd280bbba3bc657bdd0178cebd1cc51d3bf124ea2b0011e244705c"
+  },
+  {
+    "name": "grClamp",
+    "sha256": "88f5b041e109594f9a99c4de0e2a17830a908fcd34521fd7b14d22b931fc8400"
+  },
+  {
+    "name": "grReliability",
+    "sha256": "8ae053e2278c5e0d67b23c69f2d5e4fe00f7109f70c42b79331deb7dfa116c30"
+  },
+  {
+    "name": "grResolved",
+    "sha256": "9f10667ca44d1b6fc889f2ba18519a6930acce55bf77406480a898947e7bdc2d"
+  },
+  {
+    "name": "h1WatchTier",
+    "sha256": "6505c14bfc90914a40b51f8e49de46eab3d7e90e68ac459145651aae6bbb043d"
+  },
+  {
+    "name": "h1WatchThresholds",
+    "sha256": "2cae59df3012c74b3837d084687c44aab86a603e11aa6f7ff649c4758ccb42f6"
+  },
+  {
+    "name": "h1WatchLearnedStrong",
+    "sha256": "4b672ee861a1f99b2d441f1c7392fd86b31b678e796657c8cb244f22a133f3e2"
+  },
+  {
+    "name": "watchTierForScore",
+    "sha256": "b7b00e3f94c4382af6a226157bd502a87b220b46ef10022d8967bfff3fa99c0e"
+  },
+  {
+    "name": "watchThresholds",
+    "sha256": "3124e81cbcc4a47d13813b26bf0ba18a7da08d29962821376e1cd77c2528d208"
+  },
+  {
+    "name": "watchLearnedStrong",
+    "sha256": "ec99fc97f95c0823c0c82e2aa9fe2e0ec5cf9e317b704dd49f3b7da32103dad1"
+  },
+  {
+    "name": "hcTeamStates",
+    "sha256": "0ad8be6e5e30cbd7a1561c37ce84231e5bdc068c4171ebcc3aa3420920822135"
+  },
+  {
+    "name": "hcShare",
+    "sha256": "fcba459782a983d4268412c6df4788b44a91d63b077101bd1f11297545605007"
+  },
+  {
+    "name": "hcSideIndex",
+    "sha256": "f29dab9926fdcee020cd47cbd68dcb91ad26dc045a4074e615b1c6888f31ea8e"
+  },
+  {
+    "name": "hcWindow",
+    "sha256": "f2d63f05db2e0dae90b4e5ea2f1a3433eee2ee98a6d6a45aa0463c82d931757d"
+  },
+  {
+    "name": "hcFindBase",
+    "sha256": "bb38a69b5c3d58dfe52a4fde9138c192aecb691d01998bcdb96aaafd264f621c"
+  },
+  {
+    "name": "hcMetricDelta",
+    "sha256": "ddf69a1a28f781f24cf5623a1b9d55e4f9ccb26162af593d9210752b1d2e3210"
+  },
+  {
+    "name": "hcGameRegime",
+    "sha256": "3931cd3cc995ed2ca140b5d89b77ffc510ade6c2b97da5304293efa348b13f3c"
+  },
+  {
+    "name": "handicapAggregate",
+    "sha256": "6b385c63dfb7787089872f55b30d076c7554d4b59ac9c1920f6257d76e1e2938"
+  },
+  {
+    "name": "handicapSideMetrics",
+    "sha256": "31e86181f95757271089133f46c660eb4fd87525a04b9aab3a20cd600e05cbdf"
+  },
+  {
+    "name": "hcStat",
+    "sha256": "c44c19b31810cd43fe5edea7df80c9ea1d245c8fb4f1228b384462daf37566a0"
+  },
+  {
+    "name": "getAnyStat",
+    "sha256": "00cfd8baae490fc6937909c644b3ebbe4f468cfe01aadd590fb140f0413041aa"
+  },
+  {
+    "name": "compactNum",
+    "sha256": "429f8010381d392bd6e5857e7a95c2827ea3421dcfd88a885388bdad7b8377cf"
+  },
+  {
+    "name": "watchNum",
+    "sha256": "6844ee50fe7a4feff869d6ba66181425d41e716a04c546d6b6cd12b2fd3a1d52"
+  },
+  {
+    "name": "statMap",
+    "sha256": "697491fb925ca5dbb12e2a7355c41762447714d1f168b8ab0a502693681034d2"
+  },
+  {
+    "name": "statListToObject",
+    "sha256": "66e94184036ef380bb3964dff1882e173e313ebd18f0f5db5126ac379e978d0f"
+  },
+  {
+    "name": "normalizeLiveMarkets",
+    "sha256": "b51d4b64163c5f4a3ad1a74b1b234072e8ce435226fba191372d6ea69ee52787"
+  },
+  {
+    "name": "marketContextFromResponse",
+    "sha256": "62c0c2748139de9c2f23ef64bd5e01e20a4c64b7bb1f8b1269b5a2efd89c9847"
+  },
+  {
+    "name": "marketIdentity",
+    "sha256": "4711de3ade192addddeb8139419b4c56d98050e3bd60e8b634371c1b0c7e4fad"
+  },
+  {
+    "name": "betReferenceLookup",
+    "sha256": "c86f90953661e40c30e09f6358b3b0cc6f49f19f9fdd4cde243331f9529da834"
+  },
+  {
+    "name": "marketCategoryFromName",
+    "sha256": "f5e4faab09b8a5eb0ef196d44decbdd3bb84a947e6c8eb728d1862e4c6e9679b"
+  },
+  {
+    "name": "compactOddsValues",
+    "sha256": "d70b10e84555543457847a7934034d41bad0fed7800a724d8b5b93646215bb02"
+  },
+  {
+    "name": "numericHandicap",
+    "sha256": "5af9748609db09eab85d4307ad73d4f3b8881221f4a6782d2f80953377113a36"
+  },
+  {
+    "name": "handicapFromLabel",
+    "sha256": "14149dcd1c38f44a6e6f5323b648fd8b9dae764cb1190fe27c98e9c844f8660a"
+  },
+  {
+    "name": "selectionOutcome",
+    "sha256": "f1c9006db668df144e6a5a723e552174d32b33ba3c65ecd1e6b20b8e1caca9a4"
+  },
+  {
+    "name": "normalizedKey",
+    "sha256": "d3d85d8dff15abc675a55486745d5dd471bc6d3fb7aecf6887058ebd4cc00b08"
+  },
+  {
+    "name": "selectionSide",
+    "sha256": "3b6a3567ea42c8d4e39a6ba2bfc47d60d0e589dbb96fb2574337fb48b602100d"
+  },
+  {
+    "name": "isLive",
+    "sha256": "1e4484c57d3bb0ab282337035d455fb04d2fc5cce475df5c6f09a43c3c4d1ab2"
+  },
+  {
+    "name": "marketIntegrity",
+    "sha256": "d9f5c73feaf341ba3d691e25fc46e8d80f796ef52c70f16db044273bc666d312"
+  },
+  {
+    "name": "asianHandicapIntegrity",
+    "sha256": "ab21deed3b76bde1d6cb2e0b514c47c0a7ee9a874064c402b25293c909dd7623"
+  },
+  {
+    "name": "sameAbs",
+    "sha256": "b2b3051e6dd149d13be7da039e91cf9b09cf559444e08787a83f09feeb2cbc53"
+  },
+  {
+    "name": "handicapResultIntegrity",
+    "sha256": "d61e25091cf8db2060bd4831b51bc9d3720e6990498d1eb748c9181916334728"
+  },
+  {
+    "name": "status",
+    "sha256": "222aa9af9ee868e6ff3b1abbf765fbe1494bcff769ddb203371b896c30506877"
+  },
+  {
+    "name": "watchMarketInfo",
+    "sha256": "bf7485f7b1ee339d3d6420034095b7a2ef19fcb42f3fc94d6da5ce62a1a55845"
+  },
+  {
+    "name": "xienMarketText",
+    "sha256": "b073064ae8a9127d0a14e8d813d40525cc0b193e9de3fce472a6cd7528eecdac"
+  },
+  {
+    "name": "watchBestOver",
+    "sha256": "7a9ee07edbd0505dd11bef30383caa087bb4dd383672e11402d40e118a330078"
+  },
+  {
+    "name": "betTrackerLineFromValue",
+    "sha256": "52307179c6d2ad7850d6fd95e77864fb16b5b2ccec47bbecc0cc5ceaca53ae81"
+  },
+  {
+    "name": "watchOverPriceFromMap",
+    "sha256": "04c2cc4cb269e2ccb6e5c2a0cdaddbbdfbbb06a4631992f93b3d535272624eab"
+  },
+  {
+    "name": "movementCompactText",
+    "sha256": "bfae3760489563e90d1bb64daadfc3b0a78bb3208b5c9c1d88f34947b002edf1"
+  },
+  {
+    "name": "summarizeLiveOddsHistory",
+    "sha256": "672fbbb62327b3ff38bb32f7dc33342c5988e5fd98cc4fdec462121db49aac17"
+  },
+  {
+    "name": "movementForCategory",
+    "sha256": "7355621d274c8c4b8653d97bc9b6dc5d23b2ca8bfc3d8c26bf27cfb24256c053"
+  },
+  {
+    "name": "numericMaybe",
+    "sha256": "1dd96c7f46a564391aa663e61a690d54f88ae613b857aad0830c212d769a7dab"
+  },
+  {
+    "name": "priceMap",
+    "sha256": "f0821a4bdffd178a544e0125d42bcd2001acfcb085a1db37b9c5d3877a9b2518"
+  },
+  {
+    "name": "createLiveOddsSnapshot",
+    "sha256": "448e3577602bedcbaa8dda85791953bebbf6bcb19b6dc5d5d66cfe4280d83cee"
+  },
+  {
+    "name": "compactMovementLine",
+    "sha256": "44d95b039b2fc52b9b5e430a2b0f57d274bce6725111cd3f10c1d00d028286c8"
+  },
+  {
+    "name": "marketValueKey",
+    "sha256": "da076553e170b27e9a7cf7ce269e32ec0dc146af08e5bd1ec0cd2a251e973d50"
+  },
+  {
+    "name": "liveSnapshotFingerprint",
+    "sha256": "ed32c827b521ac3bf2ca79e4dc49fe1bbf8f660d35574bd06d96b7229927d4a1"
+  },
+  {
+    "name": "eventsCompact",
+    "sha256": "aa5975958efd42bfa5389a6a3196c03a81d01db500da3e1c1169a29346b2c32d"
+  },
+  {
+    "name": "normalizeHalfStatistics",
+    "sha256": "bde7edf290f419db52ae661a7339aaab756159dfbb2cca3bcbdd4f34fc365346"
+  },
+  {
+    "name": "halfLabel",
+    "sha256": "d4ef60a2f3a6461e059981bf0aca5b4f88f7fe7332def77946da75a1e160775f"
+  },
+  {
+    "name": "assignSegment",
+    "sha256": "15b9f1f806679862388c6a5f574fb1ef8063322f7b06eadb5478949e92c43839"
+  },
+  {
+    "name": "deriveH2",
+    "sha256": "0f8d43cfe045e57411b368f98f15fc4eb3208d5792d8b6191e8bcd15775934c2"
+  },
+  {
+    "name": "additiveStatName",
+    "sha256": "4c926cf5199513ca5d20237715808e61e8f94d039e70ae4064d8694d65edeb33"
+  },
+  {
+    "name": "numericStat",
+    "sha256": "758cd940521ae7e22e104740bd7eb013614c63c63cf63c7d7bc71b9a7a81ea74"
+  },
+  {
+    "name": "watchAggregate",
+    "sha256": "788ebb251258222684be148c9353c052ecfee81be3f863bce41f98a4784bcbbb"
+  },
+  {
+    "name": "watchSideMetrics",
+    "sha256": "b7ffe439478d70e77a0c2b84d06c82db91da4eac35238ec042f73cbbd248bb05"
+  },
+  {
+    "name": "watchStatsPresence",
+    "sha256": "ae115c2f41813dde315de89ac7f2cc2638fffd7ff9970c2738aff77a4f959dc5"
+  },
+  {
+    "name": "groupCoverageScore",
+    "sha256": "e1d67e50dd7174ac2430316db134472d45dc7872aa878b87d4ba49fef5de56d0"
+  },
+  {
+    "name": "dataQuality",
+    "sha256": "a43bea1080f3e0445d893a36c577c465c498792cf63dd4f69529a6b45abceea5"
+  },
+  {
+    "name": "marketIntegrityScore",
+    "sha256": "a0e796d44034d8d7ca364454eb1dc8847a0a4a828e4b7f84ac4d3a13997aa46a"
+  },
+  {
+    "name": "marketFreshness",
+    "sha256": "511cd3f5ef9119818d4748e55ea5ce58545c1527bb8f17733dfe8c56524432ce"
+  },
+  {
+    "name": "parseUpdateMs",
+    "sha256": "23495d836094989a61fbb45d566ab8f1d26516acf69fa8fa04ff4a6e972434f7"
+  }
+]
