@@ -32,6 +32,15 @@ export class BackgroundWatcher extends RetryWatcher{
       }catch(e){return reply({error:String(e?.message||e).slice(0,160)},500)}
     }
 
+    if(path==='/api/notify/scan-now'){
+      if(request.method==='OPTIONS')return reply({ok:true});
+      if(request.method!=='POST')return reply({error:'METHOD_NOT_ALLOWED'},405);
+      const control=await this.scanControl();
+      if(!control.enabled)return reply({ok:false,error:'SCAN_PAUSED'},409);
+      await this.ctx.storage.setAlarm(Date.now()+250);
+      return reply({ok:true,scheduled:true});
+    }
+
     if(path==='/api/notify/status'&&request.method==='GET'){
       const r=await super.fetch(request),d=await r.json().catch(()=>({}));
       const control=await this.scanControl();
