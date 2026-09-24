@@ -1,0 +1,6 @@
+/* Football Edge Native N0.2 — native-only compatibility layer. */
+body.fe-native-shell #fePushEnableBtn,
+body.fe-native-shell #fePushLocalTestBtn,
+body.fe-native-shell #fePushServerTestBtn{display:none!important}
+body.fe-native-shell #fePushStatus::before{content:"NATIVE SHELL • ";font-weight:900}
+body.fe-native-shell #fePushStatus{border-style:dashed!important}
