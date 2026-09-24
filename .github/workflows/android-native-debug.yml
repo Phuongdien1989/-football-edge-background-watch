@@ -36,9 +36,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
           echo "ANDROID_HOME=$ANDROID_HOME"
-          sdkmanager --version
-          sdkmanager "platform-tools" "platforms;android-36" "build-tools;36.0.0"
+          "$SDKMANAGER" --version
+          "$SDKMANAGER" "platform-tools" "platforms;android-36" "build-tools;36.0.0"
 
       - name: Prepare frozen web baseline
         shell: bash
