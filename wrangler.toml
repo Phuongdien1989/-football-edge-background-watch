@@ -1,10 +1,11 @@
 name = "football-edge-background-watch"
-main = "worker_notify_v130.js"
+main = "worker_notify_v131.js"
 compatibility_flags = ["nodejs_compat"]
 compatibility_date = "2026-09-11"
 
 [vars]
 NOTIFY_DAILY_BUDGET = "30000"
+VALIDATION_DAILY_BUDGET = "5000"
 APISPORTS_BASE = "https://v3.football.api-sports.io"
 TZ = "Asia/Ho_Chi_Minh"
 FOCUS_INTERVAL_MS = "30000"
@@ -27,7 +28,7 @@ bindings = [
 tag = "v1"
 new_sqlite_classes = ["BackgroundWatcher"]
 
-# V1.23.1 core D1 + V1.23.3 history tables; V1.23.4 analytics is read-only and needs no schema migration
+# V1.23.1 core D1 + V1.23.3 history tables; push validation reuses validation_results and needs no schema migration
 [[d1_databases]]
 binding = "FOOTBALL_DB"
 database_name = "football-edge-db"
