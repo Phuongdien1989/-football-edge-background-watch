@@ -1,6 +1,15 @@
-/* Football Edge Native N0.2 — native-only compatibility layer. */
+/* Football Edge Native N1.0 — native-only compatibility layer. */
 body.fe-native-shell #fePushEnableBtn,
+body.fe-native-shell #fePushSaveBtn,
 body.fe-native-shell #fePushLocalTestBtn,
 body.fe-native-shell #fePushServerTestBtn{display:none!important}
-body.fe-native-shell #fePushStatus::before{content:"NATIVE SHELL • ";font-weight:900}
+body.fe-native-shell #fePushStatus::before{content:"NATIVE • ";font-weight:900}
 body.fe-native-shell #fePushStatus{border-style:dashed!important}
+body.fe-native-shell .fe-native-push-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
+body.fe-native-shell .fe-native-push-actions button{width:100%;min-height:42px;font-size:8px;font-weight:900;line-height:1.2;padding:8px;white-space:normal}
+body.fe-native-shell .fe-native-push-actions button:last-child{grid-column:1/-1}
+body.fe-native-shell .fe-native-push-meta{margin-top:7px;padding:8px 9px;border:1px dashed var(--line);border-radius:10px;font-size:7px;line-height:1.45;color:var(--muted)}
+@media(max-width:520px){
+  body.fe-native-shell .fe-native-push-actions{grid-template-columns:1fr 1fr}
+  body.fe-native-shell .fe-native-push-actions button{min-height:40px;font-size:7.2px}
+}
