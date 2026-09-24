@@ -19,6 +19,8 @@ jobs:
     env:
       FIREBASE_GOOGLE_SERVICES_JSON: ${{ secrets.FIREBASE_GOOGLE_SERVICES_JSON }}
       FCM_SERVICE_ACCOUNT_JSON: ${{ secrets.FCM_SERVICE_ACCOUNT_JSON }}
+      BACKGROUND_TOKEN: ${{ secrets.BACKGROUND_TOKEN }}
+      BACKGROUND_WORKER_URL: https://football-edge-background-watch.ngophuonghuy.workers.dev
 
     steps:
       - name: Checkout
@@ -49,6 +51,11 @@ jobs:
           test -n "${FIREBASE_GOOGLE_SERVICES_JSON:-}" || { echo 'Missing FIREBASE_GOOGLE_SERVICES_JSON'; exit 1; }
           test -n "${FCM_SERVICE_ACCOUNT_JSON:-}" || { echo 'Missing FCM_SERVICE_ACCOUNT_JSON'; exit 1; }
           echo 'Required Firebase secrets are present.'
+          if [ -n "${BACKGROUND_TOKEN:-}" ]; then
+            echo 'BACKGROUND_TOKEN present: production Worker E2E enabled.'
+          else
+            echo 'BACKGROUND_TOKEN absent: production Worker E2E will be skipped.'
+          fi
 
       - name: Prepare native web baseline
         shell: bash
@@ -128,7 +135,7 @@ jobs:
               method='POST')
           try:
               with urllib.request.urlopen(req, timeout=30) as r:
-                  body=r.read().decode('utf-8','replace')
+                  r.read()
                   print('FIS_HTTP=' + str(r.status))
                   print('FIS_CLIENT_AUTH=PASS')
           except urllib.error.HTTPError as e:
