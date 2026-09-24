@@ -1,5 +1,5 @@
 name = "football-edge-background-watch"
-main = "worker_notify_v131.js"
+main = "worker_notify_v132_native.js"
 compatibility_flags = ["nodejs_compat"]
 compatibility_date = "2026-09-11"
 
@@ -18,6 +18,8 @@ MAX_FOCUS_WATCHES = "16"
 WATCH_PERSIST_HEARTBEAT_MS = "300000"
 LOOKUP_FOCUS_MS = "120000"
 LOOKUP_SCREEN_MS = "300000"
+APNS_BUNDLE_ID = "vn.footballedge.app"
+APNS_ENV = "sandbox"
 
 [durable_objects]
 bindings = [
@@ -28,7 +30,7 @@ bindings = [
 tag = "v1"
 new_sqlite_classes = ["BackgroundWatcher"]
 
-# V1.23.1 core D1 + V1.23.3 history tables; push validation reuses validation_results and needs no schema migration
+# V1.23.1 core D1 + V1.23.3 history tables; N1 native Push adds only DO storage keys and requires no D1 migration
 [[d1_databases]]
 binding = "FOOTBALL_DB"
 database_name = "football-edge-db"

@@ -1,0 +1,114 @@
+name: Football Edge Android Debug
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - native-cloud-build
+    paths:
+      - 'native/**'
+      - 'worker_notify_v132_native.js'
+      - '.github/workflows/android-native-debug.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  build-android-debug:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Setup Java 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Verify hosted Android SDK
+        shell: bash
+        run: |
+          set -euo pipefail
+          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          echo "ANDROID_HOME=$ANDROID_HOME"
+          "$SDKMANAGER" --version
+          "$SDKMANAGER" "platform-tools" "platforms;android-36" "build-tools;36.0.0"
+
+      - name: Prepare frozen web baseline
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd native
+          mkdir -p www
+
+          FRONTEND='https://shiny-silence-d892.ngophuonghuy.workers.dev'
+          curl -fsSL --retry 3 "$FRONTEND/" -o www/index.html
+          curl -fsSL --retry 3 "$FRONTEND/push-sw.js" -o www/push-sw.js
+
+          echo '16fe0c6ef7b753af1fd62d8378dc9ba934f0f88baeac2835bdf7633d5571396c  www/index.html' | sha256sum -c -
+          echo '8909f051ddaae2660ccda8cd32663af1c279b2b7b38d4f0ce4af34d3df4210eb  www/push-sw.js' | sha256sum -c -
+
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('www/index.html')
+          s=p.read_text(encoding='utf-8')
+          css='<link rel="stylesheet" href="./native-shell.css">'
+          js='<script src="./native-shell.js"></script>'
+          if css not in s:
+              s=s.replace('</head>',css+'\n</head>',1)
+          if js not in s:
+              s=s.replace('</body>',js+'\n</body>',1)
+          p.write_text(s,encoding='utf-8')
+          PY
+
+      - name: Static syntax checks
+        run: |
+          node --check native/www/native-shell.js
+          node --check worker_notify_v132_native.js
+
+      - name: Install Capacitor dependencies
+        working-directory: native
+        run: npm install
+
+      - name: Generate Android project
+        working-directory: native
+        run: npx cap add android
+
+      - name: Inject Firebase Android config when available
+        shell: bash
+        env:
+          FIREBASE_GOOGLE_SERVICES_JSON_B64: ${{ secrets.FIREBASE_GOOGLE_SERVICES_JSON_B64 }}
+        run: |
+          set -euo pipefail
+          if [ -n "${FIREBASE_GOOGLE_SERVICES_JSON_B64:-}" ]; then
+            printf '%s' "$FIREBASE_GOOGLE_SERVICES_JSON_B64" | base64 --decode > native/android/app/google-services.json
+            echo "Firebase Android config injected."
+          else
+            echo "Firebase Android config not configured yet; building shell without FCM runtime registration."
+          fi
+
+      - name: Sync Capacitor
+        working-directory: native
+        run: npx cap sync android
+
+      - name: Build debug APK
+        working-directory: native/android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: football-edge-android-debug
+          path: native/android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 14
