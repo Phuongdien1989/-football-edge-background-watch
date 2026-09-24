@@ -93,6 +93,60 @@ jobs:
           print('Firebase package PASS: vn.footballedge.app')
           PY
 
+      - name: Diagnose Firebase client registration auth
+        shell: bash
+        run: |
+          python - <<'PY'
+          import base64, json, os, urllib.error, urllib.request
+          from pathlib import Path
+
+          gs=json.loads(Path('native/android/app/google-services.json').read_text())
+          sa=json.loads(os.environ['FCM_SERVICE_ACCOUNT_JSON'])
+          project_id=gs.get('project_info',{}).get('project_id')
+          project_number=str(gs.get('project_info',{}).get('project_number') or '')
+          clients=[c for c in gs.get('client',[]) if c.get('client_info',{}).get('android_client_info',{}).get('package_name')=='vn.footballedge.app']
+          assert clients, 'Android client not found'
+          client=clients[0]
+          app_id=client.get('client_info',{}).get('mobilesdk_app_id')
+          api_keys=client.get('api_key') or []
+          api_key=(api_keys[0] or {}).get('current_key') if api_keys else None
+          print('PROJECT_MATCH=' + ('PASS' if project_id and project_id==sa.get('project_id') else 'FAIL'))
+          print('PROJECT_NUMBER_PRESENT=' + ('PASS' if project_number else 'FAIL'))
+          print('APP_ID_PRESENT=' + ('PASS' if app_id else 'FAIL'))
+          print('API_KEY_PRESENT=' + ('PASS' if api_key else 'FAIL'))
+          if not (project_id and app_id and api_key):
+              raise SystemExit('Firebase client config incomplete')
+
+          raw=bytearray(os.urandom(17))
+          raw[0]=(raw[0]&0x0F)|0x70
+          fid=base64.urlsafe_b64encode(bytes(raw)).decode().rstrip('=')[:22]
+          payload=json.dumps({'fid':fid,'appId':app_id,'authVersion':'FIS_v2','sdkVersion':'a:18.0.0'}).encode()
+          req=urllib.request.Request(
+              f'https://firebaseinstallations.googleapis.com/v1/projects/{project_id}/installations',
+              data=payload,
+              headers={'Content-Type':'application/json','Accept':'application/json','x-goog-api-key':api_key},
+              method='POST')
+          try:
+              with urllib.request.urlopen(req, timeout=30) as r:
+                  body=r.read().decode('utf-8','replace')
+                  print('FIS_HTTP=' + str(r.status))
+                  print('FIS_CLIENT_AUTH=PASS')
+          except urllib.error.HTTPError as e:
+              body=e.read().decode('utf-8','replace')
+              print('FIS_HTTP=' + str(e.code))
+              print('FIS_CLIENT_AUTH=FAIL')
+              try:
+                  obj=json.loads(body)
+                  err=obj.get('error',{})
+                  print('FIS_ERROR_STATUS=' + str(err.get('status','UNKNOWN')))
+                  print('FIS_ERROR_MESSAGE=' + str(err.get('message','UNKNOWN'))[:500])
+              except Exception:
+                  print('FIS_ERROR_BODY_UNPARSED')
+          except Exception as e:
+              print('FIS_CLIENT_AUTH=ERROR')
+              print('FIS_EXCEPTION=' + type(e).__name__ + ':' + str(e)[:300])
+          PY
+
       - name: Sync Capacitor
         working-directory: native
         run: npx cap sync android
