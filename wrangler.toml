@@ -4,7 +4,7 @@ compatibility_flags = ["nodejs_compat"]
 compatibility_date = "2026-09-11"
 
 [vars]
-NOTIFY_DAILY_BUDGET = "30000"
+NOTIFY_DAILY_BUDGET = "40000"
 VALIDATION_DAILY_BUDGET = "5000"
 APISPORTS_BASE = "https://v3.football.api-sports.io"
 TZ = "Asia/Ho_Chi_Minh"
