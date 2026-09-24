@@ -4,7 +4,9 @@ on:
   workflow_dispatch:
   push:
     branches:
+      - main
       - native-cloud-build
+      - n1-firebase-setup
     paths:
       - 'native/**'
       - 'worker_notify_v132_native.js'
@@ -85,14 +87,36 @@ jobs:
       - name: Inject Firebase Android config when available
         shell: bash
         env:
+          FIREBASE_GOOGLE_SERVICES_JSON: ${{ secrets.FIREBASE_GOOGLE_SERVICES_JSON }}
           FIREBASE_GOOGLE_SERVICES_JSON_B64: ${{ secrets.FIREBASE_GOOGLE_SERVICES_JSON_B64 }}
         run: |
           set -euo pipefail
-          if [ -n "${FIREBASE_GOOGLE_SERVICES_JSON_B64:-}" ]; then
-            printf '%s' "$FIREBASE_GOOGLE_SERVICES_JSON_B64" | base64 --decode > native/android/app/google-services.json
-            echo "Firebase Android config injected."
+          TARGET='native/android/app/google-services.json'
+          if [ -n "${FIREBASE_GOOGLE_SERVICES_JSON:-}" ]; then
+            printf '%s' "$FIREBASE_GOOGLE_SERVICES_JSON" > "$TARGET"
+            echo "Firebase Android config injected from raw JSON secret."
+          elif [ -n "${FIREBASE_GOOGLE_SERVICES_JSON_B64:-}" ]; then
+            printf '%s' "$FIREBASE_GOOGLE_SERVICES_JSON_B64" | base64 --decode > "$TARGET"
+            echo "Firebase Android config injected from base64 secret."
           else
             echo "Firebase Android config not configured yet; building shell without FCM runtime registration."
+          fi
+
+          if [ -f "$TARGET" ]; then
+            python - <<'PY'
+          import json
+          from pathlib import Path
+          p=Path('native/android/app/google-services.json')
+          data=json.loads(p.read_text(encoding='utf-8'))
+          packages=[]
+          for client in data.get('client',[]):
+              name=(client.get('client_info',{}).get('android_client_info',{}).get('package_name'))
+              if name: packages.append(name)
+          expected='vn.footballedge.app'
+          if expected not in packages:
+              raise SystemExit(f'google-services.json does not contain expected package {expected}; found {packages}')
+          print(f'Firebase package verified: {expected}')
+          PY
           fi
 
       - name: Sync Capacitor
