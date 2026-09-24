@@ -7,6 +7,7 @@ on:
       - native-cloud-build
     paths:
       - 'native/**'
+      - 'worker_notify_v132_native.js'
       - '.github/workflows/android-native-debug.yml'
 
 permissions:
@@ -68,6 +69,11 @@ jobs:
           p.write_text(s,encoding='utf-8')
           PY
 
+      - name: Static syntax checks
+        run: |
+          node --check native/www/native-shell.js
+          node --check worker_notify_v132_native.js
+
       - name: Install Capacitor dependencies
         working-directory: native
         run: npm install
@@ -75,6 +81,19 @@ jobs:
       - name: Generate Android project
         working-directory: native
         run: npx cap add android
+
+      - name: Inject Firebase Android config when available
+        shell: bash
+        env:
+          FIREBASE_GOOGLE_SERVICES_JSON_B64: ${{ secrets.FIREBASE_GOOGLE_SERVICES_JSON_B64 }}
+        run: |
+          set -euo pipefail
+          if [ -n "${FIREBASE_GOOGLE_SERVICES_JSON_B64:-}" ]; then
+            printf '%s' "$FIREBASE_GOOGLE_SERVICES_JSON_B64" | base64 --decode > native/android/app/google-services.json
+            echo "Firebase Android config injected."
+          else
+            echo "Firebase Android config not configured yet; building shell without FCM runtime registration."
+          fi
 
       - name: Sync Capacitor
         working-directory: native
