@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+REPORT='/tmp/fcm-runtime-report.txt'
 APK='native/android/app/build/outputs/apk/debug/app-debug.apk'
 adb install -r "$APK"
 adb shell pm grant vn.footballedge.app android.permission.POST_NOTIFICATIONS || true
@@ -22,7 +23,7 @@ done
 if [ -z "$TOKEN" ]; then
   echo 'FCM token was not generated.'
   adb logcat -d -s FE_FCM_TEST:I '*:S' || true
-  printf 'TOKEN_GENERATION=FAIL\nFCM_SEND=NOT_RUN\nNOTIFICATION_RECEIPT=NOT_RUN\n' > /tmp/fcm-runtime-report.txt
+  printf 'TOKEN_GENERATION=FAIL\nFCM_SEND=NOT_RUN\nNOTIFICATION_RECEIPT=NOT_RUN\nWORKER_CAPS=NOT_RUN\nWORKER_SUBSCRIBE=NOT_RUN\nWORKER_TEST=NOT_RUN\nWORKER_NOTIFICATION=NOT_RUN\n' > "$REPORT"
   exit 1
 fi
 
@@ -33,7 +34,7 @@ echo "FCM token generation PASS • length=${#TOKEN} • sha256=${HASH16}…"
 
 if [ -z "${FCM_SERVICE_ACCOUNT_JSON:-}" ]; then
   echo 'FCM direct-send phase cannot run because FCM_SERVICE_ACCOUNT_JSON is empty.'
-  printf 'TOKEN_GENERATION=PASS\nFCM_SEND=NO_CREDENTIAL\nNOTIFICATION_RECEIPT=NOT_RUN\n' > /tmp/fcm-runtime-report.txt
+  printf 'TOKEN_GENERATION=PASS\nFCM_SEND=NO_CREDENTIAL\nNOTIFICATION_RECEIPT=NOT_RUN\nWORKER_CAPS=NOT_RUN\nWORKER_SUBSCRIBE=NOT_RUN\nWORKER_TEST=NOT_RUN\nWORKER_NOTIFICATION=NOT_RUN\n' > "$REPORT"
   exit 1
 fi
 
@@ -62,7 +63,7 @@ NODE
 
 RECEIVED=0
 for i in $(seq 1 20); do
-  if adb shell dumpsys notification --noredact | grep -q 'Football Edge CI Native Push'; then
+  if adb shell dumpsys notification --noredact | grep -Fq 'Football Edge CI Native Push'; then
     RECEIVED=1
     break
   fi
@@ -72,9 +73,84 @@ done
 if [ "$RECEIVED" != '1' ]; then
   echo 'FCM send succeeded but Android notification was not observed.'
   adb shell dumpsys notification --noredact | tail -n 240 || true
-  printf 'TOKEN_GENERATION=PASS\nFCM_SEND=PASS\nNOTIFICATION_RECEIPT=FAIL\n' > /tmp/fcm-runtime-report.txt
+  printf 'TOKEN_GENERATION=PASS\nFCM_SEND=PASS\nNOTIFICATION_RECEIPT=FAIL\nWORKER_CAPS=NOT_RUN\nWORKER_SUBSCRIBE=NOT_RUN\nWORKER_TEST=NOT_RUN\nWORKER_NOTIFICATION=NOT_RUN\n' > "$REPORT"
   exit 1
 fi
 
 echo 'Android notification receipt PASS'
-printf 'TOKEN_GENERATION=PASS\nFCM_SEND=PASS\nNOTIFICATION_RECEIPT=PASS\n' > /tmp/fcm-runtime-report.txt
+
+if [ -z "${BACKGROUND_TOKEN:-}" ]; then
+  echo 'Production Worker E2E skipped: BACKGROUND_TOKEN secret is not configured in GitHub Actions.'
+  printf 'TOKEN_GENERATION=PASS\nFCM_SEND=PASS\nNOTIFICATION_RECEIPT=PASS\nWORKER_CAPS=SKIPPED_NO_TOKEN\nWORKER_SUBSCRIBE=SKIPPED_NO_TOKEN\nWORKER_TEST=SKIPPED_NO_TOKEN\nWORKER_NOTIFICATION=SKIPPED_NO_TOKEN\n' > "$REPORT"
+  exit 0
+fi
+
+WORKER_URL="${BACKGROUND_WORKER_URL:-https://football-edge-background-watch.ngophuonghuy.workers.dev}"
+WORKER_URL="${WORKER_URL%/}"
+export BACKGROUND_WORKER_URL="$WORKER_URL"
+rm -f /tmp/fe_worker_device_id
+
+cleanup_worker_device(){
+  if [ ! -s /tmp/fe_worker_device_id ]; then return 0; fi
+  export WORKER_DEVICE_ID="$(cat /tmp/fe_worker_device_id)"
+  node <<'NODE' || true
+(async()=>{
+  const base=process.env.BACKGROUND_WORKER_URL;
+  const token=process.env.BACKGROUND_TOKEN;
+  const id=process.env.WORKER_DEVICE_ID;
+  if(!base||!token||!id)return;
+  const r=await fetch(base+'/api/notify/unsubscribe',{method:'POST',headers:{authorization:'Bearer '+token,'content-type':'application/json','accept':'application/json'},body:JSON.stringify({id})});
+  if(r.ok) console.log('Production Worker cleanup PASS');
+  else console.log('Production Worker cleanup WARN • HTTP '+r.status);
+})().catch(()=>{});
+NODE
+  rm -f /tmp/fe_worker_device_id
+}
+trap cleanup_worker_device EXIT
+
+node <<'NODE'
+const fs=require('fs');
+const base=process.env.BACKGROUND_WORKER_URL;
+const auth=process.env.BACKGROUND_TOKEN;
+const deviceToken=process.env.FCM_DEVICE_TOKEN;
+const headers={authorization:'Bearer '+auth,'content-type':'application/json','accept':'application/json'};
+async function readJson(r){const t=await r.text();let j={};try{j=t?JSON.parse(t):{}}catch{j={raw:t}}return j}
+(async()=>{
+  let r=await fetch(base+'/api/notify/native/capabilities',{headers});
+  let j=await readJson(r);
+  if(!r.ok||!j?.ok||j?.fcm_configured!==true)throw new Error('WORKER_CAPS_FAILED HTTP '+r.status+' '+JSON.stringify(j).slice(0,250));
+  console.log('Production Worker native capabilities PASS • FCM configured');
+
+  r=await fetch(base+'/api/notify/native/subscribe',{method:'POST',headers,body:JSON.stringify({platform:'android',token:deviceToken,prefs:{enabled:false,h1:false,goal:false,gap:false,h1Threshold:72,goalThreshold:70,gapThreshold:70},app_version:'CI-RUNTIME',native_version:'N1.2-CI'})});
+  j=await readJson(r);
+  if(!r.ok||!j?.ok||!j?.id||j?.sender_ready!==true)throw new Error('WORKER_SUBSCRIBE_FAILED HTTP '+r.status+' '+JSON.stringify(j).slice(0,250));
+  fs.writeFileSync('/tmp/fe_worker_device_id',String(j.id));
+  console.log('Production Worker native subscribe PASS • device '+String(j.id).slice(0,12)+'…');
+
+  r=await fetch(base+'/api/notify/test',{method:'POST',headers,body:JSON.stringify({id:j.id})});
+  const t=await readJson(r);
+  if(!r.ok||!t?.ok)throw new Error('WORKER_TEST_FAILED HTTP '+r.status+' '+JSON.stringify(t).slice(0,250));
+  console.log('Production Worker native test send PASS');
+})().catch(e=>{console.error(e);process.exit(1)});
+NODE
+
+WORKER_RECEIVED=0
+for i in $(seq 1 20); do
+  if adb shell dumpsys notification --noredact | grep -Fq 'Football Edge • Thông báo thử'; then
+    WORKER_RECEIVED=1
+    break
+  fi
+  sleep 2
+done
+
+if [ "$WORKER_RECEIVED" != '1' ]; then
+  echo 'Production Worker accepted native test but Android notification was not observed.'
+  adb shell dumpsys notification --noredact | tail -n 240 || true
+  printf 'TOKEN_GENERATION=PASS\nFCM_SEND=PASS\nNOTIFICATION_RECEIPT=PASS\nWORKER_CAPS=PASS\nWORKER_SUBSCRIBE=PASS\nWORKER_TEST=PASS\nWORKER_NOTIFICATION=FAIL\n' > "$REPORT"
+  exit 1
+fi
+
+echo 'Production Worker native notification receipt PASS'
+printf 'TOKEN_GENERATION=PASS\nFCM_SEND=PASS\nNOTIFICATION_RECEIPT=PASS\nWORKER_CAPS=PASS\nWORKER_SUBSCRIBE=PASS\nWORKER_TEST=PASS\nWORKER_NOTIFICATION=PASS\n' > "$REPORT"
+cleanup_worker_device
+trap - EXIT
