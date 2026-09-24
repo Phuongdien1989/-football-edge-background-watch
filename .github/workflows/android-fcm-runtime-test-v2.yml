@@ -50,12 +50,24 @@ jobs:
         run: |
           test -n "${FIREBASE_GOOGLE_SERVICES_JSON:-}" || { echo 'Missing FIREBASE_GOOGLE_SERVICES_JSON'; exit 1; }
           test -n "${FCM_SERVICE_ACCOUNT_JSON:-}" || { echo 'Missing FCM_SERVICE_ACCOUNT_JSON'; exit 1; }
-          echo 'Required Firebase secrets are present.'
-          if [ -n "${BACKGROUND_TOKEN:-}" ]; then
-            echo 'BACKGROUND_TOKEN present: production Worker E2E enabled.'
-          else
-            echo 'BACKGROUND_TOKEN absent: production Worker E2E will be skipped.'
-          fi
+          test -n "${BACKGROUND_TOKEN:-}" || { echo 'Missing BACKGROUND_TOKEN'; exit 1; }
+          echo 'Firebase + Background Worker secrets are present.'
+
+      - name: Verify production Worker native capabilities
+        shell: bash
+        run: |
+          node <<'NODE'
+          (async()=>{
+            const base=process.env.BACKGROUND_WORKER_URL.replace(/\/+$/,'');
+            const r=await fetch(base+'/api/notify/native/capabilities',{headers:{authorization:'Bearer '+process.env.BACKGROUND_TOKEN,accept:'application/json'}});
+            const raw=await r.text();let j={};try{j=JSON.parse(raw)}catch{j={raw}}
+            console.log('WORKER_CAPS_HTTP='+r.status);
+            if(!r.ok) throw new Error('Worker native capabilities HTTP '+r.status+' '+raw.slice(0,200));
+            console.log('WORKER_NATIVE_ROUTE='+(j?.ok?'PASS':'FAIL'));
+            console.log('WORKER_FCM_CONFIGURED='+(j?.fcm_configured===true?'PASS':'FAIL'));
+            if(!j?.ok||j?.fcm_configured!==true) throw new Error('Worker native FCM is not ready');
+          })().catch(e=>{console.error(e);process.exit(1)});
+          NODE
 
       - name: Prepare native web baseline
         shell: bash
@@ -106,7 +118,6 @@ jobs:
           python - <<'PY'
           import base64, json, os, urllib.error, urllib.request
           from pathlib import Path
-
           gs=json.loads(Path('native/android/app/google-services.json').read_text())
           sa=json.loads(os.environ['FCM_SERVICE_ACCOUNT_JSON'])
           project_id=gs.get('project_info',{}).get('project_id')
@@ -121,44 +132,23 @@ jobs:
           print('PROJECT_NUMBER_PRESENT=' + ('PASS' if project_number else 'FAIL'))
           print('APP_ID_PRESENT=' + ('PASS' if app_id else 'FAIL'))
           print('API_KEY_PRESENT=' + ('PASS' if api_key else 'FAIL'))
-          if not (project_id and app_id and api_key):
-              raise SystemExit('Firebase client config incomplete')
-
-          raw=bytearray(os.urandom(17))
-          raw[0]=(raw[0]&0x0F)|0x70
+          if not (project_id and app_id and api_key): raise SystemExit('Firebase client config incomplete')
+          raw=bytearray(os.urandom(17)); raw[0]=(raw[0]&0x0F)|0x70
           fid=base64.urlsafe_b64encode(bytes(raw)).decode().rstrip('=')[:22]
           payload=json.dumps({'fid':fid,'appId':app_id,'authVersion':'FIS_v2','sdkVersion':'a:18.0.0'}).encode()
-          req=urllib.request.Request(
-              f'https://firebaseinstallations.googleapis.com/v1/projects/{project_id}/installations',
-              data=payload,
-              headers={'Content-Type':'application/json','Accept':'application/json','x-goog-api-key':api_key},
-              method='POST')
+          req=urllib.request.Request(f'https://firebaseinstallations.googleapis.com/v1/projects/{project_id}/installations',data=payload,headers={'Content-Type':'application/json','Accept':'application/json','x-goog-api-key':api_key},method='POST')
           try:
               with urllib.request.urlopen(req, timeout=30) as r:
-                  r.read()
-                  print('FIS_HTTP=' + str(r.status))
-                  print('FIS_CLIENT_AUTH=PASS')
+                  r.read(); print('FIS_HTTP='+str(r.status)); print('FIS_CLIENT_AUTH=PASS')
           except urllib.error.HTTPError as e:
-              body=e.read().decode('utf-8','replace')
-              print('FIS_HTTP=' + str(e.code))
-              print('FIS_CLIENT_AUTH=FAIL')
-              try:
-                  obj=json.loads(body)
-                  err=obj.get('error',{})
-                  print('FIS_ERROR_STATUS=' + str(err.get('status','UNKNOWN')))
-                  print('FIS_ERROR_MESSAGE=' + str(err.get('message','UNKNOWN'))[:500])
-              except Exception:
-                  print('FIS_ERROR_BODY_UNPARSED')
-          except Exception as e:
-              print('FIS_CLIENT_AUTH=ERROR')
-              print('FIS_EXCEPTION=' + type(e).__name__ + ':' + str(e)[:300])
+              body=e.read().decode('utf-8','replace'); print('FIS_HTTP='+str(e.code)); print('FIS_CLIENT_AUTH=FAIL'); print(body[:500]); raise
           PY
 
       - name: Sync Capacitor
         working-directory: native
         run: npx cap sync android
 
-      - name: Add CI-only FCM token probe
+      - name: Add CI-only FCM token probe with retry
         shell: bash
         run: |
           MAIN=$(find native/android/app/src/main -type f -name 'MainActivity.java' | head -n1)
@@ -167,20 +157,34 @@ jobs:
           package vn.footballedge.app;
 
           import android.os.Bundle;
+          import android.os.Handler;
+          import android.os.Looper;
           import android.util.Log;
           import com.getcapacitor.BridgeActivity;
           import com.google.firebase.messaging.FirebaseMessaging;
 
           public class MainActivity extends BridgeActivity {
+            private int tokenAttempt = 0;
+            private final Handler handler = new Handler(Looper.getMainLooper());
+
             @Override
             public void onCreate(Bundle savedInstanceState) {
               super.onCreate(savedInstanceState);
+              handler.postDelayed(this::fetchToken, 8000);
+            }
+
+            private void fetchToken() {
+              tokenAttempt++;
+              final int n = tokenAttempt;
+              Log.i("FE_FCM_TEST", "TOKEN_ATTEMPT=" + n);
               FirebaseMessaging.getInstance().getToken().addOnCompleteListener(task -> {
-                if (!task.isSuccessful()) {
-                  Log.e("FE_FCM_TEST", "TOKEN_ERROR", task.getException());
+                if (task.isSuccessful() && task.getResult() != null && !task.getResult().isEmpty()) {
+                  Log.i("FE_FCM_TEST", "TOKEN=" + task.getResult());
                   return;
                 }
-                Log.i("FE_FCM_TEST", "TOKEN=" + task.getResult());
+                Log.e("FE_FCM_TEST", "TOKEN_ERROR_ATTEMPT=" + n, task.getException());
+                if (n < 8) handler.postDelayed(this::fetchToken, 10000);
+                else Log.e("FE_FCM_TEST", "TOKEN_ERROR_FINAL");
               });
             }
           }
@@ -200,13 +204,13 @@ jobs:
           chmod +x gradlew
           ./gradlew assembleDebug --no-daemon
 
-      - name: Run emulator and verify FCM end-to-end
+      - name: Run Android 11 emulator and verify FCM end-to-end
         uses: reactivecircus/android-emulator-runner@v2
         with:
-          api-level: 35
-          target: google_apis_playstore
+          api-level: 30
+          target: google_apis
           arch: x86_64
-          profile: pixel_6
+          profile: pixel_4
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           script: bash .github/scripts/fcm-runtime-probe.sh
