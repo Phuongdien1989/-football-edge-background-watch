@@ -35,6 +35,10 @@
     h1Threshold:72,goalThreshold:clamp($('fePushGoalThreshold')?.value,70),gapThreshold:clamp($('fePushGapThreshold')?.value,70)
   });
   const release=()=>document.querySelector('meta[name="football-edge-release"]')?.content||'unknown';
+  const apnsEnvironment=()=>{
+    const raw=String(document.querySelector('meta[name="football-edge-apns-env"]')?.content||'sandbox').trim().toLowerCase();
+    return raw==='production'?'production':'sandbox';
+  };
   const setState=(msg,kind='warn')=>{
     const s=$('fePushStatus');if(s){s.textContent=msg;s.className='status'+(kind==='ok'?' ok':kind==='err'?' err':kind==='busy'?' busy':'')}
     const b=$('fePushBadge');if(b){b.className=kind;b.textContent=kind==='ok'?'NATIVE ON':kind==='err'?'NATIVE ERROR':kind==='busy'?'CONNECTING':'NATIVE N1'}
@@ -92,9 +96,10 @@
     if(busy)return;busy=true;const btn=$('feNativePushEnableBtn');if(btn)btn.disabled=true;setState('Đang đăng ký Native Push…','busy');
     try{
       const token=await requestNativeToken();if(!token)throw new Error('Thiết bị chưa trả registration token.');registeredToken=token;
-      const r=await workerRequest('/api/notify/native/subscribe',{method:'POST',body:{platform,token,prefs:prefs(),app_version:release(),native_version:'N1.0',apns_env:'sandbox'}});
+      const env=platform==='ios'?apnsEnvironment():null;
+      const r=await workerRequest('/api/notify/native/subscribe',{method:'POST',body:{platform,token,prefs:prefs(),app_version:release(),native_version:'N1.1',apns_env:env}});
       if(!r?.ok||!r.id)throw new Error(r?.error||'Worker chưa xác nhận Native Push.');saveId(r.id);
-      setState(r.sender_ready?`Native Push đã đăng ký • ${platform.toUpperCase()} sender READY.`:`Thiết bị đã đăng ký • ${platform.toUpperCase()} sender chưa cấu hình credentials.` ,r.sender_ready?'ok':'warn');
+      setState(r.sender_ready?`Native Push đã đăng ký • ${platform.toUpperCase()} sender READY${platform==='ios'?' • APNs '+env.toUpperCase():''}.`:`Thiết bị đã đăng ký • ${platform.toUpperCase()} sender chưa cấu hình credentials.` ,r.sender_ready?'ok':'warn');
     }catch(e){setState('Native Push: '+String(e?.message||e),'err')}
     finally{busy=false;if(btn)btn.disabled=false}
   }
@@ -115,7 +120,7 @@
     const actions=document.querySelector('#fePushPanel .fe-push-actions');if(actions&&!$('feNativePushActions')){
       const box=document.createElement('div');box.id='feNativePushActions';box.className='fe-native-push-actions';box.innerHTML='<button class="blue" id="feNativePushEnableBtn" type="button">ENABLE NATIVE PUSH</button><button id="feNativePushSaveBtn" type="button">SAVE NATIVE THRESHOLDS</button><button id="feNativePushTestBtn" type="button">NATIVE PUSH TEST</button>';
       actions.insertAdjacentElement('afterend',box);
-      const meta=document.createElement('div');meta.id='feNativePushMeta';meta.className='fe-native-push-meta';meta.textContent='N1 • Native transport: Android FCM / iOS APNs. H1 notification threshold giữ 72; FT/GAP dùng giá trị bên trên.';box.insertAdjacentElement('afterend',meta);
+      const meta=document.createElement('div');meta.id='feNativePushMeta';meta.className='fe-native-push-meta';meta.textContent=`N1.1 • Native transport: Android FCM / iOS APNs${platform==='ios'?' ('+apnsEnvironment()+')':''}. H1 notification threshold giữ 72; FT/GAP dùng giá trị bên trên.`;box.insertAdjacentElement('afterend',meta);
     }
     $('feNativePushEnableBtn')?.addEventListener('click',enable);
     $('feNativePushSaveBtn')?.addEventListener('click',savePrefs);
@@ -126,9 +131,9 @@
     installUI();await bindListeners();
     const id=savedId(),caps=await capabilities();
     if(id){const ready=platform==='android'?caps?.fcm_configured:caps?.apns_configured;setState(ready?`Native device đã liên kết • ${platform.toUpperCase()} sender READY.`:`Native device đã liên kết • còn thiếu ${platform==='android'?'FCM':'APNs'} credentials phía Worker.`,ready?'ok':'warn')}
-    else setState(`N1 Native Push • ${platform.toUpperCase()} • chưa đăng ký thiết bị.`,'warn');
+    else setState(`N1.1 Native Push • ${platform.toUpperCase()} • chưa đăng ký thiết bị${platform==='ios'?' • APNs '+apnsEnvironment().toUpperCase():''}.`,'warn');
   }
 
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',patch,{once:true});else patch();
-  window.FE_NATIVE_SHELL=Object.freeze({version:'N1.0',platform,native:true,webBaseline:'STABLE_BASELINE_RC1',enableNativePush:enable,testNativePush:test});
+  window.FE_NATIVE_SHELL=Object.freeze({version:'N1.1',platform,native:true,webBaseline:'P2.0.1_81707492',apnsEnvironment:apnsEnvironment(),enableNativePush:enable,testNativePush:test});
 })();
