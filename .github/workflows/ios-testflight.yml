@@ -17,6 +17,9 @@ on:
       - n1-ios-prep
     paths:
       - 'native/ios-release/**'
+      - 'native/www/store-presentation.js'
+      - 'native/store-edition.manifest.json'
+      - 'native/store-release-gates.json'
       - '.github/workflows/ios-testflight.yml'
 
 permissions:
@@ -55,7 +58,7 @@ jobs:
           echo "RELEASE_ACTION=${RELEASE_ACTION}"
           xcodebuild -version
 
-      - name: Prepare frozen web baseline for native release
+      - name: Prepare frozen web baseline for native Store release
         shell: bash
         run: |
           set -euo pipefail
@@ -66,6 +69,7 @@ jobs:
           curl -fsSL --retry 3 "$FRONTEND/" -o www/index.html
           curl -fsSL --retry 3 "$FRONTEND/push-sw.js" -o www/push-sw.js
 
+          # Verify production web baseline before any Store-only injection.
           echo '16fe0c6ef7b753af1fd62d8378dc9ba934f0f88baeac2835bdf7633d5571396c  www/index.html' | sha256sum -c -
           echo '8909f051ddaae2660ccda8cd32663af1c279b2b7b38d4f0ce4af34d3df4210eb  www/push-sw.js' | sha256sum -c -
 
@@ -74,28 +78,61 @@ jobs:
           p=Path('www/index.html')
           s=p.read_text(encoding='utf-8')
           css='<link rel="stylesheet" href="./native-shell.css">'
-          js='<script src="./native-shell.js"></script>'
+          native_js='<script src="./native-shell.js"></script>'
+          store_js='<script src="./store-presentation.js"></script>'
           apns='<meta name="football-edge-apns-env" content="production">'
+          store='<meta name="football-edge-store-edition" content="1">'
           s=s.replace('<meta name="football-edge-apns-env" content="sandbox">', apns)
           if apns not in s:
               s=s.replace('</head>',apns+'\n</head>',1)
+          if store not in s:
+              s=s.replace('</head>',store+'\n</head>',1)
           if css not in s:
               s=s.replace('</head>',css+'\n</head>',1)
-          if js not in s:
-              s=s.replace('</body>',js+'\n</body>',1)
+          if native_js not in s:
+              s=s.replace('</body>',native_js+'\n</body>',1)
+          if store_js not in s:
+              s=s.replace('</body>',store_js+'\n</body>',1)
           p.write_text(s,encoding='utf-8')
           PY
 
-      - name: Static release checks
+      - name: Static Store release checks
         shell: bash
         run: |
           set -euo pipefail
           node --check native/www/native-shell.js
+          node --check native/www/store-presentation.js
           python3 -m py_compile native/ios-push-patch.py
+          python3 -m json.tool native/store-edition.manifest.json >/dev/null
+          python3 -m json.tool native/store-release-gates.json >/dev/null
           plutil -lint native/ios-release/App.production.entitlements
           grep -q '<string>production</string>' native/ios-release/App.production.entitlements
           grep -q 'football-edge-apns-env.*production' native/www/index.html
-          echo 'Release static checks PASS.'
+          grep -q 'football-edge-store-edition.*content="1"' native/www/index.html
+          grep -q 'store-presentation.js' native/www/index.html
+          grep -q 'remote_feature_override_allowed.*false' native/store-edition.manifest.json
+          grep -q "presentationOnly:true" native/www/store-presentation.js
+          grep -q "engineUntouched:true" native/www/store-presentation.js
+          echo 'Store static checks PASS.'
+
+      - name: Store release compliance gate
+        if: env.RELEASE_ACTION != 'preflight'
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json,sys
+          p='native/store-release-gates.json'
+          x=json.load(open(p,encoding='utf-8'))
+          failed=[k for k,v in x.get('gates',{}).items() if v is not True]
+          if x.get('signed_distribution_allowed') is not True or failed:
+              print('Signed distribution BLOCKED by committed Store release policy.')
+              print('signed_distribution_allowed =',x.get('signed_distribution_allowed'))
+              print('Incomplete gates:')
+              for k in failed: print(' -',k)
+              sys.exit(1)
+          print('Committed Store release compliance gate PASS.')
+          PY
 
       - name: Install Capacitor dependencies
         working-directory: native
@@ -117,7 +154,7 @@ jobs:
           python3 ios-push-patch.py
           cp ios-release/App.production.entitlements ios/App/App/App.production.entitlements
 
-      - name: Validate identifier, APNs bridge and entitlement
+      - name: Validate identifier, APNs bridge, entitlement and Store layer
         shell: bash
         run: |
           set -euo pipefail
@@ -126,7 +163,8 @@ jobs:
           grep -q 'capacitorDidFailToRegisterForRemoteNotifications' native/ios/App/App/AppDelegate.swift
           grep -q '<key>aps-environment</key>' native/ios/App/App/App.production.entitlements
           grep -q '<string>production</string>' native/ios/App/App/App.production.entitlements
-          echo 'Identifier + APNs release validation PASS.'
+          grep -R -q 'store-presentation.js' native/ios/App/App/public/index.html
+          echo 'Identifier + APNs + Store layer validation PASS.'
 
       - name: Build unsigned simulator release preflight
         shell: bash
@@ -145,7 +183,7 @@ jobs:
             -destination 'generic/platform=iOS Simulator' \
             CODE_SIGNING_ALLOWED=NO \
             build
-          echo 'Unsigned Release preflight PASS.'
+          echo 'Unsigned Store Release preflight PASS.'
 
       - name: Signed release secret gate
         if: env.RELEASE_ACTION != 'preflight'
@@ -308,7 +346,7 @@ jobs:
         run: |
           set -euo pipefail
           if [ "$RELEASE_ACTION" = 'preflight' ]; then
-            echo 'Football Edge iOS RELEASE PREFLIGHT PASS. No signing secrets used; no IPA uploaded.'
+            echo 'Football Edge iOS STORE RELEASE PREFLIGHT PASS. No signing secrets used; no IPA uploaded.'
           elif [ "$RELEASE_ACTION" = 'signed-ipa' ]; then
             echo 'Football Edge signed IPA build PASS. TestFlight upload intentionally skipped.'
           else
