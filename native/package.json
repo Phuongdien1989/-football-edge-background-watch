@@ -1,11 +1,13 @@
 {
   "name": "football-edge-native",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "description": "Football Edge native cloud-build shell from frozen web baseline",
   "scripts": {
     "cap:add:android": "npx cap add android",
-    "cap:sync": "npx cap sync android"
+    "cap:add:ios": "npx cap add ios",
+    "cap:sync:android": "npx cap sync android",
+    "cap:sync:ios": "npx cap sync ios"
   },
   "dependencies": {
     "@capacitor/core": "^8.0.0",
@@ -17,6 +19,7 @@
   "devDependencies": {
     "@capacitor/cli": "^8.0.0",
     "@capacitor/android": "^8.0.0",
+    "@capacitor/ios": "^8.0.0",
     "typescript": "^5.9.0"
   }
 }
