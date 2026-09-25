@@ -1,0 +1,144 @@
+{
+  "schema_version": 1,
+  "edition": "football_edge_ios_app_store",
+  "bundle_id": "vn.footballedge.app",
+  "source_web_baseline": "P2.0.1_81707492",
+  "mode": "compile_time_store_edition",
+  "remote_feature_override_allowed": false,
+  "purpose": "Sports analytics and live match intelligence. No wagering, deposits, withdrawals, bookmaker handoff, affiliate betting links, stake sizing, bankroll management, or auto-bet execution.",
+  "non_regression": {
+    "preserve_engine_scoring": true,
+    "preserve_thresholds": true,
+    "preserve_calibration": true,
+    "preserve_data_quality_logic": true,
+    "preserve_present_first_adaptive_live_state": true,
+    "production_pwa_unchanged": true
+  },
+  "modules": {
+    "keep": [
+      "edge_command_center",
+      "match_center",
+      "live_fixture_scan",
+      "top_ranking",
+      "h1_watch",
+      "goal_radar_ft",
+      "live_gap",
+      "data_quality_coverage_integrity_freshness",
+      "live_statistics",
+      "events",
+      "historical_form_and_table_context",
+      "signal_accuracy",
+      "calibration_review",
+      "native_push_notifications",
+      "native_deep_links"
+    ],
+    "modify_for_store_presentation": [
+      "market_odds_as_market_context",
+      "entry_policy_as_analysis_state",
+      "provider_errors_as_friendly_degraded_state",
+      "release_health_as_support_diagnostics"
+    ],
+    "exclude_from_first_store_build": [
+      "bet_tracker",
+      "monetary_profit_loss",
+      "stake_sizing",
+      "bankroll_management",
+      "bookmaker_links",
+      "affiliate_tracking",
+      "deposit_withdrawal_flows",
+      "auto_bet_execution",
+      "shared_background_worker_token_ui"
+    ],
+    "add_before_submission": [
+      "privacy_policy",
+      "support_page",
+      "disconnect_and_delete_notification_data",
+      "sample_analysis",
+      "native_onboarding",
+      "native_settings",
+      "graceful_offline_or_upstream_degraded_state"
+    ]
+  },
+  "ui_translation_only": {
+    "rule": "Underlying engine enums and scoring remain unchanged. Only Store-facing labels are translated.",
+    "labels": {
+      "ENTRY_SUITABLE": "STRONG_SIGNAL",
+      "WAIT_PRICE": "MARKET_CONFIRMATION_PENDING",
+      "WAIT_CONFIRM": "CONFIRMATION_PENDING",
+      "CAUTION": "CAUTION",
+      "PASS": "INSUFFICIENT_EVIDENCE",
+      "MARKET_ODDS": "MARKET_CONTEXT",
+      "BET_TRACKER": "NOT_SHIPPED_IN_FIRST_STORE_BUILD",
+      "P_AND_L": "NOT_SHIPPED_IN_FIRST_STORE_BUILD"
+    }
+  },
+  "public_wording_rules": {
+    "allowed_examples": [
+      "Live match signal detected",
+      "Goal-likelihood signal",
+      "Live momentum gap",
+      "Analysis priority",
+      "Market context",
+      "Signal confirmation pending",
+      "Insufficient evidence"
+    ],
+    "disallowed_store_wording": [
+      "kèo",
+      "đánh",
+      "vào cửa",
+      "stake",
+      "bankroll",
+      "guaranteed win",
+      "bet now"
+    ]
+  },
+  "market_context_policy": {
+    "show_reference_market_data": true,
+    "bookmaker_branding": false,
+    "affiliate_links": false,
+    "bet_execution_links": false,
+    "stake_recommendations": false,
+    "purpose": "Reference/validation context only. Market does not decide the engine output."
+  },
+  "push_policy": {
+    "user_opt_in_required": true,
+    "app_usable_without_push": true,
+    "neutral_notification_wording": true,
+    "marketing_push": false,
+    "deep_link_to_fixture_analysis": true
+  },
+  "privacy_and_security": {
+    "document_push_token_purpose": true,
+    "document_device_id_purpose": true,
+    "document_signal_validation_history": true,
+    "retention_policy_required": true,
+    "disconnect_delete_control_required": true,
+    "shared_backend_secret_visible_to_consumer": false,
+    "consumer_device_registration_mechanism_required": true
+  },
+  "reviewer_reliability": {
+    "sample_analysis_available_without_live_match": true,
+    "raw_provider_errors_hidden_from_primary_ui": true,
+    "friendly_retry_state": true,
+    "core_flow_testable_if_upstream_provider_is_temporarily_unavailable": true
+  },
+  "review_notes_facts": [
+    "Football Edge is a sports analytics and live match intelligence application.",
+    "The app does not accept or execute wagers.",
+    "The app does not hold balances, accept deposits, process withdrawals, or size stakes.",
+    "The app does not integrate with bookmakers or provide affiliate betting links.",
+    "Market information, when shown, is reference context used to compare with live match state.",
+    "Push notifications alert users to analytical signals and open the relevant fixture analysis screen."
+  ],
+  "release_gates": [
+    "No excluded gambling-accounting modules are present in the compiled Store build.",
+    "No remote switch can enable excluded modules after App Review.",
+    "Privacy Policy and Support entry points are available in-app and in App Store metadata.",
+    "Disconnect/Delete Notification Data works end-to-end.",
+    "Sample Analysis is clearly labeled and always testable.",
+    "Store build does not expose shared Background Worker credentials.",
+    "Native push, deep links, onboarding/settings, and degraded-state handling are validated.",
+    "App Privacy and age-rating questionnaires are answered from the actual Store build.",
+    "Signed TestFlight build passes real-iPhone APNs end-to-end validation before submission."
+  ]
+}
