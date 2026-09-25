@@ -1,0 +1,123 @@
+name: Football Edge iOS Unsigned CI
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - n1-ios-prep
+    paths:
+      - 'native/**'
+      - '.github/workflows/ios-native-unsigned.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  build-ios-unsigned:
+    runs-on: macos-15
+    timeout-minutes: 35
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Show Xcode environment
+        shell: bash
+        run: |
+          set -euo pipefail
+          xcodebuild -version
+          xcrun simctl list runtimes
+
+      - name: Prepare frozen web baseline
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd native
+          mkdir -p www
+
+          FRONTEND='https://shiny-silence-d892.ngophuonghuy.workers.dev'
+          curl -fsSL --retry 3 "$FRONTEND/" -o www/index.html
+          curl -fsSL --retry 3 "$FRONTEND/push-sw.js" -o www/push-sw.js
+
+          # index.html and push-sw.js were unchanged by P2.0.1; keep the frozen hashes.
+          echo '16fe0c6ef7b753af1fd62d8378dc9ba934f0f88baeac2835bdf7633d5571396c  www/index.html' | sha256sum -c -
+          echo '8909f051ddaae2660ccda8cd32663af1c279b2b7b38d4f0ce4af34d3df4210eb  www/push-sw.js' | sha256sum -c -
+
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('www/index.html')
+          s=p.read_text(encoding='utf-8')
+          css='<link rel="stylesheet" href="./native-shell.css">'
+          js='<script src="./native-shell.js"></script>'
+          apns='<meta name="football-edge-apns-env" content="sandbox">'
+          if apns not in s:
+              s=s.replace('</head>',apns+'\n</head>',1)
+          if css not in s:
+              s=s.replace('</head>',css+'\n</head>',1)
+          if js not in s:
+              s=s.replace('</body>',js+'\n</body>',1)
+          p.write_text(s,encoding='utf-8')
+          PY
+
+      - name: Static syntax checks
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check native/www/native-shell.js
+          python3 -m py_compile native/ios-push-patch.py
+
+      - name: Install Capacitor dependencies
+        working-directory: native
+        run: npm install
+
+      - name: Generate iOS project
+        working-directory: native
+        run: npx cap add ios
+
+      - name: Sync Capacitor iOS
+        working-directory: native
+        run: npx cap sync ios
+
+      - name: Apply Capacitor PushNotifications AppDelegate bridge
+        working-directory: native
+        run: python3 ios-push-patch.py
+
+      - name: Validate iOS identifiers and push bridge
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -R "vn.footballedge.app" native/ios/App/App.xcodeproj/project.pbxproj
+          grep -q "capacitorDidRegisterForRemoteNotifications" native/ios/App/App/AppDelegate.swift
+          grep -q "capacitorDidFailToRegisterForRemoteNotifications" native/ios/App/App/AppDelegate.swift
+          echo 'iOS identifier + push bridge validation PASS.'
+
+      - name: Build unsigned iOS Simulator app
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd native
+          if [ -d ios/App/App.xcworkspace ]; then
+            XCCONTAINER=(-workspace ios/App/App.xcworkspace)
+          else
+            XCCONTAINER=(-project ios/App/App.xcodeproj)
+          fi
+          xcodebuild "${XCCONTAINER[@]}" \
+            -scheme App \
+            -configuration Debug \
+            -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' \
+            CODE_SIGNING_ALLOWED=NO \
+            build
+
+      - name: Upload generated iOS project
+        uses: actions/upload-artifact@v4
+        with:
+          name: football-edge-ios-unsigned-project
+          path: native/ios
+          if-no-files-found: error
+          retention-days: 14
