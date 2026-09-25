@@ -65,7 +65,7 @@ jobs:
           cd native
           python3 store-edition-surface-prune.py --index www/index.html
 
-      - name: Inject native shell for Store preflight
+      - name: Inject native and Store compliance shells
         shell: bash
         run: |
           set -euo pipefail
@@ -76,6 +76,7 @@ jobs:
           s=p.read_text(encoding='utf-8')
           css='<link rel="stylesheet" href="./native-shell.css">'
           js='<script src="./native-shell.js"></script>'
+          store_js='<script src="./store-compliance-links.js"></script>'
           apns='<meta name="football-edge-apns-env" content="sandbox">'
           if apns not in s:
               s=s.replace('</head>',apns+'\n</head>',1)
@@ -83,6 +84,8 @@ jobs:
               s=s.replace('</head>',css+'\n</head>',1)
           if js not in s:
               s=s.replace('</body>',js+'\n</body>',1)
+          if store_js not in s:
+              s=s.replace('</body>',store_js+'\n</body>',1)
           p.write_text(s,encoding='utf-8')
           PY
 
@@ -92,13 +95,19 @@ jobs:
           set -euo pipefail
           python3 -m py_compile native/store-edition-patch.py native/store-edition-surface-prune.py native/ios-push-patch.py
           node --check native/www/native-shell.js
+          node --check native/www/store-compliance-links.js
+          test -s native/www/privacy.html
+          test -s native/www/support.html
           grep -q 'football-edge-store-edition" content="1' native/www/index.html
           grep -q 'FE_STORE_EDITION_PATCH_V1' native/www/index.html
           grep -q 'FE_STORE_SURFACE_PRUNE_V1' native/www/index.html
+          grep -q 'store-compliance-links.js' native/www/index.html
           grep -q 'ANALYSIS STATE • ADVISORY' native/www/index.html
           grep -q 'MARKET CONTEXT • SHADOW' native/www/index.html
           grep -q 'STRONG SIGNAL' native/www/index.html
           grep -q 'LIVE SIGNALS' native/www/index.html
+          grep -q 'DISCONNECT & DELETE NOTIFICATION DATA' native/www/native-shell.js
+          grep -q '/api/notify/unsubscribe' native/www/native-shell.js
           ! grep -q 'ENTRY POLICY • ADVISORY' native/www/index.html
           ! grep -q 'FAIR PRICE & EDGE • SHADOW' native/www/index.html
           ! grep -q 'ENTRY SUITABLE</span>' native/www/index.html
@@ -109,7 +118,7 @@ jobs:
           ! grep -q 'id="quickRecordBetBtn"' native/www/index.html
           ! grep -q 'id="smaRecordFinalBtn"' native/www/index.html
           grep -q 'remote_feature_override_allowed.*false' native/store-edition.manifest.json
-          echo 'Store compliance presentation + surface gates PASS.'
+          echo 'Store compliance presentation + surface + privacy controls PASS.'
 
       - name: Install Capacitor dependencies
         working-directory: native
@@ -134,7 +143,10 @@ jobs:
           grep -R 'vn.footballedge.app' native/ios/App/App.xcodeproj/project.pbxproj
           grep -q 'capacitorDidRegisterForRemoteNotifications' native/ios/App/App/AppDelegate.swift
           grep -q 'capacitorDidFailToRegisterForRemoteNotifications' native/ios/App/App/AppDelegate.swift
-          echo 'Identifier + native push bridge PASS.'
+          test -s native/ios/App/App/public/privacy.html
+          test -s native/ios/App/App/public/support.html
+          test -s native/ios/App/App/public/store-compliance-links.js
+          echo 'Identifier + native push bridge + Store support pages PASS.'
 
       - name: Build Store Edition unsigned simulator app
         shell: bash
@@ -161,6 +173,9 @@ jobs:
           name: football-edge-ios-store-preflight
           path: |
             native/www/index.html
+            native/www/privacy.html
+            native/www/support.html
+            native/www/store-compliance-links.js
             native/store-edition.manifest.json
             native/ios
           if-no-files-found: error
