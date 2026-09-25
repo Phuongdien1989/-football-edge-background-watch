@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "release_state": "preflight_only",
+  "signed_distribution_allowed": false,
+  "gates": {
+    "store_presentation_layer": true,
+    "engine_non_regression_locked": true,
+    "excluded_modules_physically_removed_from_store_build": false,
+    "shared_background_worker_secret_removed_from_consumer_ui": false,
+    "privacy_policy_in_app": false,
+    "support_entry_in_app": false,
+    "disconnect_delete_notification_data_e2e_verified": false,
+    "sample_analysis_available": false,
+    "friendly_degraded_state_verified": false,
+    "native_onboarding_settings_verified": false,
+    "app_privacy_answers_prepared": false,
+    "age_rating_answers_prepared": false,
+    "real_iphone_apns_e2e_verified": false
+  },
+  "rule": "Signed IPA/TestFlight is blocked until signed_distribution_allowed=true and every gate is true. This file is committed build policy, not a remote feature switch."
+}
