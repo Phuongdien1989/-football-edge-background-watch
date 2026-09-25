@@ -1,0 +1,316 @@
+name: Football Edge iOS Release Pipeline
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_action:
+        description: 'Release action'
+        required: true
+        default: preflight
+        type: choice
+        options:
+          - preflight
+          - signed-ipa
+          - testflight
+  push:
+    branches:
+      - n1-ios-prep
+    paths:
+      - 'native/ios-release/**'
+      - '.github/workflows/ios-testflight.yml'
+
+permissions:
+  contents: read
+
+env:
+  BUNDLE_ID: vn.footballedge.app
+
+jobs:
+  release-pipeline:
+    runs-on: macos-15
+    timeout-minutes: 45
+    env:
+      RELEASE_ACTION: ${{ github.event_name == 'workflow_dispatch' && inputs.release_action || 'preflight' }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      IOS_DIST_CERT_P12_B64: ${{ secrets.IOS_DIST_CERT_P12_B64 }}
+      IOS_DIST_CERT_PASSWORD: ${{ secrets.IOS_DIST_CERT_PASSWORD }}
+      IOS_PROVISIONING_PROFILE_B64: ${{ secrets.IOS_PROVISIONING_PROFILE_B64 }}
+      APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+      APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+      APP_STORE_CONNECT_API_KEY_P8: ${{ secrets.APP_STORE_CONNECT_API_KEY_P8 }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Show release mode and Xcode environment
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "RELEASE_ACTION=${RELEASE_ACTION}"
+          xcodebuild -version
+
+      - name: Prepare frozen web baseline for native release
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd native
+          mkdir -p www
+
+          FRONTEND='https://shiny-silence-d892.ngophuonghuy.workers.dev'
+          curl -fsSL --retry 3 "$FRONTEND/" -o www/index.html
+          curl -fsSL --retry 3 "$FRONTEND/push-sw.js" -o www/push-sw.js
+
+          echo '16fe0c6ef7b753af1fd62d8378dc9ba934f0f88baeac2835bdf7633d5571396c  www/index.html' | sha256sum -c -
+          echo '8909f051ddaae2660ccda8cd32663af1c279b2b7b38d4f0ce4af34d3df4210eb  www/push-sw.js' | sha256sum -c -
+
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('www/index.html')
+          s=p.read_text(encoding='utf-8')
+          css='<link rel="stylesheet" href="./native-shell.css">'
+          js='<script src="./native-shell.js"></script>'
+          apns='<meta name="football-edge-apns-env" content="production">'
+          s=s.replace('<meta name="football-edge-apns-env" content="sandbox">', apns)
+          if apns not in s:
+              s=s.replace('</head>',apns+'\n</head>',1)
+          if css not in s:
+              s=s.replace('</head>',css+'\n</head>',1)
+          if js not in s:
+              s=s.replace('</body>',js+'\n</body>',1)
+          p.write_text(s,encoding='utf-8')
+          PY
+
+      - name: Static release checks
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check native/www/native-shell.js
+          python3 -m py_compile native/ios-push-patch.py
+          plutil -lint native/ios-release/App.production.entitlements
+          grep -q '<string>production</string>' native/ios-release/App.production.entitlements
+          grep -q 'football-edge-apns-env.*production' native/www/index.html
+          echo 'Release static checks PASS.'
+
+      - name: Install Capacitor dependencies
+        working-directory: native
+        run: npm install
+
+      - name: Generate iOS project
+        working-directory: native
+        run: npx cap add ios
+
+      - name: Sync Capacitor iOS
+        working-directory: native
+        run: npx cap sync ios
+
+      - name: Apply PushNotifications bridge and production entitlement
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd native
+          python3 ios-push-patch.py
+          cp ios-release/App.production.entitlements ios/App/App/App.production.entitlements
+
+      - name: Validate identifier, APNs bridge and entitlement
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -R "$BUNDLE_ID" native/ios/App/App.xcodeproj/project.pbxproj
+          grep -q 'capacitorDidRegisterForRemoteNotifications' native/ios/App/App/AppDelegate.swift
+          grep -q 'capacitorDidFailToRegisterForRemoteNotifications' native/ios/App/App/AppDelegate.swift
+          grep -q '<key>aps-environment</key>' native/ios/App/App/App.production.entitlements
+          grep -q '<string>production</string>' native/ios/App/App/App.production.entitlements
+          echo 'Identifier + APNs release validation PASS.'
+
+      - name: Build unsigned simulator release preflight
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd native
+          if [ -d ios/App/App.xcworkspace ]; then
+            XCCONTAINER=(-workspace ios/App/App.xcworkspace)
+          else
+            XCCONTAINER=(-project ios/App/App.xcodeproj)
+          fi
+          xcodebuild "${XCCONTAINER[@]}" \
+            -scheme App \
+            -configuration Release \
+            -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' \
+            CODE_SIGNING_ALLOWED=NO \
+            build
+          echo 'Unsigned Release preflight PASS.'
+
+      - name: Signed release secret gate
+        if: env.RELEASE_ACTION != 'preflight'
+        shell: bash
+        run: |
+          set -euo pipefail
+          missing=0
+          for n in APPLE_TEAM_ID IOS_DIST_CERT_P12_B64 IOS_DIST_CERT_PASSWORD IOS_PROVISIONING_PROFILE_B64; do
+            if [ -z "${!n:-}" ]; then
+              echo "Missing required GitHub Actions secret: $n"
+              missing=1
+            fi
+          done
+          if [ "$RELEASE_ACTION" = 'testflight' ]; then
+            for n in APP_STORE_CONNECT_KEY_ID APP_STORE_CONNECT_ISSUER_ID APP_STORE_CONNECT_API_KEY_P8; do
+              if [ -z "${!n:-}" ]; then
+                echo "Missing required GitHub Actions secret: $n"
+                missing=1
+              fi
+            done
+          fi
+          [ "$missing" -eq 0 ]
+          echo 'Signed release secret gate PASS.'
+
+      - name: Install Apple Distribution certificate and provisioning profile
+        if: env.RELEASE_ACTION != 'preflight'
+        shell: bash
+        run: |
+          set -euo pipefail
+          KEYCHAIN="$RUNNER_TEMP/football-edge-signing.keychain-db"
+          KEYCHAIN_PASSWORD="$(openssl rand -hex 24)"
+          CERT_PATH="$RUNNER_TEMP/distribution.p12"
+          PROFILE_PATH="$RUNNER_TEMP/appstore.mobileprovision"
+
+          printf '%s' "$IOS_DIST_CERT_P12_B64" | base64 --decode > "$CERT_PATH"
+          printf '%s' "$IOS_PROVISIONING_PROFILE_B64" | base64 --decode > "$PROFILE_PATH"
+
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security import "$CERT_PATH" -P "$IOS_DIST_CERT_PASSWORD" -A -t cert -f pkcs12 -k "$KEYCHAIN"
+          security list-keychain -d user -s "$KEYCHAIN" login.keychain-db
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+
+          security cms -D -i "$PROFILE_PATH" > "$RUNNER_TEMP/profile.plist"
+          PROFILE_UUID=$(/usr/libexec/PlistBuddy -c 'Print :UUID' "$RUNNER_TEMP/profile.plist")
+          PROFILE_NAME=$(/usr/libexec/PlistBuddy -c 'Print :Name' "$RUNNER_TEMP/profile.plist")
+          PROFILE_TEAM=$(/usr/libexec/PlistBuddy -c 'Print :TeamIdentifier:0' "$RUNNER_TEMP/profile.plist")
+          APP_IDENTIFIER=$(/usr/libexec/PlistBuddy -c 'Print :Entitlements:application-identifier' "$RUNNER_TEMP/profile.plist")
+          APS_ENV=$(/usr/libexec/PlistBuddy -c 'Print :Entitlements:aps-environment' "$RUNNER_TEMP/profile.plist")
+
+          [ "$PROFILE_TEAM" = "$APPLE_TEAM_ID" ] || { echo 'Provisioning profile Team ID mismatch'; exit 1; }
+          case "$APP_IDENTIFIER" in
+            *.$BUNDLE_ID) ;;
+            *) echo "Provisioning profile Bundle ID mismatch: $APP_IDENTIFIER"; exit 1 ;;
+          esac
+          [ "$APS_ENV" = 'production' ] || { echo "Provisioning profile aps-environment is not production: $APS_ENV"; exit 1; }
+
+          mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
+          cp "$PROFILE_PATH" "$HOME/Library/MobileDevice/Provisioning Profiles/$PROFILE_UUID.mobileprovision"
+
+          echo "PROFILE_UUID=$PROFILE_UUID" >> "$GITHUB_ENV"
+          echo "PROFILE_NAME=$PROFILE_NAME" >> "$GITHUB_ENV"
+          echo "SIGNING_KEYCHAIN=$KEYCHAIN" >> "$GITHUB_ENV"
+          echo 'Signing material validation PASS.'
+
+      - name: Archive signed iOS app
+        if: env.RELEASE_ACTION != 'preflight'
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd native
+          if [ -d ios/App/App.xcworkspace ]; then
+            XCCONTAINER=(-workspace ios/App/App.xcworkspace)
+          else
+            XCCONTAINER=(-project ios/App/App.xcodeproj)
+          fi
+          xcodebuild "${XCCONTAINER[@]}" \
+            -scheme App \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath "$RUNNER_TEMP/FootballEdge.xcarchive" \
+            PRODUCT_BUNDLE_IDENTIFIER="$BUNDLE_ID" \
+            DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
+            CODE_SIGN_STYLE=Manual \
+            CODE_SIGN_IDENTITY='Apple Distribution' \
+            PROVISIONING_PROFILE_SPECIFIER="$PROFILE_NAME" \
+            CODE_SIGN_ENTITLEMENTS='App/App.production.entitlements' \
+            archive
+
+      - name: Export signed IPA
+        if: env.RELEASE_ACTION != 'preflight'
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > "$RUNNER_TEMP/ExportOptions.plist" <<PLIST
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key><string>app-store-connect</string>
+            <key>teamID</key><string>${APPLE_TEAM_ID}</string>
+            <key>signingStyle</key><string>manual</string>
+            <key>provisioningProfiles</key>
+            <dict>
+              <key>${BUNDLE_ID}</key><string>${PROFILE_NAME}</string>
+            </dict>
+            <key>stripSwiftSymbols</key><true/>
+            <key>uploadSymbols</key><true/>
+          </dict>
+          </plist>
+          PLIST
+          plutil -lint "$RUNNER_TEMP/ExportOptions.plist"
+          mkdir -p "$RUNNER_TEMP/export"
+          xcodebuild -exportArchive \
+            -archivePath "$RUNNER_TEMP/FootballEdge.xcarchive" \
+            -exportPath "$RUNNER_TEMP/export" \
+            -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist"
+          IPA=$(find "$RUNNER_TEMP/export" -maxdepth 1 -name '*.ipa' -print -quit)
+          [ -n "$IPA" ] && [ -s "$IPA" ] || { echo 'IPA export missing'; exit 1; }
+          echo "IPA_PATH=$IPA" >> "$GITHUB_ENV"
+          shasum -a 256 "$IPA"
+          echo 'Signed IPA export PASS.'
+
+      - name: Upload signed IPA artifact
+        if: env.RELEASE_ACTION != 'preflight'
+        uses: actions/upload-artifact@v4
+        with:
+          name: football-edge-ios-signed-ipa
+          path: ${{ env.IPA_PATH }}
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Configure App Store Connect API key
+        if: env.RELEASE_ACTION == 'testflight'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$HOME/.appstoreconnect/private_keys"
+          KEY_PATH="$HOME/.appstoreconnect/private_keys/AuthKey_${APP_STORE_CONNECT_KEY_ID}.p8"
+          printf '%s' "$APP_STORE_CONNECT_API_KEY_P8" > "$KEY_PATH"
+          chmod 600 "$KEY_PATH"
+          grep -q 'BEGIN PRIVATE KEY' "$KEY_PATH"
+          echo 'App Store Connect API key installed for this runner.'
+
+      - name: Upload IPA to TestFlight
+        if: env.RELEASE_ACTION == 'testflight'
+        shell: bash
+        run: |
+          set -euo pipefail
+          xcrun altool --upload-app \
+            --type ios \
+            --file "$IPA_PATH" \
+            --apiKey "$APP_STORE_CONNECT_KEY_ID" \
+            --apiIssuer "$APP_STORE_CONNECT_ISSUER_ID"
+          echo 'TestFlight upload request accepted by App Store Connect.'
+
+      - name: Release summary
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "$RELEASE_ACTION" = 'preflight' ]; then
+            echo 'Football Edge iOS RELEASE PREFLIGHT PASS. No signing secrets used; no IPA uploaded.'
+          elif [ "$RELEASE_ACTION" = 'signed-ipa' ]; then
+            echo 'Football Edge signed IPA build PASS. TestFlight upload intentionally skipped.'
+          else
+            echo 'Football Edge signed IPA build + TestFlight upload PASS.'
+          fi
