@@ -49,6 +49,43 @@ jobs:
           test -n "$(find .wrangler-dry-run -type f -maxdepth 2 | head -n 1)"
           echo 'Wrangler dry-run bundle PASS.'
 
+      - name: Local pause-resume API smoke test
+        shell: bash
+        run: |
+          set -euo pipefail
+          LOG="$RUNNER_TEMP/wrangler-dev.log"
+          npx wrangler dev --local --port 8787 \
+            --var BACKGROUND_TOKEN:test-token \
+            --var APISPORTS_KEY:test-api-key >"$LOG" 2>&1 &
+          PID=$!
+          trap 'kill $PID 2>/dev/null || true; cat "$LOG" || true' EXIT
+
+          for i in $(seq 1 40); do
+            if curl -fsS http://127.0.0.1:8787/health >/dev/null 2>&1; then break; fi
+            sleep 1
+          done
+          curl -fsS http://127.0.0.1:8787/health >/dev/null
+
+          AUTH='Authorization: Bearer test-token'
+          RUNNING=$(curl -fsS -H "$AUTH" http://127.0.0.1:8787/api/notify/scan-control)
+          node -e 'const x=JSON.parse(process.argv[1]); if(!x.ok||x.paused!==false||x.state!=="RUNNING") process.exit(1)' "$RUNNING"
+
+          PAUSE=$(curl -fsS -X POST -H "$AUTH" -H 'Content-Type: application/json' \
+            --data '{"action":"pause"}' http://127.0.0.1:8787/api/notify/scan-control)
+          node -e 'const x=JSON.parse(process.argv[1]); if(!x.ok||x.paused!==true||x.state!=="PAUSED_BY_USER") process.exit(1)' "$PAUSE"
+
+          STATUS=$(curl -fsS -H "$AUTH" http://127.0.0.1:8787/api/notify/status)
+          node -e 'const x=JSON.parse(process.argv[1]); if(!x.ok||x.paused!==true||x.control?.paused!==true||x.scan_state!=="PAUSED_BY_USER") process.exit(1)' "$STATUS"
+
+          RESUME=$(curl -fsS -X POST -H "$AUTH" -H 'Content-Type: application/json' \
+            --data '{"action":"resume"}' http://127.0.0.1:8787/api/notify/scan-control)
+          node -e 'const x=JSON.parse(process.argv[1]); if(!x.ok||x.paused!==false||x.state!=="RUNNING") process.exit(1)' "$RESUME"
+
+          echo 'Pause/resume API smoke PASS.'
+          kill $PID 2>/dev/null || true
+          wait $PID 2>/dev/null || true
+          trap - EXIT
+
       - name: Verify production invariants remain unchanged
         shell: bash
         run: |
