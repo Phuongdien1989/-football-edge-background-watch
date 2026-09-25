@@ -8,6 +8,7 @@ on:
     paths:
       - 'native/store-edition.manifest.json'
       - 'native/store-edition-patch.py'
+      - 'native/store-edition-surface-prune.py'
       - 'native/www/**'
       - 'native/capacitor.config.ts'
       - 'native/package.json'
@@ -57,6 +58,13 @@ jobs:
           cd native
           python3 store-edition-patch.py --index www/index.html --manifest store-edition.manifest.json
 
+      - name: Prune betting-accounting Store surfaces
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd native
+          python3 store-edition-surface-prune.py --index www/index.html
+
       - name: Inject native shell for Store preflight
         shell: bash
         run: |
@@ -82,18 +90,26 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python3 -m py_compile native/store-edition-patch.py native/ios-push-patch.py
+          python3 -m py_compile native/store-edition-patch.py native/store-edition-surface-prune.py native/ios-push-patch.py
           node --check native/www/native-shell.js
           grep -q 'football-edge-store-edition" content="1' native/www/index.html
           grep -q 'FE_STORE_EDITION_PATCH_V1' native/www/index.html
+          grep -q 'FE_STORE_SURFACE_PRUNE_V1' native/www/index.html
           grep -q 'ANALYSIS STATE • ADVISORY' native/www/index.html
           grep -q 'MARKET CONTEXT • SHADOW' native/www/index.html
           grep -q 'STRONG SIGNAL' native/www/index.html
+          grep -q 'LIVE SIGNALS' native/www/index.html
           ! grep -q 'ENTRY POLICY • ADVISORY' native/www/index.html
           ! grep -q 'FAIR PRICE & EDGE • SHADOW' native/www/index.html
           ! grep -q 'ENTRY SUITABLE</span>' native/www/index.html
+          ! grep -q 'id="betTrackerCard"' native/www/index.html
+          ! grep -q 'id="betStake"' native/www/index.html
+          ! grep -q 'id="betPrice"' native/www/index.html
+          ! grep -q 'href="#betTrackerCard"' native/www/index.html
+          ! grep -q 'id="quickRecordBetBtn"' native/www/index.html
+          ! grep -q 'id="smaRecordFinalBtn"' native/www/index.html
           grep -q 'remote_feature_override_allowed.*false' native/store-edition.manifest.json
-          echo 'Store compliance presentation gates PASS.'
+          echo 'Store compliance presentation + surface gates PASS.'
 
       - name: Install Capacitor dependencies
         working-directory: native
