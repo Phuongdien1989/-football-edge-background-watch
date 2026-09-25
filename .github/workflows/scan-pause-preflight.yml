@@ -1,0 +1,60 @@
+name: Football Edge Scan Pause Preflight
+
+on:
+  push:
+    branches:
+      - feature-scan-pause
+    paths:
+      - 'worker_notify_v133_scan_control.js'
+      - 'wrangler.toml'
+      - '.github/workflows/scan-pause-preflight.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  preflight:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Static syntax and contract checks
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check worker_notify_v133_scan_control.js
+          grep -q 'main = "worker_notify_v133_scan_control.js"' wrangler.toml
+          grep -q '/api/notify/scan-control' worker_notify_v133_scan_control.js
+          grep -q "PAUSED_BY_USER" worker_notify_v133_scan_control.js
+          grep -q 'return super.alarm()' worker_notify_v133_scan_control.js
+          grep -q 'setAlarm(now+1000)' worker_notify_v133_scan_control.js
+          echo 'Static scan-control contract PASS.'
+
+      - name: Install Wrangler
+        run: npm install
+
+      - name: Cloudflare bundle dry run
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx wrangler deploy --dry-run --outdir .wrangler-dry-run
+          test -n "$(find .wrangler-dry-run -type f -maxdepth 2 | head -n 1)"
+          echo 'Wrangler dry-run bundle PASS.'
+
+      - name: Verify production invariants remain unchanged
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -q 'NOTIFY_DAILY_BUDGET = "40000"' wrangler.toml
+          grep -q 'FOCUS_INTERVAL_MS = "30000"' wrangler.toml
+          grep -q 'SCREEN_INTERVAL_MS = "60000"' wrangler.toml
+          grep -q 'APNS_BUNDLE_ID = "vn.footballedge.app"' wrangler.toml
+          echo 'Budget/cadence/APNs invariants PASS.'
