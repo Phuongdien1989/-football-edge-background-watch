@@ -1,0 +1,79 @@
+name: Football Edge HC Validation Integrity Preflight
+
+on:
+  push:
+    branches:
+      - fix-hc-validation-integrity
+    paths:
+      - 'hc-validation-guard.js'
+      - 'worker_notify_v134_hc_validation.js'
+      - 'wrangler.toml'
+      - '.github/workflows/hc-validation-integrity-preflight.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  preflight:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Static syntax checks
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check hc-validation-guard.js
+          node --check worker_notify_v134_hc_validation.js
+          grep -q 'main = "worker_notify_v134_hc_validation.js"' wrangler.toml
+          grep -q 'HC_END_STATE_GUARDED_V1' worker_notify_v134_hc_validation.js
+          echo 'Static HC validation checks PASS.'
+
+      - name: HC guard unit smoke tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import {hcEndStateGuard,classifyHcEnd} from './hc-validation-guard.js';
+          const now=1_000_000;
+          const partial={last:{gap:0,at:now,sourceHealth:{stats:'OK'}},hcHistory:[{captured_at:now-120000,metrics:{dataTier:'FULL'}},{captured_at:now,metrics:{dataTier:'PARTIAL'}}]};
+          if(hcEndStateGuard(partial,now).ready)throw new Error('PARTIAL_ZERO_MUST_NOT_RESOLVE');
+          const reset={last:{gap:0,at:now,sourceHealth:{stats:'OK'}},hcHistory:[{captured_at:now-30000,metrics:{dataTier:'FULL'}},{captured_at:now,metrics:{dataTier:'FULL'}}]};
+          if(hcEndStateGuard(reset,now).ready)throw new Error('RESET_WINDOW_MUST_NOT_RESOLVE');
+          const full={last:{gap:0,at:now,sourceHealth:{stats:'OK'}},hcHistory:[{captured_at:now-180000,metrics:{dataTier:'FULL'}},{captured_at:now,metrics:{dataTier:'FULL'}}]};
+          const g=hcEndStateGuard(full,now);if(!g.ready)throw new Error('FULL_END_STATE_SHOULD_RESOLVE');
+          if(classifyHcEnd(72,0,70).state!=='NEUTRALIZED')throw new Error('LEGIT_ZERO_CLASSIFICATION_CHANGED');
+          if(classifyHcEnd(64,66,60).state!=='SAME_ABOVE_THRESHOLD')throw new Error('SAME_ABOVE_CHANGED');
+          if(classifyHcEnd(72,-35,70).state!=='FLIPPED')throw new Error('FLIP_CHANGED');
+          console.log('HC guard unit smoke tests PASS.');
+          NODE
+
+      - name: Install Wrangler
+        run: npm install
+
+      - name: Cloudflare bundle dry run
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx wrangler deploy --dry-run --outdir .wrangler-dry-run
+          test -n "$(find .wrangler-dry-run -maxdepth 2 -type f | head -n 1)"
+          echo 'Wrangler dry-run bundle PASS.'
+
+      - name: Verify non-regression invariants
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -q 'NOTIFY_DAILY_BUDGET = "40000"' wrangler.toml
+          grep -q 'FOCUS_INTERVAL_MS = "30000"' wrangler.toml
+          grep -q 'SCREEN_INTERVAL_MS = "60000"' wrangler.toml
+          grep -q 'APNS_BUNDLE_ID = "vn.footballedge.app"' wrangler.toml
+          grep -q "worker_notify_v133_scan_control.js" worker_notify_v134_hc_validation.js
+          echo 'Budget/cadence/APNs/scan-control invariants PASS.'
