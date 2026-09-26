@@ -1,5 +1,5 @@
 name = "football-edge-background-watch"
-main = "worker_notify_v133_scan_control.js"
+main = "worker_notify_v134_hc_validation.js"
 compatibility_flags = ["nodejs_compat"]
 compatibility_date = "2026-09-11"
 
@@ -30,7 +30,7 @@ bindings = [
 tag = "v1"
 new_sqlite_classes = ["BackgroundWatcher"]
 
-# V1.23.1 core D1 + V1.23.3 history tables; N1 native Push and V1.33 scan control add only DO storage keys and require no D1 migration
+# V1.23.1 core D1 + V1.23.3 history tables; native Push, scan control and HC validation guard add only DO/runtime logic and require no D1 migration
 [[d1_databases]]
 binding = "FOOTBALL_DB"
 database_name = "football-edge-db"
