@@ -1,23 +1,33 @@
 name = "football-edge-background-watch"
-main = "worker_notify_v132_native.js"
+main = "worker_notify_v134_global6500.js"
 compatibility_flags = ["nodejs_compat"]
 compatibility_date = "2026-09-11"
 
 [vars]
-NOTIFY_DAILY_BUDGET = "40000"
-VALIDATION_DAILY_BUDGET = "5000"
+# API-Football safe operating envelope: 6,500/day total.
+# Worker background traffic is hard/paced at 5,000/day, leaving 1,000 for
+# foreground/manual app work and 500 as safety reserve.
+BACKGROUND_DAILY_BUDGET = "5000"
+NOTIFY_DAILY_BUDGET = "4500"
+VALIDATION_DAILY_BUDGET = "500"
+API_TOTAL_DAILY_BUDGET = "6500"
+API_FOREGROUND_RESERVE = "1000"
+API_SAFETY_RESERVE = "500"
 APISPORTS_BASE = "https://v3.football.api-sports.io"
 TZ = "Asia/Ho_Chi_Minh"
-FOCUS_INTERVAL_MS = "30000"
-SCREEN_INTERVAL_MS = "60000"
-DETAIL_FOCUS_MS = "60000"
-DETAIL_SCREEN_MS = "180000"
-MAX_DETAIL_PER_TICK = "6"
+
+# Lower-breadth Smart Follow under Q6500. Focus remains fresher than screen,
+# while the global quota gate can still slow all paths if the day is overspending.
+FOCUS_INTERVAL_MS = "60000"
+SCREEN_INTERVAL_MS = "120000"
+DETAIL_FOCUS_MS = "90000"
+DETAIL_SCREEN_MS = "240000"
+MAX_DETAIL_PER_TICK = "2"
 MAX_ACTIVE_WATCHES = "120"
 MAX_FOCUS_WATCHES = "16"
 WATCH_PERSIST_HEARTBEAT_MS = "300000"
-LOOKUP_FOCUS_MS = "120000"
-LOOKUP_SCREEN_MS = "300000"
+LOOKUP_FOCUS_MS = "180000"
+LOOKUP_SCREEN_MS = "480000"
 APNS_BUNDLE_ID = "vn.footballedge.app"
 APNS_ENV = "sandbox"
 
@@ -30,7 +40,7 @@ bindings = [
 tag = "v1"
 new_sqlite_classes = ["BackgroundWatcher"]
 
-# V1.23.1 core D1 + V1.23.3 history tables; N1 native Push adds only DO storage keys and requires no D1 migration
+# V1.23.1 core D1 + V1.23.3 history tables; quota envelope changes no D1 schema
 [[d1_databases]]
 binding = "FOOTBALL_DB"
 database_name = "football-edge-db"
