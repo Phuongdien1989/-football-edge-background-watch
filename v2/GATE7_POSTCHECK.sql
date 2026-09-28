@@ -1,0 +1,12 @@
+SELECT 'V1_CORE_SCHEMA' AS check_name, value AS value FROM fe_schema_meta WHERE key='schema_version';
+SELECT 'V1_HISTORY_SCHEMA' AS check_name, value AS value FROM fe_schema_meta WHERE key='history_schema_version';
+SELECT 'V2_SCHEMA' AS check_name, schema_version AS value FROM v2_schema_meta WHERE id=1;
+SELECT 'V2_DQ_POLICY' AS check_name, dq_version || ':' || status AS value FROM v2_quality_policies WHERE dq_version='DQ_V2_0_1_SHADOW';
+SELECT 'V1_TEAMS' AS check_name, COUNT(*) AS value FROM teams;
+SELECT 'V2_TEAMS' AS check_name, COUNT(*) AS value FROM v2_teams;
+SELECT 'V1_FIXTURE_HISTORY_VALID_KEYS' AS check_name, COUNT(*) AS value FROM fixture_history WHERE fixture_id IS NOT NULL AND league_id IS NOT NULL AND season IS NOT NULL AND home_team_id IS NOT NULL AND away_team_id IS NOT NULL AND home_team_id <> away_team_id AND kickoff IS NOT NULL;
+SELECT 'V2_FIXTURES' AS check_name, COUNT(*) AS value FROM v2_fixtures;
+SELECT 'V2_LIVE_SNAPSHOTS' AS check_name, COUNT(*) AS value FROM v2_live_snapshots;
+SELECT 'V2_DQ_SNAPSHOTS' AS check_name, COUNT(*) AS value FROM v2_data_quality_snapshots;
+SELECT COUNT(*) AS duplicate_fixture_bucket_groups FROM (SELECT fixture_id,capture_bucket,COUNT(*) n FROM v2_live_snapshots GROUP BY fixture_id,capture_bucket HAVING COUNT(*)>1);
+PRAGMA foreign_key_check;
