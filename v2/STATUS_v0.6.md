@@ -1,4 +1,4 @@
-# FOOTBALL V2 — STATUS v0.6
+# FOOTBALL V2 — STATUS v0.6.1
 
 ## B6 SHADOW LIVE CAPTURE WORKER
 **LOCAL PASS / BRANCH-READY**
@@ -6,8 +6,9 @@
 ### DA CO
 - Shadow enable switch
 - D1 schema readiness gate
-- Same V1 PAUSE semantics
-- Own daily API budget
+- Same V1 PAUSE semantics, re-check sau `super.alarm()`
+- Own daily API budget (default 4,000/day)
+- Independent 120s shadow tick throttle
 - League-season coverage cache
 - All-LIVE discovery
 - Least-recently-captured round robin
