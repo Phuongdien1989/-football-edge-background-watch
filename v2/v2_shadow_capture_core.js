@@ -2,7 +2,7 @@
   FOOTBALL V2 — SHADOW CAPTURE PLANNER v0.6
   Pure functions: no API calls, no database writes.
 */
-export const SHADOW_VERSION='V2_SHADOW_CAPTURE_0.6';
+export const SHADOW_VERSION='V2_SHADOW_CAPTURE_0.6.1';
 
 export const SHADOW_POLICY=Object.freeze({
   base_interval_ms:120000,
@@ -97,6 +97,12 @@ export function planCaptures(fixtures,lastById={},nowMs=Date.now(),maxPerTick=SH
     a.fixture_id-b.fixture_id
   );
   return candidates.slice(0,Math.max(1,Number(maxPerTick)||SHADOW_POLICY.max_per_tick));
+}
+
+export function shadowTickDue(lastTickAt,nowMs=Date.now(),intervalMs=120000){
+  const last=Number(lastTickAt||0);
+  const interval=Math.max(30000,Math.min(600000,Number(intervalMs)||120000));
+  return last<=0 || nowMs-last>=interval;
 }
 
 export function compactLastState(packet,uiInterest=null){
