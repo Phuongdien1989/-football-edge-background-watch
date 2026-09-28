@@ -1,0 +1,46 @@
+name = "football-edge-background-watch"
+main = "worker_v2_shadow_capture.js"
+compatibility_flags = ["nodejs_compat"]
+compatibility_date = "2026-09-11"
+
+[vars]
+NOTIFY_DAILY_BUDGET = "50000"
+VALIDATION_DAILY_BUDGET = "5000"
+APISPORTS_BASE = "https://v3.football.api-sports.io"
+TZ = "Asia/Ho_Chi_Minh"
+FOCUS_INTERVAL_MS = "30000"
+SCREEN_INTERVAL_MS = "60000"
+DETAIL_FOCUS_MS = "60000"
+DETAIL_SCREEN_MS = "180000"
+MAX_DETAIL_PER_TICK = "6"
+MAX_ACTIVE_WATCHES = "120"
+MAX_FOCUS_WATCHES = "16"
+WATCH_PERSIST_HEARTBEAT_MS = "300000"
+LOOKUP_FOCUS_MS = "120000"
+LOOKUP_SCREEN_MS = "300000"
+APNS_BUNDLE_ID = "vn.footballedge.app"
+APNS_ENV = "sandbox"
+
+# V2 SHADOW — OFF BY DEFAULT
+V2_SHADOW_ENABLED = "0"
+V2_SHADOW_MAX_FIXTURES = "12"
+V2_SHADOW_DAILY_BUDGET = "4000"
+V2_SHADOW_TICK_INTERVAL_MS = "120000"
+
+[durable_objects]
+bindings = [
+  { name = "BACKGROUND_WATCHER", class_name = "BackgroundWatcher" }
+]
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["BackgroundWatcher"]
+
+[[d1_databases]]
+binding = "FOOTBALL_DB"
+database_name = "football-edge-db"
+database_id = "0d12a7cc-12a9-4c71-b55b-61dfd2dac4d4"
+
+[observability]
+enabled = true
+head_sampling_rate = 1
