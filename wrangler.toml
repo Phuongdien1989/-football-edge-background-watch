@@ -1,5 +1,5 @@
 name = "football-edge-background-watch"
-main = "worker_notify_v132_native.js"
+main = "worker_notify_v135_full_pause.js"
 compatibility_flags = ["nodejs_compat"]
 compatibility_date = "2026-09-11"
 
@@ -13,7 +13,7 @@ VALIDATION_DAILY_BUDGET = "5000"
 APISPORTS_BASE = "https://v3.football.api-sports.io"
 TZ = "Asia/Ho_Chi_Minh"
 
-# Restore stable pre-Q6500 cadence/breadth.
+# Stable pre-Q6500 cadence/breadth.
 FOCUS_INTERVAL_MS = "30000"
 SCREEN_INTERVAL_MS = "60000"
 DETAIL_FOCUS_MS = "60000"
