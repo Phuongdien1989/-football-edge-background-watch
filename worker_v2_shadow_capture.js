@@ -2,7 +2,7 @@ import base,{BackgroundWatcher as ExistingWatcher} from './worker_notify_v135_fu
 import {buildSnapshot} from './v2/v2_ingest_core.js';
 import {persistSnapshotD1} from './v2/v2_persist_d1.js';
 import {
-  SHADOW_VERSION,SHADOW_POLICY,planCaptures,compactLastState
+  SHADOW_VERSION,SHADOW_POLICY,planCaptures,compactLastState,shadowTickDue
 } from './v2/v2_shadow_capture_core.js';
 
 const V2_SCHEMA_EXPECTED='2.0.0-foundation';
@@ -58,7 +58,11 @@ export class BackgroundWatcher extends ExistingWatcher{
   }
 
   v2DailyBudget(){
-    return Math.max(100,num(this.env.V2_SHADOW_DAILY_BUDGET,20000));
+    return Math.max(100,num(this.env.V2_SHADOW_DAILY_BUDGET,4000));
+  }
+
+  v2TickInterval(){
+    return Math.max(30000,Math.min(600000,num(this.env.V2_SHADOW_TICK_INTERVAL_MS,120000)));
   }
 
   async v2SchemaReady(){
@@ -251,6 +255,15 @@ export class BackgroundWatcher extends ExistingWatcher{
       return {ok:false,skipped:true,reason:'V2_SHADOW_DISABLED'};
     }
 
+    const now=Date.now();
+    if(!manual){
+      const lastTickAt=await this.ctx.storage.get('v2:shadow:last-tick-at');
+      if(!shadowTickDue(lastTickAt,now,this.v2TickInterval())){
+        return {ok:true,skipped:true,reason:'V2_SHADOW_THROTTLED',last_tick_at:lastTickAt||null};
+      }
+      await this.ctx.storage.put('v2:shadow:last-tick-at',now);
+    }
+
     const schema=await this.v2SchemaReady();
     if(!schema.ok){
       const s={
@@ -346,6 +359,7 @@ export class BackgroundWatcher extends ExistingWatcher{
         base_interval_sec:SHADOW_POLICY.base_interval_ms/1000,
         active_interval_sec:SHADOW_POLICY.active_interval_ms/1000,
         event_min_gap_sec:SHADOW_POLICY.event_min_gap_ms/1000,
+        shadow_tick_interval_sec:this.v2TickInterval()/1000,
         max_per_tick:this.v2MaxFixtures()
       },
       production_engines_changed:false,
@@ -382,11 +396,13 @@ export class BackgroundWatcher extends ExistingWatcher{
   }
 
   async alarm(){
+    // V1 remains the scheduling owner and executes unchanged first.
+    await super.alarm();
+
+    // Re-read PAUSE after V1 alarm completes so a mid-run pause is respected.
     const control=typeof this.scanControl==='function'
       ?await this.scanControl()
       :{enabled:true};
-
-    await super.alarm();
 
     if(control?.enabled===false)return;
     if(!this.v2ShadowEnabled())return;
