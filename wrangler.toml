@@ -1,20 +1,20 @@
 name = "football-edge-background-watch"
-main = "worker_notify_v136_hot_priority.js"
+main = "worker_notify_v137_quota50000.js"
 compatibility_flags = ["nodejs_compat"]
 compatibility_date = "2026-09-11"
 
 [vars]
-# API-Football current plan: 65,000 calls/day.
-# Notification scanner may use up to 50,000/day; Push Validation up to 5,000.
-# Remaining ~10,000 calls stay available for Smart Follow/Evidence/foreground/manual work.
-NOTIFY_DAILY_BUDGET = "50000"
-VALIDATION_DAILY_BUDGET = "5000"
+# API-Football current plan: 50,000 calls/day TOTAL.
+# P1.3 adds a global hard cap across Notification + Smart Follow + Evidence + Validation.
+# It does NOT pace or slow requests while quota remains available.
+API_TOTAL_DAILY_BUDGET = "50000"
+NOTIFY_DAILY_BUDGET = "43000"
+VALIDATION_DAILY_BUDGET = "3000"
 APISPORTS_BASE = "https://v3.football.api-sports.io"
 TZ = "Asia/Ho_Chi_Minh"
 
-# P1.2 notification latency scheduler.
+# P1.2 notification latency scheduler remains unchanged.
 # HOT fixtures get priority slots and a 20s cadence; normal rotation remains 30s.
-# This changes scheduling only — H1/FT/HC engines and thresholds are untouched.
 NOTIFY_HOT_INTERVAL_MS = "20000"
 NOTIFY_NORMAL_INTERVAL_MS = "30000"
 NOTIFY_HOT_SLOTS = "6"
