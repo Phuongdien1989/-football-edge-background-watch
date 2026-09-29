@@ -1,19 +1,27 @@
 name = "football-edge-background-watch"
-main = "worker_notify_v135_full_pause.js"
+main = "worker_notify_v136_hot_priority.js"
 compatibility_flags = ["nodejs_compat"]
 compatibility_date = "2026-09-11"
 
 [vars]
 # API-Football current plan: 65,000 calls/day.
-# Keep the stable v132 scanner behavior. The notification scanner may use up to
-# 50,000 calls/day; Push Validation may use up to 5,000. The remaining ~10,000
-# calls are left for Smart Follow/Evidence/foreground/manual app work.
+# Notification scanner may use up to 50,000/day; Push Validation up to 5,000.
+# Remaining ~10,000 calls stay available for Smart Follow/Evidence/foreground/manual work.
 NOTIFY_DAILY_BUDGET = "50000"
 VALIDATION_DAILY_BUDGET = "5000"
 APISPORTS_BASE = "https://v3.football.api-sports.io"
 TZ = "Asia/Ho_Chi_Minh"
 
-# Stable pre-Q6500 cadence/breadth.
+# P1.2 notification latency scheduler.
+# HOT fixtures get priority slots and a 20s cadence; normal rotation remains 30s.
+# This changes scheduling only — H1/FT/HC engines and thresholds are untouched.
+NOTIFY_HOT_INTERVAL_MS = "20000"
+NOTIFY_NORMAL_INTERVAL_MS = "30000"
+NOTIFY_HOT_SLOTS = "6"
+NOTIFY_HOT_GAP_MARGIN = "10"
+NOTIFY_HOT_H1_MARGIN = "8"
+
+# Stable Smart Follow cadence/breadth.
 FOCUS_INTERVAL_MS = "30000"
 SCREEN_INTERVAL_MS = "60000"
 DETAIL_FOCUS_MS = "60000"
