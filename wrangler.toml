@@ -22,7 +22,7 @@ crons = ["* * * * *"]
 [[d1_databases]]
 binding = "DB"
 database_name = "football-edge-v2-raw"
-database_id = "__D1_DATABASE_ID__"
+database_id = "8b11770e-0273-429a-a22c-b61245f7023e"
 
 [observability]
 enabled = true
