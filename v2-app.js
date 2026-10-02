@@ -45,8 +45,8 @@ async function refreshPushStatus(){
     if(!('serviceWorker'in navigator)||!('PushManager'in window)||!('Notification'in window)){setPushUi('UNSUPPORTED','Trình duyệt này không hỗ trợ Web Push');return}
     var id=localStorage.getItem('fev2_push_id'),sub=await getPushSubscription();
     if(id&&sub&&Notification.permission==='granted'){
-      var r=await fetch('/api/v2/push/status',{cache:'no-store'}),d=await r.json(),found=(d.devices||[]).some(function(x){return x.id===id});
-      if(found){setPushUi('ON','Push server đã kết nối thiết bị này');return}
+      var r=await fetch('/api/v2/push/status?id='+encodeURIComponent(id),{cache:'no-store'}),d=await r.json();
+      if(d.exists){setPushUi('ON','Push server đã kết nối thiết bị này');return}
     }
     if(Notification.permission==='denied'){setPushUi('DENIED','Quyền thông báo đang bị chặn trong iPhone Settings');return}
     setPushUi('OFF',isIOS()&&!isStandalone()?'iPhone: Add to Home Screen trước khi bật Push':'Chưa đăng ký Background Push');
