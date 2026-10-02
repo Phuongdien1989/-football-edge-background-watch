@@ -346,13 +346,99 @@ async function status(env) {
     SUM(CASE WHEN evidence_kind='EVENTS' AND item_count>0 THEN 1 ELSE 0 END) event_payloads,
     SUM(CASE WHEN evidence_kind='STATISTICS' AND non_null_value_count>0 THEN 1 ELSE 0 END) stats_payloads,
     MIN(received_at) first_received_at, MAX(received_at) last_received_at FROM raw_fixture_evidence`).first();
+  const recent = await env.DB.prepare(`SELECT fixture_id,match_clock,status_short,received_at,event_count,stats_value_count,has_events,has_stats
+    FROM raw_fixture_captures ORDER BY received_at DESC LIMIT 10`).all();
   return {ok:true,worker_version:WORKER_VERSION,capture_schema_version:CAPTURE_SCHEMA_VERSION,capture_enabled:flag(env.CAPTURE_ENABLED,true),
-    api_key_configured:!!env.APISPORTS_KEY,capture_token_configured:!!env.CAPTURE_TOKEN,last_cycle:last||null,stored:captures||null,evidence:evidence||null};
+    api_key_configured:!!env.APISPORTS_KEY,capture_token_configured:!!env.CAPTURE_TOKEN,last_cycle:last||null,stored:captures||null,
+    evidence:evidence||null,recent:(recent.results||[])};
 }
+
+function dashboardHtml() {
+  return \`<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0b1739">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="FE V2 Monitor">
+<title>Football Edge V2 Monitor</title>
+<style>
+:root{color-scheme:dark;--bg:#071127;--card:#0e1b3d;--card2:#11244f;--text:#f5f8ff;--muted:#9db0d4;--line:#223866;--good:#39d98a;--warn:#ffcc66;--bad:#ff6b7a;--blue:#63a4ff}
+*{box-sizing:border-box}body{margin:0;background:linear-gradient(180deg,#071127,#0a1530 55%,#071127);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--text)}
+.wrap{max-width:760px;margin:0 auto;padding:calc(env(safe-area-inset-top) + 16px) 14px calc(env(safe-area-inset-bottom) + 28px)}
+.head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}.title{font-weight:800;font-size:22px;letter-spacing:.2px}.sub{font-size:12px;color:var(--muted);margin-top:4px}
+.btn{border:1px solid var(--line);background:#132654;color:#fff;border-radius:12px;padding:10px 13px;font-weight:700}.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+.card{background:rgba(14,27,61,.92);border:1px solid var(--line);border-radius:16px;padding:14px;box-shadow:0 8px 28px rgba(0,0,0,.18)}
+.k{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.8px}.v{font-size:25px;font-weight:800;margin-top:5px}.small{font-size:12px;color:var(--muted);margin-top:4px}
+.full{grid-column:1/-1}.row{display:flex;align-items:center;justify-content:space-between;gap:10px}.pill{display:inline-flex;align-items:center;gap:6px;padding:7px 10px;border-radius:999px;font-size:12px;font-weight:800}.good{background:rgba(57,217,138,.14);color:var(--good)}.warn{background:rgba(255,204,102,.14);color:var(--warn)}.bad{background:rgba(255,107,122,.14);color:var(--bad)}.neutral{background:rgba(99,164,255,.14);color:var(--blue)}
+.section{margin-top:12px}.section h3{font-size:14px;margin:0 0 8px;color:#dbe6ff}.item{display:grid;grid-template-columns:1fr auto;gap:8px;padding:10px 0;border-top:1px solid rgba(34,56,102,.7)}.item:first-child{border-top:0}.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px}.right{text-align:right}
+.bar{height:7px;background:#09152f;border-radius:10px;overflow:hidden;margin-top:10px}.fill{height:100%;background:linear-gradient(90deg,#4c8dff,#39d98a);width:0}
+.note{font-size:12px;line-height:1.5;color:var(--muted)}.footer{text-align:center;color:#6f84ae;font-size:11px;margin-top:16px}
+@media(min-width:600px){.grid{grid-template-columns:repeat(4,1fr)}.full{grid-column:1/-1}}
+</style>
+</head>
+<body><div class="wrap">
+<div class="head"><div><div class="title">FOOTBALL EDGE V2</div><div class="sub">RAW CAPTURE MONITOR · GIAM SAT DU LIEU THAT</div></div><button class="btn" onclick="load()">Refresh</button></div>
+<div id="top" class="grid">
+  <div class="card"><div class="k">Fixtures</div><div class="v" id="fixtures">—</div><div class="small">Tran da thu raw</div></div>
+  <div class="card"><div class="k">Snapshots</div><div class="v" id="snapshots">—</div><div class="small">Moc du lieu da luu</div></div>
+  <div class="card"><div class="k">Events</div><div class="v" id="events">—</div><div class="small">Payload co event</div></div>
+  <div class="card"><div class="k">Stats</div><div class="v" id="stats">—</div><div class="small">Payload statistics hop le</div></div>
+  <div class="card full">
+    <div class="row"><div><div class="k">Readiness</div><div class="v" style="font-size:20px" id="readiness">CHECKING</div></div><span id="readyPill" class="pill neutral">...</span></div>
+    <div class="bar"><div id="readyBar" class="fill"></div></div>
+    <div id="readyNote" class="note" style="margin-top:9px"></div>
+  </div>
+  <div class="card full">
+    <div class="row"><div><div class="k">Last collector cycle</div><div class="v" style="font-size:18px" id="cycle">—</div></div><span id="cyclePill" class="pill neutral">—</span></div>
+    <div class="note" id="cycleNote" style="margin-top:9px"></div>
+  </div>
+  <div class="card full">
+    <div class="row"><div><div class="k">API quota</div><div class="v" style="font-size:20px"><span id="remaining">—</span></div></div><div class="right small"><div id="limit">limit —</div><div id="minute">minute —</div></div></div>
+  </div>
+</div>
+<div class="section card"><h3>RECENT CAPTURES · DU LIEU GAN NHAT</h3><div id="recent"><div class="note">Loading...</div></div></div>
+<div class="section card"><h3>WHAT THIS MEANS · Y NGHIA</h3><div class="note">Raw capture available = collector da thu du lieu API that. LRS scorable = can co statistics that hop le. Hai trang thai nay khac nhau; dashboard se khong coi raw da co la LRS da san sang.</div></div>
+<div class="footer">Auto refresh 30s · Worker <span id="ver">—</span></div>
+</div>
+<script>
+const $=id=>document.getElementById(id);
+const fmt=n=>n===null||n===undefined?'—':Number(n).toLocaleString('en-US');
+const when=s=>{if(!s)return '—';try{return new Date(s).toLocaleString('vi-VN',{hour12:false})}catch{return s}};
+function pill(el,text,cls){el.textContent=text;el.className='pill '+cls}
+async function load(){
+  try{
+    const r=await fetch('/status',{cache:'no-store'}); const s=await r.json();
+    $('ver').textContent=s.worker_version||'—';
+    $('fixtures').textContent=fmt(s.stored?.fixtures);
+    $('snapshots').textContent=fmt(s.stored?.n);
+    $('events').textContent=fmt(s.evidence?.event_payloads);
+    $('stats').textContent=fmt(s.evidence?.stats_payloads);
+    const stats=Number(s.evidence?.stats_payloads||0), raw=Number(s.stored?.n||0);
+    if(stats>0){$('readiness').textContent='REAL STATS AVAILABLE';pill($('readyPill'),'READY FOR REPLAY','good');$('readyBar').style.width='100%';$('readyNote').textContent='Da co statistics that. Co the export va chay Strict Replay/LRS shadow.'}
+    else if(raw>0){$('readiness').textContent='RAW YES · LRS NOT YET';pill($('readyPill'),'STATS BLOCKER','warn');$('readyBar').style.width='55%';$('readyNote').textContent='Da thu raw that, nhung chua co statistics hop le. Khong du dieu kien cham LRS.'}
+    else{$('readiness').textContent='COLLECTING';pill($('readyPill'),'WAITING RAW','neutral');$('readyBar').style.width='20%';$('readyNote').textContent='Collector dang cho chu ky du lieu dau tien.'}
+    const c=s.last_cycle||{};$('cycle').textContent=(c.status||'—')+' · '+(c.live_count??0)+' LIVE';
+    const stop=c.stop_reason||'NONE';const cc=c.status==='ERROR'?'bad':(stop.includes('RATE')?'warn':'good');pill($('cyclePill'),stop,cc);
+    $('cycleNote').textContent='Last: '+when(c.completed_at||c.started_at)+' · requests '+fmt(c.total_requests)+' · detail '+fmt(c.detail_requests)+(c.error_message?' · '+c.error_message:'');
+    $('remaining').textContent=c.daily_remaining==null?'—':fmt(c.daily_remaining)+' remaining';
+    $('limit').textContent='daily limit '+fmt(c.daily_limit);$('minute').textContent='minute '+fmt(c.minute_remaining)+' / '+fmt(c.minute_limit);
+    const rows=s.recent||[];$('recent').innerHTML=rows.length?rows.map(x=>\`<div class="item"><div><div class="mono">#\${x.fixture_id} · \${x.status_short||'—'} · \${x.match_clock??'—'}'</div><div class="small">\${when(x.received_at)}</div></div><div class="right"><div class="mono">E \${x.event_count??0} · S \${x.stats_value_count??0}</div><div class="small">\${x.has_stats?'STATS OK':'NO STATS'}</div></div></div>\`).join(''):'<div class="note">No captures yet.</div>';
+  }catch(e){$('readiness').textContent='STATUS ERROR';pill($('readyPill'),'CHECK WORKER','bad');$('readyNote').textContent=String(e)}
+}
+load();setInterval(load,30000);
+</script></body></html>\`;
+}
+
 export default {
   async scheduled(controller, env, ctx) { ctx.waitUntil(capture(env,'SCHEDULED')); },
   async fetch(request, env) {
     const u = new URL(request.url);
+    if (u.pathname === '/' || u.pathname === '/app' || u.pathname === '/dashboard') {
+      return new Response(dashboardHtml(),{headers:{'content-type':'text/html; charset=utf-8','cache-control':'no-store'}});
+    }
     if (u.pathname === '/health') return json({ok:true,worker_version:WORKER_VERSION,capture_schema_version:CAPTURE_SCHEMA_VERSION});
     if (u.pathname === '/status') return json(await status(env));
     if (u.pathname === '/capture-now') {
@@ -379,6 +465,6 @@ export default {
       const q=await env.DB.prepare(`SELECT capture_id,fixture_id,match_clock,status_short,received_at,event_count,stats_team_count,stats_value_count,has_events,has_stats,has_lineups,has_players FROM raw_fixture_captures ORDER BY received_at DESC LIMIT ?`).bind(limit).all();
       return json({ok:true,rows:q.results||[]});
     }
-    return new Response('Football Edge V2 Raw Capture Worker', {status:200});
+    return new Response('Not found', {status:404});
   }
 };
