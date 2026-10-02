@@ -72,3 +72,19 @@ CREATE TABLE IF NOT EXISTS collector_state (
   value TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );
+
+
+CREATE TABLE IF NOT EXISTS raw_fixture_evidence (
+  evidence_id TEXT PRIMARY KEY,
+  request_id TEXT NOT NULL,
+  fixture_id INTEGER NOT NULL,
+  evidence_kind TEXT NOT NULL,
+  received_at TEXT NOT NULL,
+  item_count INTEGER NOT NULL DEFAULT 0,
+  non_null_value_count INTEGER NOT NULL DEFAULT 0,
+  payload_hash TEXT NOT NULL,
+  payload_json TEXT NOT NULL,
+  FOREIGN KEY(request_id) REFERENCES raw_api_requests(request_id)
+);
+CREATE INDEX IF NOT EXISTS idx_raw_fixture_evidence_fx_time ON raw_fixture_evidence(fixture_id, received_at);
+CREATE INDEX IF NOT EXISTS idx_raw_fixture_evidence_kind_time ON raw_fixture_evidence(evidence_kind, received_at);
