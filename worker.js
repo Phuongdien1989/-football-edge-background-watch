@@ -354,7 +354,7 @@ async function status(env) {
 }
 
 function dashboardHtml() {
-  return \`<!doctype html>
+  return `<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
@@ -425,11 +425,11 @@ async function load(){
     $('cycleNote').textContent='Last: '+when(c.completed_at||c.started_at)+' · requests '+fmt(c.total_requests)+' · detail '+fmt(c.detail_requests)+(c.error_message?' · '+c.error_message:'');
     $('remaining').textContent=c.daily_remaining==null?'—':fmt(c.daily_remaining)+' remaining';
     $('limit').textContent='daily limit '+fmt(c.daily_limit);$('minute').textContent='minute '+fmt(c.minute_remaining)+' / '+fmt(c.minute_limit);
-    const rows=s.recent||[];$('recent').innerHTML=rows.length?rows.map(x=>\`<div class="item"><div><div class="mono">#\${x.fixture_id} · \${x.status_short||'—'} · \${x.match_clock??'—'}'</div><div class="small">\${when(x.received_at)}</div></div><div class="right"><div class="mono">E \${x.event_count??0} · S \${x.stats_value_count??0}</div><div class="small">\${x.has_stats?'STATS OK':'NO STATS'}</div></div></div>\`).join(''):'<div class="note">No captures yet.</div>';
+    const rows=s.recent||[];$('recent').innerHTML=rows.length?rows.map(x=>'<div class="item"><div><div class="mono">#'+x.fixture_id+' · '+(x.status_short||'—')+' · '+(x.match_clock??'—')+'\'</div><div class="small">'+when(x.received_at)+'</div></div><div class="right"><div class="mono">E '+(x.event_count??0)+' · S '+(x.stats_value_count??0)+'</div><div class="small">'+(x.has_stats?'STATS OK':'NO STATS')+'</div></div></div>').join(''):'<div class="note">No captures yet.</div>';
   }catch(e){$('readiness').textContent='STATUS ERROR';pill($('readyPill'),'CHECK WORKER','bad');$('readyNote').textContent=String(e)}
 }
 load();setInterval(load,30000);
-</script></body></html>\`;
+</script></body></html>`;
 }
 
 export default {
