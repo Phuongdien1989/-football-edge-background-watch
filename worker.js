@@ -1,8 +1,8 @@
 import {v2AppHtml} from './v2-app.js';
 import {buildV2Overview, buildV2Match} from './v2-engine.js';
 const BASE = 'https://v3.football.api-sports.io';
-const WORKER_VERSION = 'RAW_COLLECTOR_V0.4.1';
-const CAPTURE_SCHEMA_VERSION = 'RAW_CAPTURE_V0.4';
+const WORKER_VERSION = 'RAW_COLLECTOR_V0.5.0';
+const CAPTURE_SCHEMA_VERSION = 'RAW_CAPTURE_V0.5';
 const API_VERSION = 'v3';
 const PROVIDER = 'API_FOOTBALL';
 const SOURCE = 'CLOUDFLARE_V2_RAW_CAPTURE';
@@ -61,27 +61,61 @@ async function recordCycleEnd(env, cycleId, patch) {
       patch.daily_limit, patch.daily_remaining, patch.minute_limit, patch.minute_remaining,
       patch.stop_reason || null, patch.error_message || null, cycleId).run();
 }
+async function storeFixtureEvidence(env, requestId, fid, kind, received, rows, parentHash) {
+  if (fid == null || !kind) return null;
+  const arr = Array.isArray(rows) ? rows : [];
+  let nonNull = 0;
+  if (kind === 'STATISTICS') {
+    for (const team of arr) for (const st of (team?.statistics || [])) if (st?.value !== null && st?.value !== undefined) nonNull++;
+  } else if (kind === 'EVENTS' || kind === 'LINEUPS' || kind === 'PLAYERS') {
+    nonNull = arr.length;
+  } else {
+    const walk = v => {
+      if (v === null || v === undefined) return;
+      if (Array.isArray(v)) { for (const x of v) walk(x); return; }
+      if (typeof v === 'object') { for (const x of Object.values(v)) walk(x); return; }
+      nonNull++;
+    };
+    walk(arr);
+  }
+  const payload = {response:arr};
+  const body = JSON.stringify(payload);
+  const payloadHash = await stable(body);
+  const eid = 'EV-' + (await stable(`${requestId}|${kind}|${fid}|${payloadHash}|${parentHash||''}`)).slice(0,24);
+  await env.DB.prepare(`INSERT OR IGNORE INTO raw_fixture_evidence
+    (evidence_id,request_id,fixture_id,evidence_kind,received_at,item_count,non_null_value_count,payload_hash,payload_json)
+    VALUES(?,?,?,?,?,?,?,?,?)`)
+    .bind(eid,requestId,fid,kind,received,arr.length,nonNull,payloadHash,body).run();
+  return {kind, fixture_id:fid, item_count:arr.length, non_null_value_count:nonNull, payload_hash:payloadHash};
+}
 async function recordEndpointEvidence(env, requestId, endpoint, params, received, payload, payloadHash) {
   const fid = num(params?.fixture);
   if (fid == null) return null;
   let kind = null;
   if (endpoint === '/fixtures/events') kind = 'EVENTS';
   else if (endpoint === '/fixtures/statistics') kind = 'STATISTICS';
+  else if (endpoint === '/fixtures/lineups') kind = 'LINEUPS';
+  else if (endpoint === '/fixtures/players') kind = 'PLAYERS';
+  else if (endpoint === '/odds/live') kind = 'LIVE_ODDS';
+  else if (endpoint === '/odds') kind = 'PRE_ODDS';
+  else if (endpoint === '/predictions') kind = 'PREDICTIONS';
   if (!kind) return null;
-  const rows = Array.isArray(payload?.response) ? payload.response : [];
-  let nonNull = 0;
-  if (kind === 'STATISTICS') {
-    for (const team of rows) for (const st of (team?.statistics || [])) if (st?.value !== null && st?.value !== undefined) nonNull++;
-  } else {
-    nonNull = rows.length;
+  return storeFixtureEvidence(env,requestId,fid,kind,received,Array.isArray(payload?.response)?payload.response:[],payloadHash);
+}
+async function recordEmbeddedFixtureEvidence(env, requestId, item, received, parentHash) {
+  const fid = num(item?.fixture?.id);
+  if (fid == null) return [];
+  const out = [];
+  for (const [kind,rows] of [
+    ['EVENTS',item?.events],
+    ['STATISTICS',item?.statistics],
+    ['LINEUPS',item?.lineups],
+    ['PLAYERS',item?.players]
+  ]) {
+    if (!Array.isArray(rows)) continue;
+    out.push(await storeFixtureEvidence(env,requestId,fid,kind,received,rows,parentHash));
   }
-  const body = JSON.stringify(payload);
-  const eid = 'EV-' + (await stable(`${requestId}|${kind}|${fid}|${payloadHash}`)).slice(0,24);
-  await env.DB.prepare(`INSERT OR IGNORE INTO raw_fixture_evidence
-    (evidence_id,request_id,fixture_id,evidence_kind,received_at,item_count,non_null_value_count,payload_hash,payload_json)
-    VALUES(?,?,?,?,?,?,?,?,?)`)
-    .bind(eid,requestId,fid,kind,received,rows.length,nonNull,payloadHash,body).run();
-  return {kind, fixture_id:fid, item_count:rows.length, non_null_value_count:nonNull};
+  return out.filter(Boolean);
 }
 
 async function apiGet(env, endpoint, params) {
@@ -121,6 +155,9 @@ async function apiGet(env, endpoint, params) {
       VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
       .bind(cid,requestId,fid,item?.fixture?.status?.elapsed??null,item?.fixture?.status?.short??null,received,fh,fp,
         c.event_count,c.stats_team_count,c.stats_value_count,c.has_events,c.has_stats,c.has_lineups,c.has_players).run();
+    if (endpoint === '/fixtures' && params?.ids) {
+      await recordEmbeddedFixtureEvidence(env,requestId,item,received,payloadHash);
+    }
     detailFixtureCount++;
     fixturesWithStats += c.has_stats;
     fixturesWithEvents += c.has_events;
@@ -275,50 +312,69 @@ async function capture(env, triggerType='SCHEDULED') {
     if (!ids.length) { summary.stop_reason='NO_LIVE_FIXTURES'; await recordCycleEnd(env,cycleId,summary); return summary; }
 
     let requestsLeft = Math.max(0, requestAllowance - 1);
-    const spacingMs = Math.max(250, Math.min(5000, num(env.DETAIL_SPACING_MS,1500)));
-    const wantedEvidence = Math.max(0, Math.min(10, num(env.EVIDENCE_FIXTURES_PER_CYCLE,3)));
-    const cursorState = await getState(env,'evidence_cursor');
-    let cursor = Math.max(0,num(cursorState?.value,0));
-    const evidenceFixtureCount = Math.min(ids.length, wantedEvidence, Math.floor(requestsLeft/2));
-    const rankedIds = [...liveItems].sort((a,b)=>{
-      const ae=(a?.events||[]).length, be=(b?.events||[]).length;
-      if(be!==ae) return be-ae;
-      const am=Number(a?.fixture?.status?.elapsed||0), bm=Number(b?.fixture?.status?.elapsed||0);
-      return bm-am;
-    }).map(x=>x.fixture.id);
-    const selected = [];
-    for (let i=0;i<evidenceFixtureCount;i++) selected.push(rankedIds[(cursor+i)%rankedIds.length]);
-    if (ids.length) await setState(env,'evidence_cursor',(cursor+evidenceFixtureCount)%ids.length);
+    const spacingMs = Math.max(1000, Math.min(12000, num(env.DETAIL_SPACING_MS,6500)));
 
-    for (const fid of selected) {
-      for (const [endpoint,kind] of [['/fixtures/statistics','STATISTICS'],['/fixtures/events','EVENTS']]) {
-        if (requestsLeft <= 0) break;
+    // Primary detail batch: API-Football can return embedded events/lineups/statistics/players
+    // for up to 20 fixture IDs in one request. This is the highest-value call in the cycle.
+    let detail = null;
+    if (requestsLeft > 0) {
+      await sleep(spacingMs);
+      detail = await apiGetWithRetry(env, '/fixtures', {ids:ids.slice(0,20).join('-')}, 1);
+      summary.detail_requests++; summary.total_requests++; requestsLeft--;
+      summary.detail_fixture_count += detail.detailFixtureCount;
+      summary.fixtures_with_stats += detail.fixturesWithStats;
+      summary.fixtures_with_events += detail.fixturesWithEvents;
+      if (detail.quota.daily_limit != null) summary.daily_limit = detail.quota.daily_limit;
+      if (detail.quota.daily_remaining != null) summary.daily_remaining = detail.quota.daily_remaining;
+      if (detail.quota.minute_limit != null) summary.minute_limit = detail.quota.minute_limit;
+      if (detail.quota.minute_remaining != null) summary.minute_remaining = detail.quota.minute_remaining;
+    }
+
+    // Every PRE interval, spend the optional request on today's fixture slate.
+    // Otherwise use it for one cross-check endpoint. Optional failure never discards
+    // the already-captured LIVE + detail batch.
+    if (requestsLeft > 0) {
+      const preState = await getState(env,'last_pre_capture_at');
+      const preAt = num(preState?.value);
+      const preInterval = Math.max(10*60*1000,Math.min(6*60*60*1000,num(env.PRE_CAPTURE_INTERVAL_MS,30*60*1000)));
+      const preDue = preAt == null || Date.now()-preAt >= preInterval;
+      try {
         await sleep(spacingMs);
-        const e = await apiGetWithRetry(env, endpoint, {fixture:String(fid)}, 1);
-        summary.detail_requests++; summary.total_requests++; requestsLeft--;
-        if (kind==='EVENTS' && (e.endpointEvidence?.item_count||0)>0) summary.fixtures_with_events++;
-        if (kind==='STATISTICS' && (e.endpointEvidence?.non_null_value_count||0)>0) summary.fixtures_with_stats++;
-        if (e.quota.daily_limit != null) summary.daily_limit = e.quota.daily_limit;
-        if (e.quota.daily_remaining != null) summary.daily_remaining = e.quota.daily_remaining;
-        if (e.quota.minute_limit != null) summary.minute_limit = e.quota.minute_limit;
-        if (e.quota.minute_remaining != null) summary.minute_remaining = e.quota.minute_remaining;
+        if (preDue) {
+          const vn = new Date(Date.now()+7*60*60*1000).toISOString().slice(0,10);
+          const pr = await apiGetWithRetry(env,'/fixtures',{date:vn,timezone:'Asia/Ho_Chi_Minh'},0);
+          summary.detail_requests++; summary.total_requests++; requestsLeft--;
+          await setState(env,'last_pre_capture_at',Date.now());
+          await setState(env,'last_pre_fixture_count',Array.isArray(pr.payload?.response)?pr.payload.response.length:0);
+        } else {
+          // Cross-check one fixture explicitly. Prefer a match whose embedded detail
+          // already proved statistics coverage; otherwise rotate through the live list.
+          const candidate = (detail?.payload?.response||[]).find(x=>fixtureCoverage(x).has_stats)?.fixture?.id
+            || ids[Math.max(0,num((await getState(env,'aux_cursor'))?.value,0)) % ids.length];
+          const auxCursor = Math.max(0,num((await getState(env,'aux_cursor'))?.value,0));
+          if (candidate != null) {
+            const useOdds = auxCursor % 3 === 2;
+            const ep = useOdds ? '/odds/live' : '/fixtures/statistics';
+            const ar = await apiGetWithRetry(env,ep,{fixture:String(candidate)},0);
+            summary.detail_requests++; summary.total_requests++; requestsLeft--;
+            await setState(env,'aux_cursor',auxCursor+1);
+            if (!useOdds && (ar.endpointEvidence?.non_null_value_count||0)>0) summary.fixtures_with_stats++;
+          }
+        }
+      } catch (auxErr) {
+        const msg=String(auxErr?.message||auxErr);
+        if (isRateLimitError(auxErr)) {
+          summary.stop_reason='AUX_RATE_LIMIT_BACKOFF';
+          const backoffMs=Math.max(30000,Math.min(600000,num(env.RATE_BACKOFF_MS,300000)));
+          await setState(env,'rate_backoff_until',Date.now()+backoffMs).catch(()=>{});
+        } else {
+          summary.stop_reason='AUX_REQUEST_FAILED';
+        }
+        summary.error_message=msg.slice(0,500);
       }
     }
 
-    if (requestsLeft > 0) {
-      await sleep(spacingMs);
-      const batch = ids.slice(0,20);
-      const d = await apiGetWithRetry(env, '/fixtures', {ids:batch.join('-')}, 1);
-      summary.detail_requests++; summary.total_requests++; requestsLeft--;
-      summary.detail_fixture_count += d.detailFixtureCount;
-      summary.fixtures_with_stats += d.fixturesWithStats;
-      summary.fixtures_with_events += d.fixturesWithEvents;
-      if (d.quota.daily_limit != null) summary.daily_limit = d.quota.daily_limit;
-      if (d.quota.daily_remaining != null) summary.daily_remaining = d.quota.daily_remaining;
-      if (d.quota.minute_limit != null) summary.minute_limit = d.quota.minute_limit;
-      if (d.quota.minute_remaining != null) summary.minute_remaining = d.quota.minute_remaining;
-    }
-    if (!summary.stop_reason && ids.length > selected.length) summary.stop_reason='BOUNDED_EVIDENCE_SAMPLING';
+    if (!summary.stop_reason) summary.stop_reason='BOUNDED_CAPTURE_COMPLETE';
     await setState(env,'last_capture_success_at',Date.now()).catch(()=>{});
     await recordCycleEnd(env,cycleId,summary);
     return summary;
