@@ -659,7 +659,13 @@ async function v2PushSend(env,device,payload){
 async function handleV2Push(request,env,path){
   try{
     if(path==='/api/v2/push/key'&&request.method==='GET')return json({ok:true,publicKey:(await v2PushKeys(env)).publicKey});
-    if(path==='/api/v2/push/status'&&request.method==='GET'){const ds=await v2PushDevices(env);return json({ok:true,devices:ds.map(d=>({id:d.id,prefs:d.prefs,updated_at:d.updated_at}))})}
+    if(path==='/api/v2/push/status'&&request.method==='GET'){
+      const ds=await v2PushDevices(env),qid=new URL(request.url).searchParams.get('id');
+      if(qid&&/^[a-f0-9]{64}$/.test(qid)){
+        const d=ds.find(x=>x.id===qid);return json({ok:true,count:ds.length,exists:!!d,device:d?{prefs:d.prefs,updated_at:d.updated_at}:null});
+      }
+      return json({ok:true,count:ds.length});
+    }
     if(request.method!=='POST')return json({ok:false,error:'METHOD_NOT_ALLOWED'},405);
     const raw=await request.text();if(raw.length>250000)return json({ok:false,error:'REQUEST_TOO_LARGE'},413);
     const b=JSON.parse(raw||'{}');
