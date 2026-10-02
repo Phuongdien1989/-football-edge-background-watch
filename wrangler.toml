@@ -1,6 +1,7 @@
 name = "football-edge-v2-raw-capture"
 main = "worker.js"
 compatibility_date = "2026-10-02"
+compatibility_flags = ["nodejs_compat"]
 
 [vars]
 CAPTURE_ENABLED = "true"
