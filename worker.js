@@ -1,5 +1,6 @@
 import {v2AppHtml} from './v2-app.js';
 import {buildV2Overview, buildV2Match} from './v2-engine.js';
+import {generateVAPIDKeys,generateRequestDetails} from './notify-transport.js';
 const BASE = 'https://v3.football.api-sports.io';
 const WORKER_VERSION = 'RAW_COLLECTOR_V0.5.1';
 const CAPTURE_SCHEMA_VERSION = 'RAW_CAPTURE_V0.5';
@@ -626,12 +627,88 @@ load();setInterval(load,30000);
 </script></body></html>`;
 }
 
+const V2_APP_URL='https://football-edge-v2-raw-capture.ngophuonghuy.workers.dev/v2';
+function validPushSubscription(sub){
+  try{
+    const u=new URL(sub?.endpoint||'');
+    return u.protocol==='https:'&&!u.username&&!u.password&&!u.port&&
+      (u.hostname==='web.push.apple.com'||u.hostname.endsWith('.push.apple.com')||u.hostname==='fcm.googleapis.com'||u.hostname.endsWith('.fcm.googleapis.com')||u.hostname==='updates.push.services.mozilla.com')&&
+      /^[A-Za-z0-9_-]{80,100}$/.test(sub?.keys?.p256dh||'')&&/^[A-Za-z0-9_-]{16,32}$/.test(sub?.keys?.auth||'');
+  }catch{return false}
+}
+async function v2PushDeviceId(endpoint){return await stable(String(endpoint||''))}
+async function v2PushKeys(env){
+  const st=await getState(env,'v2push:vapid');
+  if(st?.value){try{const k=JSON.parse(st.value);if(k?.publicKey&&k?.privateKey)return k}catch{}}
+  const keys=generateVAPIDKeys();await setState(env,'v2push:vapid',JSON.stringify(keys));return keys;
+}
+async function v2PushDevices(env){
+  const q=await env.DB.prepare("SELECT key,value,updated_at FROM collector_state WHERE key LIKE 'v2push:device:%' ORDER BY updated_at DESC LIMIT 10").all();
+  const out=[];for(const r of (q.results||[])){try{const d=JSON.parse(r.value);if(d?.id&&d?.subscription)out.push(d)}catch{}}
+  return out;
+}
+function v2PushPrefs(p={}){return {enabled:p.enabled!==false,signals:p.signals!==false,entry:p.entry!==false,minLrs:Math.max(0,Math.min(100,num(p.minLrs,60))),cooldownMin:Math.max(3,Math.min(60,num(p.cooldownMin,5)))}}
+async function v2PushSend(env,device,payload){
+  const keys=await v2PushKeys(env);
+  const req=generateRequestDetails(device.subscription,JSON.stringify(payload),{TTL:180,urgency:'high',vapidDetails:{subject:V2_APP_URL,publicKey:keys.publicKey,privateKey:keys.privateKey}});
+  const r=await fetch(req.endpoint,{method:'POST',headers:req.headers,body:req.body,redirect:'manual',signal:AbortSignal.timeout(12000)});
+  if([404,410].includes(r.status)){await env.DB.prepare("DELETE FROM collector_state WHERE key=?").bind('v2push:device:'+device.id).run();return false}
+  if(!r.ok)throw new Error('PUSH_HTTP_'+r.status);
+  return true;
+}
+async function handleV2Push(request,env,path){
+  try{
+    if(path==='/api/v2/push/key'&&request.method==='GET')return json({ok:true,publicKey:(await v2PushKeys(env)).publicKey});
+    if(path==='/api/v2/push/status'&&request.method==='GET'){const ds=await v2PushDevices(env);return json({ok:true,devices:ds.map(d=>({id:d.id,prefs:d.prefs,updated_at:d.updated_at}))})}
+    if(request.method!=='POST')return json({ok:false,error:'METHOD_NOT_ALLOWED'},405);
+    const raw=await request.text();if(raw.length>250000)return json({ok:false,error:'REQUEST_TOO_LARGE'},413);
+    const b=JSON.parse(raw||'{}');
+    if(path==='/api/v2/push/subscribe'){
+      if(!validPushSubscription(b.subscription))return json({ok:false,error:'INVALID_PUSH_SUBSCRIPTION'},400);
+      const id=await v2PushDeviceId(b.subscription.endpoint),devices=await v2PushDevices(env);
+      if(devices.length>=10&&!devices.some(d=>d.id===id))return json({ok:false,error:'DEVICE_LIMIT_10'},409);
+      const d={id,subscription:b.subscription,prefs:v2PushPrefs(b.prefs),updated_at:Date.now(),app:'FE_V2'};
+      await setState(env,'v2push:device:'+id,JSON.stringify(d));return json({ok:true,id,prefs:d.prefs});
+    }
+    const id=String(b.id||'');
+    if(!/^[a-f0-9]{64}$/.test(id))return json({ok:false,error:'DEVICE_REQUIRED'},400);
+    const st=await getState(env,'v2push:device:'+id);if(!st?.value)return json({ok:false,error:'DEVICE_NOT_FOUND'},404);
+    const d=JSON.parse(st.value);
+    if(path==='/api/v2/push/unsubscribe'){await env.DB.prepare("DELETE FROM collector_state WHERE key=?").bind('v2push:device:'+id).run();return json({ok:true})}
+    if(path==='/api/v2/push/settings'){d.prefs=v2PushPrefs(b.prefs);d.updated_at=Date.now();await setState(env,'v2push:device:'+id,JSON.stringify(d));return json({ok:true,prefs:d.prefs})}
+    if(path==='/api/v2/push/test'){
+      const ok=await v2PushSend(env,d,{title:'⚽ Football Edge V2',body:'Background Push V2 đang hoạt động.',url:V2_APP_URL,tag:'fe-v2-test',created_at:Date.now()});
+      return json({ok});
+    }
+    return json({ok:false,error:'NOT_FOUND'},404);
+  }catch(e){return json({ok:false,error:String(e?.message||e).slice(0,200)},500)}
+}
+async function dispatchV2Notifications(env){
+  const devices=(await v2PushDevices(env)).filter(d=>d.prefs?.enabled!==false);
+  if(!devices.length)return {devices:0,sent:0};
+  const data=await buildV2Overview(env);let sent=0;
+  for(const m of (data.matches||[])){
+    const e=m.engine||{},lrs=Number(e.lrs?.final_lrs),active=e.signal?.lifecycle==='ACTIVE',open=e.entry?.state==='OPEN';
+    if(e.lrs?.status!=='OK'||(!active&&!open))continue;
+    for(const d of devices){
+      const p=v2PushPrefs(d.prefs);if((active&&!p.signals)&&(open&&!p.entry))continue;if(!Number.isFinite(lrs)||lrs<p.minLrs)continue;
+      const fingerprint=[m.fixture_id,e.signal?.signal_type,e.signal?.side||'',e.entry?.state,e.goal_pressure?.level].join('|');
+      const key='v2push:sent:'+d.id+':'+m.fixture_id,last=await getState(env,key);let prev={};try{prev=last?.value?JSON.parse(last.value):{}}catch{}
+      const cooldown=p.cooldownMin*60000;if(prev.fingerprint===fingerprint&&Date.now()-Number(prev.sent_at||0)<cooldown)continue;
+      const title=open?'⚡ Football Edge V2 • ENTRY OPEN':'⚽ Football Edge V2 • SIGNAL';
+      const body=`${m.teams.home.name} ${m.goals.home??'-'}-${m.goals.away??'-'} ${m.teams.away.name} • ${e.signal?.signal_type||'SIGNAL'} • LRS ${Math.round(lrs)}/100`;
+      try{if(await v2PushSend(env,d,{title,body,url:V2_APP_URL+'?fixture='+m.fixture_id,tag:'fe-v2-'+m.fixture_id,fixture_id:m.fixture_id,signal:e.signal,entry:e.entry,lrs,created_at:Date.now()})){sent++;await setState(env,key,JSON.stringify({fingerprint,sent_at:Date.now()}));}}catch(err){await setState(env,'v2push:last_error',String(err?.message||err).slice(0,160))}
+    }
+  }
+  await setState(env,'v2push:last_dispatch',JSON.stringify({at:Date.now(),devices:devices.length,sent}));
+  return {devices:devices.length,sent};
+}
 export default {
   async scheduled(controller, env, ctx) {
     const minute=new Date().getUTCMinutes();
     if(minute%30===7) ctx.waitUntil(capturePreOnly(env));
     else if(minute%10===7) ctx.waitUntil(capturePreContextOnly(env));
-    else ctx.waitUntil(capture(env,'SCHEDULED'));
+    else ctx.waitUntil((async()=>{const r=await capture(env,'SCHEDULED');if(['OK','SKIPPED'].includes(r.status)&&!['RATE_LIMIT_BACKOFF','MINUTE_RATE_LIMIT_BACKOFF'].includes(r.stop_reason||''))await dispatchV2Notifications(env).catch(()=>{});})());
   },
   async fetch(request, env) {
     const u = new URL(request.url);
@@ -654,7 +731,8 @@ export default {
       const id=Number(u.searchParams.get('id')); if(!Number.isFinite(id))return json({ok:false,error:'FIXTURE_ID_REQUIRED'},400);
       try{const m=await buildV2Match(env,id);return m?json({ok:true,match:m}):json({ok:false,error:'FIXTURE_NOT_FOUND'},404);}catch(e){return json({ok:false,error:String(e?.message||e)},500);}
     }
-    if (u.pathname === '/health') return json({ok:true,worker_version:WORKER_VERSION,capture_schema_version:CAPTURE_SCHEMA_VERSION,app_version:'V2.0.0-ALPHA'});
+    if (u.pathname.startsWith('/api/v2/push/')) return handleV2Push(request,env,u.pathname);
+    if (u.pathname === '/health') return json({ok:true,worker_version:WORKER_VERSION,capture_schema_version:CAPTURE_SCHEMA_VERSION,app_version:'V2.1.0-ALPHA'});
     if (u.pathname === '/status') return json(await status(env));
     if (u.pathname === '/capture-now') {
       if (!authorized(request,env)) return json({ok:false,error:'UNAUTHORIZED'},401);
