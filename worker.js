@@ -1,6 +1,6 @@
 const BASE = 'https://v3.football.api-sports.io';
-const WORKER_VERSION = 'RAW_COLLECTOR_V0.3.1';
-const CAPTURE_SCHEMA_VERSION = 'RAW_CAPTURE_V0.3';
+const WORKER_VERSION = 'RAW_COLLECTOR_V0.4';
+const CAPTURE_SCHEMA_VERSION = 'RAW_CAPTURE_V0.4';
 const API_VERSION = 'v3';
 const PROVIDER = 'API_FOOTBALL';
 const SOURCE = 'CLOUDFLARE_V2_RAW_CAPTURE';
@@ -59,6 +59,29 @@ async function recordCycleEnd(env, cycleId, patch) {
       patch.daily_limit, patch.daily_remaining, patch.minute_limit, patch.minute_remaining,
       patch.stop_reason || null, patch.error_message || null, cycleId).run();
 }
+async function recordEndpointEvidence(env, requestId, endpoint, params, received, payload, payloadHash) {
+  const fid = num(params?.fixture);
+  if (fid == null) return null;
+  let kind = null;
+  if (endpoint === '/fixtures/events') kind = 'EVENTS';
+  else if (endpoint === '/fixtures/statistics') kind = 'STATISTICS';
+  if (!kind) return null;
+  const rows = Array.isArray(payload?.response) ? payload.response : [];
+  let nonNull = 0;
+  if (kind === 'STATISTICS') {
+    for (const team of rows) for (const st of (team?.statistics || [])) if (st?.value !== null && st?.value !== undefined) nonNull++;
+  } else {
+    nonNull = rows.length;
+  }
+  const body = JSON.stringify(payload);
+  const eid = 'EV-' + (await stable(`${requestId}|${kind}|${fid}|${payloadHash}`)).slice(0,24);
+  await env.DB.prepare(`INSERT OR IGNORE INTO raw_fixture_evidence
+    (evidence_id,request_id,fixture_id,evidence_kind,received_at,item_count,non_null_value_count,payload_hash,payload_json)
+    VALUES(?,?,?,?,?,?,?,?,?)`)
+    .bind(eid,requestId,fid,kind,received,rows.length,nonNull,payloadHash,body).run();
+  return {kind, fixture_id:fid, item_count:rows.length, non_null_value_count:nonNull};
+}
+
 async function apiGet(env, endpoint, params) {
   const started = iso();
   const qs = new URLSearchParams(params);
@@ -82,6 +105,7 @@ async function apiGet(env, endpoint, params) {
   await setState(env, 'last_received_at', received);
   if (!r.ok) throw new Error(`API_HTTP_${r.status}`);
   if (payload?.errors && Object.keys(payload.errors).length) throw new Error(`API_PAYLOAD_ERROR:${JSON.stringify(payload.errors).slice(0,300)}`);
+  const endpointEvidence = await recordEndpointEvidence(env,requestId,endpoint,params,received,payload,payloadHash);
   let detailFixtureCount = 0, fixturesWithStats = 0, fixturesWithEvents = 0;
   for (const item of payload.response || []) {
     const fid = item?.fixture?.id;
@@ -99,7 +123,7 @@ async function apiGet(env, endpoint, params) {
     fixturesWithStats += c.has_stats;
     fixturesWithEvents += c.has_events;
   }
-  return {payload, requestId, received, quota, detailFixtureCount, fixturesWithStats, fixturesWithEvents};
+  return {payload, requestId, received, quota, detailFixtureCount, fixturesWithStats, fixturesWithEvents, endpointEvidence};
 }
 async function apiGetWithRetry(env, endpoint, params, retries=1) {
   let last;
@@ -116,22 +140,50 @@ async function apiGetWithRetry(env, endpoint, params, retries=1) {
 function chunks(a,n){ const out=[]; for(let i=0;i<a.length;i+=n) out.push(a.slice(i,i+n)); return out; }
 async function providerQuota(env) {
   const started = iso();
-  const r = await fetch(`${BASE}/status`, {headers:{'x-apisports-key':env.APISPORTS_KEY,'accept':'application/json'}});
-  const text = await r.text();
-  let p;
-  try { p = JSON.parse(text); } catch { p = null; }
-  if (!r.ok || !p) throw new Error(`PROVIDER_STATUS_HTTP_${r.status}`);
-  const body = Array.isArray(p?.response) ? p.response[0] : p?.response;
-  const current = num(body?.requests?.current);
-  const limitDay = num(body?.requests?.limit_day);
-  if (current == null || limitDay == null || limitDay <= 0) throw new Error('PROVIDER_STATUS_QUOTA_MISSING');
-  return {
-    checked_at: started,
-    current,
-    limit_day: limitDay,
-    remaining: Math.max(0, limitDay-current),
-    plan: body?.subscription?.plan ? String(body.subscription.plan).slice(0,40) : null
-  };
+  try {
+    const r = await fetch(`${BASE}/status`, {headers:{'x-apisports-key':env.APISPORTS_KEY,'accept':'application/json'}});
+    const text = await r.text();
+    let p;
+    try { p = JSON.parse(text); } catch { p = null; }
+    if (!r.ok || !p) throw new Error(`PROVIDER_STATUS_HTTP_${r.status}`);
+    const body = Array.isArray(p?.response) ? p.response[0] : p?.response;
+    const current = num(body?.requests?.current);
+    const limitDay = num(body?.requests?.limit_day);
+    if (current == null || limitDay == null || limitDay <= 0) {
+      const errText = JSON.stringify(p?.errors || {});
+      if (/rateLimit|Too many requests/i.test(errText)) throw new Error('PROVIDER_STATUS_RATE_LIMIT');
+      throw new Error('PROVIDER_STATUS_QUOTA_MISSING');
+    }
+    return {
+      checked_at: started,
+      current,
+      limit_day: limitDay,
+      remaining: Math.max(0, limitDay-current),
+      plan: body?.subscription?.plan ? String(body.subscription.plan).slice(0,40) : null,
+      stale: false
+    };
+  } catch (e) {
+    const [lim,cur,plan] = await Promise.all([
+      getState(env,'provider_limit_day'),
+      getState(env,'provider_current'),
+      getState(env,'provider_plan')
+    ]);
+    const limitDay=num(lim?.value), current=num(cur?.value);
+    const ageMs=Date.now()-Date.parse(cur?.updated_at||0);
+    if (limitDay != null && current != null && ageMs >= 0 && ageMs <= 10*60*1000) {
+      const safety = 5000;
+      return {
+        checked_at: started,
+        current,
+        limit_day: limitDay,
+        remaining: Math.max(0,limitDay-current-safety),
+        plan: plan?.value && plan.value!=='UNKNOWN' ? plan.value : null,
+        stale: true,
+        fallback_reason: String(e?.message||e).slice(0,120)
+      };
+    }
+    throw e;
+  }
 }
 async function collectorUsedToday(env) {
   const day = iso().slice(0,10);
@@ -179,9 +231,11 @@ async function capture(env, triggerType='SCHEDULED') {
     const pre = await quotaGuard(env);
     summary.daily_limit = pre.provider.limit_day;
     summary.daily_remaining = pre.provider.remaining;
-    await setState(env,'provider_plan',pre.provider.plan || 'UNKNOWN');
-    await setState(env,'provider_limit_day',pre.provider.limit_day);
-    await setState(env,'provider_current',pre.provider.current);
+    if (!pre.provider.stale) {
+      await setState(env,'provider_plan',pre.provider.plan || 'UNKNOWN');
+      await setState(env,'provider_limit_day',pre.provider.limit_day);
+      await setState(env,'provider_current',pre.provider.current);
+    }
     await setState(env,'collector_budget',pre.collector_budget);
     await setState(env,'collector_used',pre.collector_used);
     if (pre.skip) {
@@ -206,14 +260,36 @@ async function capture(env, triggerType='SCHEDULED') {
     summary.live_count = ids.length;
     if (!ids.length) { summary.stop_reason='NO_LIVE_FIXTURES'; await recordCycleEnd(env,cycleId,summary); return summary; }
 
-    const detailBudget = Math.max(0, requestAllowance - 1);
-    for (const batch of chunks(ids,20).slice(0,detailBudget)) {
-      if (summary.daily_remaining != null && summary.daily_remaining <= pre.reserve) { summary.stop_reason='PROVIDER_DAILY_RESERVE'; break; }
-      if (summary.minute_remaining != null && summary.minute_remaining <= 2) { summary.stop_reason='MINUTE_RATE_LIMIT_GUARD'; break; }
-      const spacingMs = Math.max(250, Math.min(5000, num(env.DETAIL_SPACING_MS,1200)));
+    let requestsLeft = Math.max(0, requestAllowance - 1);
+    const spacingMs = Math.max(250, Math.min(5000, num(env.DETAIL_SPACING_MS,1500)));
+    const wantedEvidence = Math.max(0, Math.min(10, num(env.EVIDENCE_FIXTURES_PER_CYCLE,3)));
+    const cursorState = await getState(env,'evidence_cursor');
+    let cursor = Math.max(0,num(cursorState?.value,0));
+    const evidenceFixtureCount = Math.min(ids.length, wantedEvidence, Math.floor(requestsLeft/2));
+    const selected = [];
+    for (let i=0;i<evidenceFixtureCount;i++) selected.push(ids[(cursor+i)%ids.length]);
+    if (ids.length) await setState(env,'evidence_cursor',(cursor+evidenceFixtureCount)%ids.length);
+
+    for (const fid of selected) {
+      for (const [endpoint,kind] of [['/fixtures/events','EVENTS'],['/fixtures/statistics','STATISTICS']]) {
+        if (requestsLeft <= 0) break;
+        await sleep(spacingMs);
+        const e = await apiGetWithRetry(env, endpoint, {fixture:String(fid)}, 1);
+        summary.detail_requests++; summary.total_requests++; requestsLeft--;
+        if (kind==='EVENTS' && (e.endpointEvidence?.item_count||0)>0) summary.fixtures_with_events++;
+        if (kind==='STATISTICS' && (e.endpointEvidence?.non_null_value_count||0)>0) summary.fixtures_with_stats++;
+        if (e.quota.daily_limit != null) summary.daily_limit = e.quota.daily_limit;
+        if (e.quota.daily_remaining != null) summary.daily_remaining = e.quota.daily_remaining;
+        if (e.quota.minute_limit != null) summary.minute_limit = e.quota.minute_limit;
+        if (e.quota.minute_remaining != null) summary.minute_remaining = e.quota.minute_remaining;
+      }
+    }
+
+    if (requestsLeft > 0) {
       await sleep(spacingMs);
+      const batch = ids.slice(0,20);
       const d = await apiGetWithRetry(env, '/fixtures', {ids:batch.join('-')}, 1);
-      summary.detail_requests++; summary.total_requests++;
+      summary.detail_requests++; summary.total_requests++; requestsLeft--;
       summary.detail_fixture_count += d.detailFixtureCount;
       summary.fixtures_with_stats += d.fixturesWithStats;
       summary.fixtures_with_events += d.fixturesWithEvents;
@@ -222,7 +298,7 @@ async function capture(env, triggerType='SCHEDULED') {
       if (d.quota.minute_limit != null) summary.minute_limit = d.quota.minute_limit;
       if (d.quota.minute_remaining != null) summary.minute_remaining = d.quota.minute_remaining;
     }
-    if (!summary.stop_reason && chunks(ids,20).length > detailBudget) summary.stop_reason='MAX_REQUESTS_PER_CYCLE_REACHED';
+    if (!summary.stop_reason && ids.length > selected.length) summary.stop_reason='BOUNDED_EVIDENCE_SAMPLING';
     await recordCycleEnd(env,cycleId,summary);
     return summary;
   } catch (e) {
@@ -247,8 +323,12 @@ async function status(env) {
   const last = await env.DB.prepare('SELECT * FROM capture_cycles ORDER BY started_at DESC LIMIT 1').first();
   const captures = await env.DB.prepare(`SELECT COUNT(*) n, COUNT(DISTINCT fixture_id) fixtures,
     SUM(has_stats) stats_rows, SUM(has_events) event_rows, MIN(received_at) first_received_at, MAX(received_at) last_received_at FROM raw_fixture_captures`).first();
+  const evidence = await env.DB.prepare(`SELECT COUNT(*) n, COUNT(DISTINCT fixture_id) fixtures,
+    SUM(CASE WHEN evidence_kind='EVENTS' AND item_count>0 THEN 1 ELSE 0 END) event_payloads,
+    SUM(CASE WHEN evidence_kind='STATISTICS' AND non_null_value_count>0 THEN 1 ELSE 0 END) stats_payloads,
+    MIN(received_at) first_received_at, MAX(received_at) last_received_at FROM raw_fixture_evidence`).first();
   return {ok:true,worker_version:WORKER_VERSION,capture_schema_version:CAPTURE_SCHEMA_VERSION,capture_enabled:flag(env.CAPTURE_ENABLED,true),
-    api_key_configured:!!env.APISPORTS_KEY,capture_token_configured:!!env.CAPTURE_TOKEN,last_cycle:last||null,stored:captures||null};
+    api_key_configured:!!env.APISPORTS_KEY,capture_token_configured:!!env.CAPTURE_TOKEN,last_cycle:last||null,stored:captures||null,evidence:evidence||null};
 }
 export default {
   async scheduled(controller, env, ctx) { ctx.waitUntil(capture(env,'SCHEDULED')); },
