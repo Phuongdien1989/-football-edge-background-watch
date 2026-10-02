@@ -1,0 +1,38 @@
+name: Export V2 Real Raw Evidence
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - v2-raw-capture
+    paths:
+      - ".github/workflows/export-v2-real-raw.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: npm install --no-audit --no-fund
+      - run: node prepare-d1.mjs
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      - run: node export-real-raw.mjs
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: football-edge-v2-real-raw
+          path: |
+            football-edge-v2-real-raw.ndjson
+            football-edge-v2-real-raw-summary.json
+          retention-days: 7
