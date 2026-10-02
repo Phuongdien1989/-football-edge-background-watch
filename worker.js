@@ -442,12 +442,36 @@ async function capturePreOnly(env) {
     if(until!=null&&Date.now()<until){summary.status='SKIPPED';summary.stop_reason='RATE_LIMIT_BACKOFF';await recordCycleEnd(env,cycleId,summary);return summary;}
     const q=await quotaGuard(env);summary.daily_limit=q.provider.limit_day;summary.daily_remaining=q.provider.remaining;
     if(q.skip){summary.status='SKIPPED';summary.stop_reason=q.stop_reason;await recordCycleEnd(env,cycleId,summary);return summary;}
-    const jitter=Math.max(0,Math.min(30000,num(env.PRE_JITTER_MS,24000)));if(jitter)await sleep(jitter);
+    const jitter=Math.max(0,Math.min(30000,num(env.PRE_JITTER_MS,24000))),spacing=Math.max(1000,Math.min(12000,num(env.DETAIL_SPACING_MS,6500)));
+    if(jitter)await sleep(jitter);
     const vn=new Date(Date.now()+7*60*60*1000).toISOString().slice(0,10);
     const pr=await apiGetWithRetry(env,'/fixtures',{date:vn,timezone:'Asia/Ho_Chi_Minh'},0);
-    summary.total_requests=1;summary.detail_requests=1;summary.detail_fixture_count=pr.detailFixtureCount;
+    summary.total_requests++;summary.detail_requests++;summary.detail_fixture_count+=pr.detailFixtureCount;
     if(pr.quota.daily_limit!=null)summary.daily_limit=pr.quota.daily_limit;if(pr.quota.daily_remaining!=null)summary.daily_remaining=pr.quota.daily_remaining;
-    await setState(env,'last_pre_capture_at',Date.now());await setState(env,'last_pre_fixture_count',Array.isArray(pr.payload?.response)?pr.payload.response.length:0);
+    const rows=Array.isArray(pr.payload?.response)?pr.payload.response:[];
+    await setState(env,'last_pre_capture_at',Date.now());await setState(env,'last_pre_fixture_count',rows.length);
+
+    const upcoming=rows.filter(x=>x?.fixture?.status?.short==='NS'&&Date.parse(x?.fixture?.date||0)>=Date.now()-10*60*1000)
+      .sort((a,b)=>Date.parse(a.fixture.date)-Date.parse(b.fixture.date));
+    const detailItems=upcoming.slice(0,20);
+    if(detailItems.length){
+      await sleep(spacing);
+      const dr=await apiGetWithRetry(env,'/fixtures',{ids:detailItems.map(x=>x.fixture.id).join('-')},0);
+      summary.total_requests++;summary.detail_requests++;summary.detail_fixture_count+=dr.detailFixtureCount;
+      if(dr.quota.daily_remaining!=null)summary.daily_remaining=dr.quota.daily_remaining;
+    }
+
+    if(upcoming.length){
+      const pc=await getState(env,'pre_context_cursor'),cursor=Math.max(0,num(pc?.value,0)),target=upcoming[cursor%upcoming.length],fid=num(target?.fixture?.id);
+      if(fid!=null){
+        await sleep(spacing);
+        const mode=cursor%2===0?'PRE_ODDS':'PREDICTIONS',ep=mode==='PRE_ODDS'?'/odds':'/predictions';
+        const cr=await apiGetWithRetry(env,ep,{fixture:String(fid)},0);
+        summary.total_requests++;summary.detail_requests++;
+        await setState(env,'pre_context_cursor',cursor+1);
+        await setState(env,'last_pre_context_probe',JSON.stringify({fixture_id:fid,kind:mode,item_count:cr.endpointEvidence?.item_count||0,received_at:cr.received}));
+      }
+    }
     summary.stop_reason='PRE_CAPTURE_COMPLETE';await recordCycleEnd(env,cycleId,summary);return summary;
   }catch(e){
     summary.error_message=String(e?.message||e).slice(0,500);
@@ -456,6 +480,7 @@ async function capturePreOnly(env) {
     await recordCycleEnd(env,cycleId,summary).catch(()=>{});return summary;
   }
 }
+
 function authorized(request, env) {
   const token = request.headers.get('authorization')?.replace(/^Bearer\s+/i,'');
   return !!env.CAPTURE_TOKEN && token === env.CAPTURE_TOKEN;
