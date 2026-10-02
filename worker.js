@@ -1,5 +1,5 @@
 const BASE = 'https://v3.football.api-sports.io';
-const WORKER_VERSION = 'RAW_COLLECTOR_V0.4';
+const WORKER_VERSION = 'RAW_COLLECTOR_V0.4.1';
 const CAPTURE_SCHEMA_VERSION = 'RAW_CAPTURE_V0.4';
 const API_VERSION = 'v3';
 const PROVIDER = 'API_FOOTBALL';
@@ -267,7 +267,8 @@ async function capture(env, triggerType='SCHEDULED') {
     if (live.quota.minute_limit != null) summary.minute_limit = live.quota.minute_limit;
     if (live.quota.minute_remaining != null) summary.minute_remaining = live.quota.minute_remaining;
 
-    const ids = (live.payload.response || []).map(x=>x?.fixture?.id).filter(x=>x!=null);
+    const liveItems = (live.payload.response || []).filter(x=>x?.fixture?.id!=null);
+    const ids = liveItems.map(x=>x.fixture.id);
     summary.live_count = ids.length;
     if (!ids.length) { summary.stop_reason='NO_LIVE_FIXTURES'; await recordCycleEnd(env,cycleId,summary); return summary; }
 
@@ -277,12 +278,18 @@ async function capture(env, triggerType='SCHEDULED') {
     const cursorState = await getState(env,'evidence_cursor');
     let cursor = Math.max(0,num(cursorState?.value,0));
     const evidenceFixtureCount = Math.min(ids.length, wantedEvidence, Math.floor(requestsLeft/2));
+    const rankedIds = [...liveItems].sort((a,b)=>{
+      const ae=(a?.events||[]).length, be=(b?.events||[]).length;
+      if(be!==ae) return be-ae;
+      const am=Number(a?.fixture?.status?.elapsed||0), bm=Number(b?.fixture?.status?.elapsed||0);
+      return bm-am;
+    }).map(x=>x.fixture.id);
     const selected = [];
-    for (let i=0;i<evidenceFixtureCount;i++) selected.push(ids[(cursor+i)%ids.length]);
+    for (let i=0;i<evidenceFixtureCount;i++) selected.push(rankedIds[(cursor+i)%rankedIds.length]);
     if (ids.length) await setState(env,'evidence_cursor',(cursor+evidenceFixtureCount)%ids.length);
 
     for (const fid of selected) {
-      for (const [endpoint,kind] of [['/fixtures/events','EVENTS'],['/fixtures/statistics','STATISTICS']]) {
+      for (const [endpoint,kind] of [['/fixtures/statistics','STATISTICS'],['/fixtures/events','EVENTS']]) {
         if (requestsLeft <= 0) break;
         await sleep(spacingMs);
         const e = await apiGetWithRetry(env, endpoint, {fixture:String(fid)}, 1);
