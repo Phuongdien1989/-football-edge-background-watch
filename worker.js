@@ -431,6 +431,53 @@ async function capture(env, triggerType='SCHEDULED') {
     return summary;
   }
 }
+async function upcomingPreFixturesFromDb(env, limit=12) {
+  const q=await env.DB.prepare("SELECT fixture_id,fixture_json,received_at FROM raw_fixture_captures WHERE status_short='NS' ORDER BY received_at DESC LIMIT 400").all();
+  const seen=new Set(),out=[],now=Date.now(),horizon=now+12*60*60*1000;
+  for(const r of (q.results||[])){
+    if(seen.has(String(r.fixture_id)))continue;seen.add(String(r.fixture_id));
+    let item;try{item=JSON.parse(r.fixture_json)}catch{continue}
+    const dt=Date.parse(item?.fixture?.date||0);if(!Number.isFinite(dt)||dt<now-10*60*1000||dt>horizon)continue;
+    out.push(item);
+  }
+  out.sort((a,b)=>Date.parse(a.fixture.date)-Date.parse(b.fixture.date));
+  return out.slice(0,limit);
+}
+async function capturePreContextOnly(env) {
+  const cycleId='CY-'+(await stable(`PRE_CONTEXT|${iso()}|${crypto.randomUUID()}`)).slice(0,24);
+  await recordCycleStart(env,cycleId,'PRE_CONTEXT');
+  const summary={cycle_id:cycleId,status:'OK',live_count:0,detail_requests:0,total_requests:0,detail_fixture_count:0,fixtures_with_stats:0,fixtures_with_events:0,daily_limit:null,daily_remaining:null,minute_limit:null,minute_remaining:null,stop_reason:null};
+  try{
+    if(!flag(env.CAPTURE_ENABLED,true)||!env.APISPORTS_KEY){summary.status='BLOCKED';summary.stop_reason=!env.APISPORTS_KEY?'APISPORTS_KEY_MISSING':'CAPTURE_DISABLED';await recordCycleEnd(env,cycleId,summary);return summary;}
+    const bo=await getState(env,'rate_backoff_until'),until=num(bo?.value);if(until!=null&&Date.now()<until){summary.status='SKIPPED';summary.stop_reason='RATE_LIMIT_BACKOFF';await recordCycleEnd(env,cycleId,summary);return summary;}
+    const q=await quotaGuard(env);summary.daily_limit=q.provider.limit_day;summary.daily_remaining=q.provider.remaining;if(q.skip){summary.status='SKIPPED';summary.stop_reason=q.stop_reason;await recordCycleEnd(env,cycleId,summary);return summary;}
+    const upcoming=await upcomingPreFixturesFromDb(env,8);if(!upcoming.length){summary.status='SKIPPED';summary.stop_reason='NO_PRE_FIXTURES';await recordCycleEnd(env,cycleId,summary);return summary;}
+    const fs=await getState(env,'pre_context_fixture_cursor'),fixtureCursor=Math.max(0,num(fs?.value,0)),target=upcoming[fixtureCursor%upcoming.length];
+    const fid=num(target?.fixture?.id),league=num(target?.league?.id),season=num(target?.league?.season),home=num(target?.teams?.home?.id),away=num(target?.teams?.away?.id);
+    const ks=await getState(env,`prectx:${fid}:cursor`),kindCursor=Math.max(0,num(ks?.value,0));
+    const kinds=['PRE_ODDS','PREDICTIONS','STANDINGS','H2H','HOME_FORM','AWAY_FORM'],kind=kinds[kindCursor%kinds.length];
+    const jitter=Math.max(0,Math.min(30000,num(env.PRE_CONTEXT_JITTER_MS,21000)));if(jitter)await sleep(jitter);
+    let ep,params;
+    if(kind==='PRE_ODDS'){ep='/odds';params={fixture:String(fid)}}
+    else if(kind==='PREDICTIONS'){ep='/predictions';params={fixture:String(fid)}}
+    else if(kind==='STANDINGS'){if(league==null||season==null)throw new Error('PRE_CONTEXT_LEAGUE_SEASON_MISSING');ep='/standings';params={league:String(league),season:String(season)}}
+    else if(kind==='H2H'){if(home==null||away==null)throw new Error('PRE_CONTEXT_TEAMS_MISSING');ep='/fixtures/headtohead';params={h2h:`${home}-${away}`,last:'5'}}
+    else if(kind==='HOME_FORM'){if(home==null)throw new Error('PRE_CONTEXT_HOME_MISSING');ep='/fixtures';params={team:String(home),last:'5'}}
+    else {if(away==null)throw new Error('PRE_CONTEXT_AWAY_MISSING');ep='/fixtures';params={team:String(away),last:'5'}}
+    const cr=await apiGetWithRetry(env,ep,params,0);summary.total_requests=1;summary.detail_requests=1;summary.detail_fixture_count=cr.detailFixtureCount||0;
+    if(cr.quota.daily_remaining!=null)summary.daily_remaining=cr.quota.daily_remaining;
+    if(['STANDINGS','H2H','HOME_FORM','AWAY_FORM'].includes(kind))await storeFixtureEvidence(env,cr.requestId,fid,kind,cr.received,Array.isArray(cr.payload?.response)?cr.payload.response:[],cr.requestId);
+    await setState(env,`prectx:${fid}:cursor`,kindCursor+1);
+    if((kindCursor+1)%kinds.length===0)await setState(env,'pre_context_fixture_cursor',fixtureCursor+1);
+    await setState(env,'last_pre_context_probe',JSON.stringify({fixture_id:fid,kind,item_count:Array.isArray(cr.payload?.response)?cr.payload.response.length:0,received_at:cr.received}));
+    summary.stop_reason='PRE_CONTEXT_COMPLETE';await recordCycleEnd(env,cycleId,summary);return summary;
+  }catch(e){
+    summary.error_message=String(e?.message||e).slice(0,500);
+    if(isRateLimitError(e)){summary.status='SKIPPED';summary.stop_reason='PRE_CONTEXT_RATE_LIMIT_BACKOFF';const ms=Math.max(30000,Math.min(600000,num(env.RATE_BACKOFF_MS,300000)));await setState(env,'rate_backoff_until',Date.now()+ms).catch(()=>{});}
+    else{summary.status='ERROR';summary.stop_reason='PRE_CONTEXT_FAILED';}
+    await recordCycleEnd(env,cycleId,summary).catch(()=>{});return summary;
+  }
+}
 async function capturePreOnly(env) {
   const cycleId='CY-'+(await stable(`PRE_SCHEDULED|${iso()}|${crypto.randomUUID()}`)).slice(0,24);
   await recordCycleStart(env,cycleId,'PRE_SCHEDULED');
@@ -583,6 +630,7 @@ export default {
   async scheduled(controller, env, ctx) {
     const minute=new Date().getUTCMinutes();
     if(minute%30===7) ctx.waitUntil(capturePreOnly(env));
+    else if(minute%10===7) ctx.waitUntil(capturePreContextOnly(env));
     else ctx.waitUntil(capture(env,'SCHEDULED'));
   },
   async fetch(request, env) {
