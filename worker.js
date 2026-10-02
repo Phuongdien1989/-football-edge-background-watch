@@ -722,10 +722,45 @@ export default {
       return new Response(JSON.stringify({name:'Football Edge V2',short_name:'FE V2',start_url:'/v2',display:'standalone',background_color:'#f3f7fb',theme_color:'#2378ee',description:'Live Football Intelligence'}),{headers:{'content-type':'application/manifest+json; charset=utf-8','cache-control':'public,max-age=3600'}});
     }
     if (u.pathname === '/v2-sw.js') {
-      return new Response("self.addEventListener('install',e=>self.skipWaiting());self.addEventListener('activate',e=>e.waitUntil(self.clients.claim()));self.addEventListener('fetch',e=>{if(e.request.method!=='GET')return;e.respondWith(fetch(e.request).catch(()=>new Response('Offline',{status:503})))})",{headers:{'content-type':'application/javascript; charset=utf-8','cache-control':'no-store'}});
+      const sw = `
+self.addEventListener('install',event=>{self.skipWaiting()});
+self.addEventListener('activate',event=>{event.waitUntil(self.clients.claim())});
+self.addEventListener('push',event=>{
+  let data={};
+  try{data=event.data?event.data.json():{}}catch{try{data={body:event.data?event.data.text():''}}catch{}}
+  const title=data.title||'Football Edge V2';
+  const options={
+    body:data.body||'Có tín hiệu Football Edge V2.',
+    tag:data.tag||('fe-v2-'+(data.fixture_id||'signal')),
+    renotify:true,
+    data:{url:data.url||'/v2',fixture_id:data.fixture_id||null},
+    timestamp:Number(data.created_at||Date.now())
+  };
+  event.waitUntil(self.registration.showNotification(title,options));
+});
+self.addEventListener('notificationclick',event=>{
+  event.notification.close();
+  const target=new URL(event.notification?.data?.url||'/v2',self.location.origin).href;
+  event.waitUntil((async()=>{
+    const windows=await self.clients.matchAll({type:'window',includeUncontrolled:true});
+    for(const client of windows){
+      if('focus' in client){
+        try{if('navigate' in client)await client.navigate(target)}catch{}
+        return client.focus();
+      }
+    }
+    if(self.clients.openWindow)return self.clients.openWindow(target);
+  })());
+});
+self.addEventListener('fetch',event=>{
+  if(event.request.method!=='GET')return;
+  event.respondWith(fetch(event.request).catch(()=>new Response('Football Edge V2 offline',{status:503,headers:{'content-type':'text/plain; charset=utf-8'}})));
+});
+`;
+      return new Response(sw,{headers:{'content-type':'application/javascript; charset=utf-8','cache-control':'no-store','service-worker-allowed':'/'}});
     }
     if (u.pathname === '/api/v2/overview') {
-      try{return json(await buildV2Overview(env));}catch(e){return json({ok:false,error:String(e?.message||e),schema:'FE_V2_APP_OVERVIEW_V1'},500);}
+      try{return json(await buildV2Overview(env));}catch(e){return json({ok:false,error:String(e?.message||e),schema:'FE_V2_APP_OVERVIEW_V2'},500);}
     }
     if (u.pathname === '/api/v2/match') {
       const id=Number(u.searchParams.get('id')); if(!Number.isFinite(id))return json({ok:false,error:'FIXTURE_ID_REQUIRED'},400);
