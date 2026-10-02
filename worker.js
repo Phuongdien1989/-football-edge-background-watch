@@ -100,15 +100,51 @@ async function apiGet(env, endpoint, params) {
   return {payload, requestId, received, quota, detailFixtureCount, fixturesWithStats, fixturesWithEvents};
 }
 function chunks(a,n){ const out=[]; for(let i=0;i<a.length;i+=n) out.push(a.slice(i,i+n)); return out; }
-async function shouldSkipForQuota(env) {
-  const reserve = Math.max(0, num(env.API_SHARED_RESERVE, 10000));
-  const st = await getState(env, 'last_daily_remaining');
-  if (!st || st.value === 'UNKNOWN') return {skip:false,reserve};
-  const remaining = num(st.value);
-  if (remaining == null || remaining > reserve) return {skip:false,reserve,remaining};
-  const ageMs = Date.now() - Date.parse(st.updated_at || 0);
-  const probeMinutes = Math.max(5, num(env.QUOTA_PROBE_MINUTES, 30));
-  return {skip: ageMs < probeMinutes*60000, reserve, remaining, probe_after_minutes:probeMinutes};
+async function providerQuota(env) {
+  const started = iso();
+  const r = await fetch(`${BASE}/status`, {headers:{'x-apisports-key':env.APISPORTS_KEY,'accept':'application/json'}});
+  const text = await r.text();
+  let p;
+  try { p = JSON.parse(text); } catch { p = null; }
+  if (!r.ok || !p) throw new Error(`PROVIDER_STATUS_HTTP_${r.status}`);
+  const body = Array.isArray(p?.response) ? p.response[0] : p?.response;
+  const current = num(body?.requests?.current);
+  const limitDay = num(body?.requests?.limit_day);
+  if (current == null || limitDay == null || limitDay <= 0) throw new Error('PROVIDER_STATUS_QUOTA_MISSING');
+  return {
+    checked_at: started,
+    current,
+    limit_day: limitDay,
+    remaining: Math.max(0, limitDay-current),
+    plan: body?.subscription?.plan ? String(body.subscription.plan).slice(0,40) : null
+  };
+}
+async function collectorUsedToday(env) {
+  const day = iso().slice(0,10);
+  const r = await env.DB.prepare("SELECT COUNT(*) AS n FROM raw_api_requests WHERE substr(received_at,1,10)=?").bind(day).first();
+  return Math.max(0, num(r?.n,0));
+}
+async function quotaGuard(env) {
+  const q = await providerQuota(env);
+  const reserve = Math.max(0, num(env.API_SHARED_RESERVE,10000));
+  const legacyBudget = Math.max(0, num(env.LEGACY_DAILY_BUDGET,50000));
+  const collectorMax = Math.max(0, num(env.COLLECTOR_DAILY_BUDGET_MAX,12000));
+  const collectorBudget = Math.max(0, Math.min(collectorMax, q.limit_day-legacyBudget-reserve));
+  const collectorUsed = await collectorUsedToday(env);
+  let stop_reason = null;
+  if (q.remaining <= reserve) stop_reason = 'PROVIDER_DAILY_RESERVE';
+  else if (collectorBudget <= 0) stop_reason = 'NO_SAFE_COLLECTOR_BUDGET';
+  else if (collectorUsed >= collectorBudget) stop_reason = 'COLLECTOR_DAILY_BUDGET';
+  return {
+    skip: !!stop_reason,
+    stop_reason,
+    reserve,
+    legacy_budget: legacyBudget,
+    collector_budget: collectorBudget,
+    collector_used: collectorUsed,
+    collector_remaining: Math.max(0,collectorBudget-collectorUsed),
+    provider: q
+  };
 }
 async function capture(env, triggerType='SCHEDULED') {
   const cycleId = 'CY-' + (await stable(`${triggerType}|${iso()}|${crypto.randomUUID()}`)).slice(0,24);
@@ -118,26 +154,48 @@ async function capture(env, triggerType='SCHEDULED') {
   try {
     if (!flag(env.CAPTURE_ENABLED, true)) { summary.status='SKIPPED'; summary.stop_reason='CAPTURE_DISABLED'; await recordCycleEnd(env,cycleId,summary); return summary; }
     if (!env.APISPORTS_KEY) { summary.status='BLOCKED'; summary.stop_reason='APISPORTS_KEY_MISSING'; await recordCycleEnd(env,cycleId,summary); return summary; }
-    const pre = await shouldSkipForQuota(env);
-    if (pre.skip) { summary.status='SKIPPED'; summary.stop_reason='SHARED_DAILY_QUOTA_RESERVE'; summary.daily_remaining=pre.remaining; await recordCycleEnd(env,cycleId,summary); return summary; }
+
+    const pre = await quotaGuard(env);
+    summary.daily_limit = pre.provider.limit_day;
+    summary.daily_remaining = pre.provider.remaining;
+    await setState(env,'provider_plan',pre.provider.plan || 'UNKNOWN');
+    await setState(env,'provider_limit_day',pre.provider.limit_day);
+    await setState(env,'provider_current',pre.provider.current);
+    await setState(env,'collector_budget',pre.collector_budget);
+    await setState(env,'collector_used',pre.collector_used);
+    if (pre.skip) {
+      summary.status='SKIPPED';
+      summary.stop_reason=pre.stop_reason;
+      await recordCycleEnd(env,cycleId,summary);
+      return summary;
+    }
+
+    const maxPerCycle = Math.max(1, Math.min(20, num(env.CAPTURE_MAX_REQUESTS_PER_CYCLE, 8)));
+    const requestAllowance = Math.max(1, Math.min(maxPerCycle, pre.collector_remaining));
     const live = await apiGet(env, '/fixtures', {live:'all'});
     summary.total_requests++;
-    Object.assign(summary, live.quota);
+    if (live.quota.daily_limit != null) summary.daily_limit = live.quota.daily_limit;
+    if (live.quota.daily_remaining != null) summary.daily_remaining = live.quota.daily_remaining;
+    if (live.quota.minute_limit != null) summary.minute_limit = live.quota.minute_limit;
+    if (live.quota.minute_remaining != null) summary.minute_remaining = live.quota.minute_remaining;
+
     const ids = (live.payload.response || []).map(x=>x?.fixture?.id).filter(x=>x!=null);
     summary.live_count = ids.length;
     if (!ids.length) { summary.stop_reason='NO_LIVE_FIXTURES'; await recordCycleEnd(env,cycleId,summary); return summary; }
-    const reserve = Math.max(0, num(env.API_SHARED_RESERVE, 10000));
-    const maxPerCycle = Math.max(1, Math.min(20, num(env.CAPTURE_MAX_REQUESTS_PER_CYCLE, 8)));
-    const detailBudget = Math.max(0, maxPerCycle - 1);
+
+    const detailBudget = Math.max(0, requestAllowance - 1);
     for (const batch of chunks(ids,20).slice(0,detailBudget)) {
-      if (summary.daily_remaining != null && summary.daily_remaining <= reserve) { summary.stop_reason='SHARED_DAILY_QUOTA_RESERVE'; break; }
+      if (summary.daily_remaining != null && summary.daily_remaining <= pre.reserve) { summary.stop_reason='PROVIDER_DAILY_RESERVE'; break; }
       if (summary.minute_remaining != null && summary.minute_remaining <= 2) { summary.stop_reason='MINUTE_RATE_LIMIT_GUARD'; break; }
       const d = await apiGet(env, '/fixtures', {ids:batch.join('-')});
       summary.detail_requests++; summary.total_requests++;
       summary.detail_fixture_count += d.detailFixtureCount;
       summary.fixtures_with_stats += d.fixturesWithStats;
       summary.fixtures_with_events += d.fixturesWithEvents;
-      Object.assign(summary, d.quota);
+      if (d.quota.daily_limit != null) summary.daily_limit = d.quota.daily_limit;
+      if (d.quota.daily_remaining != null) summary.daily_remaining = d.quota.daily_remaining;
+      if (d.quota.minute_limit != null) summary.minute_limit = d.quota.minute_limit;
+      if (d.quota.minute_remaining != null) summary.minute_remaining = d.quota.minute_remaining;
     }
     if (!summary.stop_reason && chunks(ids,20).length > detailBudget) summary.stop_reason='MAX_REQUESTS_PER_CYCLE_REACHED';
     await recordCycleEnd(env,cycleId,summary);
