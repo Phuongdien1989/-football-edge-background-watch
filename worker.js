@@ -5,7 +5,7 @@ const API_VERSION = 'v3';
 const PROVIDER = 'API_FOOTBALL';
 const SOURCE = 'CLOUDFLARE_V2_RAW_CAPTURE';
 const iso = () => new Date().toISOString();
-const num = (v, d = null) => { const n = Number(v); return Number.isFinite(n) ? n : d; };
+const num = (v, d = null) => { if (v === null || v === undefined || v === '') return d; const n = Number(v); return Number.isFinite(n) ? n : d; };
 const flag = (v, d = false) => v == null ? d : /^(1|true|yes|on)$/i.test(String(v));
 const stable = async s => Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s))))
   .map(b => b.toString(16).padStart(2, '0')).join('');
