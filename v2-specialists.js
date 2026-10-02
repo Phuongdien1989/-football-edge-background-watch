@@ -47,8 +47,8 @@ function buildSnapshots(item,captures,statsRows,marketRows){
 function tierFT(score){return score>=80?'STRONG':score>=73?'READY':score>=65?'CANDIDATE':score>=55?'WATCH':'LOW'}
 function buildFT(snapshots,dq){
   if(!snapshots.length)return {status:'INSUFFICIENT_DATA',profile:'FT',version:'LEGACY_V1.16.2',reason:'NO_STATS'};
-  const latest=snapshots.at(-1),item={history:snapshots.slice(0,-1),initialDQ:dq?.dq_score||0,initialIntegrity:dq?.integrity??100,latest};
-  const evalResult=eng.watchEvaluate(item,latest),full={...item,history:snapshots,eval:evalResult};
+  const latest=snapshots.at(-1),item={history:snapshots,initialDQ:dq?.dq_score||0,initialIntegrity:dq?.integrity??100,latest};
+  const evalResult=eng.watchEvaluate(item,latest),full={...item,eval:evalResult};
   const goal=(latest.status==='2H'||latest.minute>=45)?eng.grEstimate(full,'FT'):{prob:null,source:'H1_NOT_FT_WINDOW',n:0};
   return {status:'OK',profile:'FT',version:'LEGACY_V1.16.2',score:evalResult.score,score_mode:evalResult.scoreMode,tier:tierFT(evalResult.score),core:evalResult.core,hard_veto:evalResult.hardVeto,veto_reasons:evalResult.vetoReasons||[],goal_radar:goal,components:{game:evalResult.game,pressure:evalResult.pressure,chance:evalResult.chance,momentum:evalResult.momentum,market:evalResult.market,context:evalResult.context,quality:evalResult.quality},independent_of_lrs:true};
 }
