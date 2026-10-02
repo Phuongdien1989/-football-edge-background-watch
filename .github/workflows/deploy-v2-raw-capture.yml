@@ -54,6 +54,7 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
       - name: Reset smoke-test guards
+        if: github.event_name == 'workflow_dispatch'
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -61,9 +62,11 @@ jobs:
           npx wrangler d1 execute football-edge-v2-raw --remote --config wrangler.deploy.toml --command "DELETE FROM collector_state WHERE key IN ('rate_backoff_until','last_capture_attempt_at');"
 
       - name: Wait for scheduled capture
+        if: github.event_name == 'workflow_dispatch'
         run: sleep 100
 
       - name: Verify Worker status
+        if: github.event_name == 'workflow_dispatch'
         run: |
           set -euo pipefail
           URL="https://football-edge-v2-raw-capture.ngophuonghuy.workers.dev/status"
@@ -78,7 +81,7 @@ jobs:
           const fs=require('fs');
           const s=JSON.parse(fs.readFileSync('status.json','utf8'));
           if(!s.ok) throw new Error('STATUS_NOT_OK');
-          if(s.worker_version!=='RAW_COLLECTOR_V0.4') throw new Error('WRONG_WORKER_VERSION:'+s.worker_version);
+          if(s.worker_version!=='RAW_COLLECTOR_V0.4.1') throw new Error('WRONG_WORKER_VERSION:'+s.worker_version);
           if(!s.api_key_configured) throw new Error('APISPORTS_KEY_NOT_CONFIGURED');
           if(!s.capture_token_configured) throw new Error('CAPTURE_TOKEN_NOT_CONFIGURED');
           if(!s.last_cycle) throw new Error('NO_CAPTURE_CYCLE');
@@ -91,6 +94,7 @@ jobs:
           NODE
 
       - name: Inspect D1 raw evidence coverage
+        if: github.event_name == 'workflow_dispatch'
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
