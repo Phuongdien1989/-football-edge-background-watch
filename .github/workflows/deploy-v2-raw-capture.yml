@@ -8,7 +8,7 @@ on:
 
 concurrency:
   group: football-edge-v2-raw-capture
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -84,6 +84,12 @@ jobs:
           npx wrangler d1 execute football-edge-v2-raw --remote --config wrangler.deploy.toml --command "SELECT COUNT(*) AS raw_requests, MIN(received_at) AS first_received_at, MAX(received_at) AS last_received_at FROM raw_api_requests;"
           echo "=== FIXTURE CAPTURES / COVERAGE ==="
           npx wrangler d1 execute football-edge-v2-raw --remote --config wrangler.deploy.toml --command "SELECT COUNT(*) AS fixture_captures, COUNT(DISTINCT fixture_id) AS distinct_fixtures, SUM(has_stats) AS captures_with_stats, SUM(has_events) AS captures_with_events, MIN(received_at) AS first_received_at, MAX(received_at) AS last_received_at FROM raw_fixture_captures;"
+          echo "=== EXPLICIT EVENTS/STATS EVIDENCE ==="
+          npx wrangler d1 execute football-edge-v2-raw --remote --config wrangler.deploy.toml --command "SELECT evidence_kind, COUNT(*) AS payloads, COUNT(DISTINCT fixture_id) AS fixtures, SUM(CASE WHEN item_count>0 THEN 1 ELSE 0 END) AS nonempty_payloads, SUM(non_null_value_count) AS non_null_values, MIN(received_at) AS first_received_at, MAX(received_at) AS last_received_at FROM raw_fixture_evidence GROUP BY evidence_kind ORDER BY evidence_kind;"
+          echo "=== RAW ENDPOINT COUNTS ==="
+          npx wrangler d1 execute football-edge-v2-raw --remote --config wrangler.deploy.toml --command "SELECT endpoint, COUNT(*) AS n, SUM(CASE WHEN api_errors_json NOT IN ('{}','[]','null') THEN 1 ELSE 0 END) AS error_rows, MIN(received_at) AS first_received_at, MAX(received_at) AS last_received_at FROM raw_api_requests GROUP BY endpoint ORDER BY endpoint;"
+          echo "=== TIMESTAMP INTEGRITY ==="
+          npx wrangler d1 execute football-edge-v2-raw --remote --config wrangler.deploy.toml --command "SELECT COUNT(*) AS total_raw, SUM(CASE WHEN received_at < request_started_at THEN 1 ELSE 0 END) AS received_before_started, COUNT(DISTINCT payload_hash) AS distinct_payload_hashes FROM raw_api_requests;"
           echo "=== MULTI-SNAPSHOT FIXTURES ==="
           npx wrangler d1 execute football-edge-v2-raw --remote --config wrangler.deploy.toml --command "SELECT fixture_id, COUNT(*) AS snapshots, MIN(match_clock) AS min_clock, MAX(match_clock) AS max_clock, MIN(received_at) AS first_received_at, MAX(received_at) AS last_received_at FROM raw_fixture_captures GROUP BY fixture_id HAVING COUNT(*) >= 2 ORDER BY snapshots DESC LIMIT 10;"
           echo "=== LATEST CYCLES ==="
