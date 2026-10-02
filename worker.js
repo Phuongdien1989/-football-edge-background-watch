@@ -1,7 +1,7 @@
 import {v2AppHtml} from './v2-app.js';
 import {buildV2Overview, buildV2Match} from './v2-engine.js';
 const BASE = 'https://v3.football.api-sports.io';
-const WORKER_VERSION = 'RAW_COLLECTOR_V0.5.0';
+const WORKER_VERSION = 'RAW_COLLECTOR_V0.5.1';
 const CAPTURE_SCHEMA_VERSION = 'RAW_CAPTURE_V0.5';
 const API_VERSION = 'v3';
 const PROVIDER = 'API_FOOTBALL';
@@ -179,6 +179,12 @@ async function apiGetWithRetry(env, endpoint, params, retries=1) {
 function chunks(a,n){ const out=[]; for(let i=0;i<a.length;i+=n) out.push(a.slice(i,i+n)); return out; }
 async function providerQuota(env) {
   const started = iso();
+  const probeMin=Math.max(1,Math.min(60,num(env.QUOTA_PROBE_MINUTES,10)));
+  const [limState,curState,planState]=await Promise.all([getState(env,'provider_limit_day'),getState(env,'provider_current'),getState(env,'provider_plan')]);
+  const limCached=num(limState?.value),curCached=num(curState?.value),ageMs=Date.now()-Date.parse(curState?.updated_at||0);
+  if(limCached!=null&&curCached!=null&&ageMs>=0&&ageMs<probeMin*60*1000){
+    return {checked_at:started,current:curCached,limit_day:limCached,remaining:Math.max(0,limCached-curCached-500),plan:planState?.value||null,stale:true,fallback_reason:'CACHED_QUOTA_WINDOW'};
+  }
   try {
     const r = await fetch(`${BASE}/status`, {headers:{'x-apisports-key':env.APISPORTS_KEY,'accept':'application/json'}});
     const text = await r.text();
@@ -425,6 +431,31 @@ async function capture(env, triggerType='SCHEDULED') {
     return summary;
   }
 }
+async function capturePreOnly(env) {
+  const cycleId='CY-'+(await stable(`PRE_SCHEDULED|${iso()}|${crypto.randomUUID()}`)).slice(0,24);
+  await recordCycleStart(env,cycleId,'PRE_SCHEDULED');
+  const summary={cycle_id:cycleId,status:'OK',live_count:0,detail_requests:0,total_requests:0,detail_fixture_count:0,fixtures_with_stats:0,fixtures_with_events:0,daily_limit:null,daily_remaining:null,minute_limit:null,minute_remaining:null,stop_reason:null};
+  try{
+    if(!flag(env.CAPTURE_ENABLED,true)){summary.status='SKIPPED';summary.stop_reason='CAPTURE_DISABLED';await recordCycleEnd(env,cycleId,summary);return summary;}
+    if(!env.APISPORTS_KEY){summary.status='BLOCKED';summary.stop_reason='APISPORTS_KEY_MISSING';await recordCycleEnd(env,cycleId,summary);return summary;}
+    const backoff=await getState(env,'rate_backoff_until'),until=num(backoff?.value);
+    if(until!=null&&Date.now()<until){summary.status='SKIPPED';summary.stop_reason='RATE_LIMIT_BACKOFF';await recordCycleEnd(env,cycleId,summary);return summary;}
+    const q=await quotaGuard(env);summary.daily_limit=q.provider.limit_day;summary.daily_remaining=q.provider.remaining;
+    if(q.skip){summary.status='SKIPPED';summary.stop_reason=q.stop_reason;await recordCycleEnd(env,cycleId,summary);return summary;}
+    const jitter=Math.max(0,Math.min(30000,num(env.PRE_JITTER_MS,24000)));if(jitter)await sleep(jitter);
+    const vn=new Date(Date.now()+7*60*60*1000).toISOString().slice(0,10);
+    const pr=await apiGetWithRetry(env,'/fixtures',{date:vn,timezone:'Asia/Ho_Chi_Minh'},0);
+    summary.total_requests=1;summary.detail_requests=1;summary.detail_fixture_count=pr.detailFixtureCount;
+    if(pr.quota.daily_limit!=null)summary.daily_limit=pr.quota.daily_limit;if(pr.quota.daily_remaining!=null)summary.daily_remaining=pr.quota.daily_remaining;
+    await setState(env,'last_pre_capture_at',Date.now());await setState(env,'last_pre_fixture_count',Array.isArray(pr.payload?.response)?pr.payload.response.length:0);
+    summary.stop_reason='PRE_CAPTURE_COMPLETE';await recordCycleEnd(env,cycleId,summary);return summary;
+  }catch(e){
+    summary.error_message=String(e?.message||e).slice(0,500);
+    if(isRateLimitError(e)){summary.status='SKIPPED';summary.stop_reason='PRE_RATE_LIMIT_BACKOFF';const ms=Math.max(30000,Math.min(600000,num(env.RATE_BACKOFF_MS,300000)));await setState(env,'rate_backoff_until',Date.now()+ms).catch(()=>{});}
+    else{summary.status='ERROR';summary.stop_reason='PRE_CAPTURE_FAILED';}
+    await recordCycleEnd(env,cycleId,summary).catch(()=>{});return summary;
+  }
+}
 function authorized(request, env) {
   const token = request.headers.get('authorization')?.replace(/^Bearer\s+/i,'');
   return !!env.CAPTURE_TOKEN && token === env.CAPTURE_TOKEN;
@@ -524,7 +555,11 @@ load();setInterval(load,30000);
 }
 
 export default {
-  async scheduled(controller, env, ctx) { ctx.waitUntil(capture(env,'SCHEDULED')); },
+  async scheduled(controller, env, ctx) {
+    const minute=new Date().getUTCMinutes();
+    if(minute%30===7) ctx.waitUntil(capturePreOnly(env));
+    else ctx.waitUntil(capture(env,'SCHEDULED'));
+  },
   async fetch(request, env) {
     const u = new URL(request.url);
     if (u.pathname === '/' || u.pathname === '/app' || u.pathname === '/v2') {
