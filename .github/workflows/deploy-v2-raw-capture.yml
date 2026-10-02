@@ -17,7 +17,7 @@ jobs:
   deploy:
     name: Deploy football-edge-v2-raw-capture
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -52,3 +52,39 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      - name: Wait for scheduled capture
+        run: sleep 75
+
+      - name: Verify Worker status
+        run: |
+          set -euo pipefail
+          curl -fsS "https://football-edge-v2-raw-capture.ngophuonghuy.workers.dev/status" -o status.json
+          cat status.json
+          node - <<'NODE'
+          const fs=require('fs');
+          const s=JSON.parse(fs.readFileSync('status.json','utf8'));
+          if(!s.ok) throw new Error('STATUS_NOT_OK');
+          if(!s.api_key_configured) throw new Error('APISPORTS_KEY_NOT_CONFIGURED');
+          if(!s.capture_token_configured) throw new Error('CAPTURE_TOKEN_NOT_CONFIGURED');
+          if(!s.last_cycle) throw new Error('NO_CAPTURE_CYCLE');
+          if(s.last_cycle.stop_reason==='APISPORTS_KEY_MISSING') throw new Error('API_KEY_NOT_SEEN_BY_WORKER');
+          console.log('STATUS_CHECK_PASS');
+          console.log('last_cycle=', JSON.stringify(s.last_cycle));
+          console.log('stored=', JSON.stringify(s.stored));
+          NODE
+
+      - name: Inspect D1 raw evidence coverage
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          echo "=== RAW REQUESTS ==="
+          npx wrangler d1 execute football-edge-v2-raw --remote --config wrangler.deploy.toml --command "SELECT COUNT(*) AS raw_requests, MIN(received_at) AS first_received_at, MAX(received_at) AS last_received_at FROM raw_api_requests;"
+          echo "=== FIXTURE CAPTURES / COVERAGE ==="
+          npx wrangler d1 execute football-edge-v2-raw --remote --config wrangler.deploy.toml --command "SELECT COUNT(*) AS fixture_captures, COUNT(DISTINCT fixture_id) AS distinct_fixtures, SUM(has_stats) AS captures_with_stats, SUM(has_events) AS captures_with_events, MIN(received_at) AS first_received_at, MAX(received_at) AS last_received_at FROM raw_fixture_captures;"
+          echo "=== MULTI-SNAPSHOT FIXTURES ==="
+          npx wrangler d1 execute football-edge-v2-raw --remote --config wrangler.deploy.toml --command "SELECT fixture_id, COUNT(*) AS snapshots, MIN(match_clock) AS min_clock, MAX(match_clock) AS max_clock, MIN(received_at) AS first_received_at, MAX(received_at) AS last_received_at FROM raw_fixture_captures GROUP BY fixture_id HAVING COUNT(*) >= 2 ORDER BY snapshots DESC LIMIT 10;"
+          echo "=== LATEST CYCLES ==="
+          npx wrangler d1 execute football-edge-v2-raw --remote --config wrangler.deploy.toml --command "SELECT cycle_id,started_at,completed_at,status,live_count,total_requests,detail_fixture_count,fixtures_with_stats,fixtures_with_events,daily_remaining,stop_reason,error_message FROM capture_cycles ORDER BY started_at DESC LIMIT 5;"
