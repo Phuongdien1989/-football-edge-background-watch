@@ -53,6 +53,14 @@ jobs:
           if(!Array.isArray(d.pre_matches)) throw new Error('PRE_MATCHES_NOT_ARRAY');
           if(!d.system || !d.scan) throw new Error('MISSING_SYSTEM_OR_SCAN');
           if(!d.collector || !d.validation) throw new Error('MISSING_STATUS_BLOCKS');
+          const withStats=d.matches.find(m=>Number(m.stats_evidence_count||0)>0);
+          if(withStats){
+            if(!withStats.engine?.specialists) throw new Error('SPECIALISTS_MISSING');
+            if(withStats.engine.specialists.lrs_inclusion!==false) throw new Error('SPECIALISTS_MUST_BE_LRS_EXCLUDED');
+            for(const k of ['H1','FT','HC']) if(!withStats.engine.specialists[k]) throw new Error('SPECIALIST_'+k+'_MISSING');
+            if(!withStats.engine.market || !Array.isArray(withStats.engine.market.markets)) throw new Error('MARKET_NORMALIZER_SCHEMA_MISSING');
+            console.log('SPECIALISTS_PASS fixture='+withStats.fixture_id+' H1='+withStats.engine.specialists.H1.status+' FT='+withStats.engine.specialists.FT.status+' HC='+withStats.engine.specialists.HC.status+' market='+withStats.engine.market.status);
+          }
           console.log('OVERVIEW_PASS live='+d.matches.length+' pre='+d.pre_matches.length+' raw='+d.collector.counts.raw_snapshots+' stats='+d.collector.evidence.stats_payloads+' lineups='+d.collector.evidence.lineups_payloads+' health='+d.system.health+' scorable='+d.scan.live_scorable);
           console.log('TOP_LIVE='+JSON.stringify(d.scan.top_live||[]));
           console.log('PRE_READY='+d.pre_matches.filter(x=>x.pre_context?.status==='READY').length+' PRE_PARTIAL='+d.pre_matches.filter(x=>x.pre_context?.status==='PARTIAL').length);
