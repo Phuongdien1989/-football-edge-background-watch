@@ -317,9 +317,16 @@ async function capture(env, triggerType='SCHEDULED') {
     // Primary detail batch: API-Football can return embedded events/lineups/statistics/players
     // for up to 20 fixture IDs in one request. This is the highest-value call in the cycle.
     let detail = null;
+    let detailBatchItems = [];
     if (requestsLeft > 0) {
+      const batchState = await getState(env,'detail_batch_cursor');
+      const batchCursor = Math.max(0,num(batchState?.value,0));
+      const groups = chunks(liveItems,20);
+      const groupIndex = groups.length ? batchCursor % groups.length : 0;
+      detailBatchItems = groups[groupIndex] || liveItems.slice(0,20);
+      await setState(env,'detail_batch_cursor',batchCursor+1);
       await sleep(spacingMs);
-      detail = await apiGetWithRetry(env, '/fixtures', {ids:ids.slice(0,20).join('-')}, 1);
+      detail = await apiGetWithRetry(env, '/fixtures', {ids:detailBatchItems.map(x=>x.fixture.id).join('-')}, 1);
       summary.detail_requests++; summary.total_requests++; requestsLeft--;
       summary.detail_fixture_count += detail.detailFixtureCount;
       summary.fixtures_with_stats += detail.fixturesWithStats;
@@ -330,9 +337,10 @@ async function capture(env, triggerType='SCHEDULED') {
       if (detail.quota.minute_remaining != null) summary.minute_remaining = detail.quota.minute_remaining;
     }
 
-    // Every PRE interval, spend the optional request on today's fixture slate.
-    // Otherwise use it for one cross-check endpoint. Optional failure never discards
-    // the already-captured LIVE + detail batch.
+    // Optional third call planner:
+    // 1) when embedded detail has no stats, probe league/season coverage or explicit stats;
+    // 2) otherwise refresh PRE slate when due;
+    // 3) otherwise rotate explicit stats and live odds.
     if (requestsLeft > 0) {
       const preState = await getState(env,'last_pre_capture_at');
       const preAt = num(preState?.value);
@@ -340,25 +348,52 @@ async function capture(env, triggerType='SCHEDULED') {
       const preDue = preAt == null || Date.now()-preAt >= preInterval;
       try {
         await sleep(spacingMs);
-        if (preDue) {
+        let handled = false;
+        if ((detail?.fixturesWithStats||0) === 0 && detailBatchItems.length) {
+          const covCursorState = await getState(env,'coverage_cursor');
+          const covCursor = Math.max(0,num(covCursorState?.value,0));
+          const candidateItem = detailBatchItems[covCursor % detailBatchItems.length];
+          const leagueId = num(candidateItem?.league?.id), season = num(candidateItem?.league?.season);
+          const fixtureId = num(candidateItem?.fixture?.id);
+          const key = leagueId!=null && season!=null ? `coverage:${leagueId}:${season}` : null;
+          const cached = key ? await getState(env,key) : null;
+          let coverage = null;
+          try { coverage = cached?.value ? JSON.parse(cached.value) : null; } catch {}
+          if (!coverage && leagueId!=null && season!=null) {
+            const lr = await apiGetWithRetry(env,'/leagues',{id:String(leagueId),season:String(season)},0);
+            summary.detail_requests++; summary.total_requests++; requestsLeft--; handled=true;
+            const row = Array.isArray(lr.payload?.response) ? lr.payload.response[0] : null;
+            const cov = row?.seasons?.find(x=>Number(x?.year)===season)?.coverage || row?.coverage || null;
+            coverage = cov ? {league_id:leagueId,season,statistics_fixtures:!!cov?.fixtures?.statistics_fixtures,events:!!cov?.fixtures?.events,lineups:!!cov?.fixtures?.lineups,players:!!cov?.fixtures?.statistics_players,standings:!!cov?.standings,predictions:!!cov?.predictions,odds:!!cov?.odds,checked_at:iso()} : {league_id:leagueId,season,unknown:true,checked_at:iso()};
+            await setState(env,key,JSON.stringify(coverage));
+            await setState(env,'coverage_cursor',covCursor+1);
+            await setState(env,'last_coverage_probe',JSON.stringify(coverage));
+          } else if (coverage?.statistics_fixtures && fixtureId!=null) {
+            const sr = await apiGetWithRetry(env,'/fixtures/statistics',{fixture:String(fixtureId)},0);
+            summary.detail_requests++; summary.total_requests++; requestsLeft--; handled=true;
+            await setState(env,'coverage_cursor',covCursor+1);
+            await setState(env,'last_stats_probe',JSON.stringify({fixture_id:fixtureId,league_id:leagueId,season,non_null:sr.endpointEvidence?.non_null_value_count||0,received_at:sr.received}));
+            if ((sr.endpointEvidence?.non_null_value_count||0)>0) summary.fixtures_with_stats++;
+          } else {
+            await setState(env,'coverage_cursor',covCursor+1);
+          }
+        }
+        if (!handled && preDue && requestsLeft > 0) {
           const vn = new Date(Date.now()+7*60*60*1000).toISOString().slice(0,10);
           const pr = await apiGetWithRetry(env,'/fixtures',{date:vn,timezone:'Asia/Ho_Chi_Minh'},0);
-          summary.detail_requests++; summary.total_requests++; requestsLeft--;
+          summary.detail_requests++; summary.total_requests++; requestsLeft--; handled=true;
           await setState(env,'last_pre_capture_at',Date.now());
           await setState(env,'last_pre_fixture_count',Array.isArray(pr.payload?.response)?pr.payload.response.length:0);
-        } else {
-          // Cross-check one fixture explicitly. Prefer a match whose embedded detail
-          // already proved statistics coverage; otherwise rotate through the live list.
-          const candidate = (detail?.payload?.response||[]).find(x=>fixtureCoverage(x).has_stats)?.fixture?.id
-            || ids[Math.max(0,num((await getState(env,'aux_cursor'))?.value,0)) % ids.length];
-          const auxCursor = Math.max(0,num((await getState(env,'aux_cursor'))?.value,0));
-          if (candidate != null) {
-            const useOdds = auxCursor % 3 === 2;
-            const ep = useOdds ? '/odds/live' : '/fixtures/statistics';
-            const ar = await apiGetWithRetry(env,ep,{fixture:String(candidate)},0);
-            summary.detail_requests++; summary.total_requests++; requestsLeft--;
+        }
+        if (!handled && requestsLeft > 0) {
+          const auxState=await getState(env,'aux_cursor'),auxCursor=Math.max(0,num(auxState?.value,0));
+          const candidate=(detail?.payload?.response||[]).find(x=>fixtureCoverage(x).has_stats)?.fixture?.id || ids[auxCursor%ids.length];
+          if(candidate!=null){
+            const useOdds=auxCursor%3===2,ep=useOdds?'/odds/live':'/fixtures/statistics';
+            const ar=await apiGetWithRetry(env,ep,{fixture:String(candidate)},0);
+            summary.detail_requests++;summary.total_requests++;requestsLeft--;
             await setState(env,'aux_cursor',auxCursor+1);
-            if (!useOdds && (ar.endpointEvidence?.non_null_value_count||0)>0) summary.fixtures_with_stats++;
+            if(!useOdds&&(ar.endpointEvidence?.non_null_value_count||0)>0)summary.fixtures_with_stats++;
           }
         }
       } catch (auxErr) {
@@ -367,9 +402,7 @@ async function capture(env, triggerType='SCHEDULED') {
           summary.stop_reason='AUX_RATE_LIMIT_BACKOFF';
           const backoffMs=Math.max(30000,Math.min(600000,num(env.RATE_BACKOFF_MS,300000)));
           await setState(env,'rate_backoff_until',Date.now()+backoffMs).catch(()=>{});
-        } else {
-          summary.stop_reason='AUX_REQUEST_FAILED';
-        }
+        } else summary.stop_reason='AUX_REQUEST_FAILED';
         summary.error_message=msg.slice(0,500);
       }
     }
