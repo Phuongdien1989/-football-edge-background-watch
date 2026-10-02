@@ -1,0 +1,37 @@
+name: Verify V2 Mobile App
+on:
+  push:
+    branches: [v2-raw-capture]
+    paths: [".github/workflows/verify-v2-app.yml"]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Verify app shell
+        run: |
+          set -euo pipefail
+          curl -fsS https://football-edge-v2-raw-capture.ngophuonghuy.workers.dev/v2 -o app.html
+          grep -q "FOOTBALL EDGE V2" app.html
+          grep -q "LIVE FOOTBALL INTELLIGENCE" app.html
+          grep -q "SIGNALS" app.html
+          grep -q "WATCH" app.html
+          grep -q "DATA / VALIDATION" app.html
+          grep -q "SETTINGS" app.html
+          echo "APP_SHELL_PASS"
+      - name: Verify V2 overview API
+        run: |
+          set -euo pipefail
+          curl -fsS https://football-edge-v2-raw-capture.ngophuonghuy.workers.dev/api/v2/overview -o overview.json
+          node - <<'NODE'
+          const fs=require('fs');
+          const d=JSON.parse(fs.readFileSync('overview.json','utf8'));
+          if(!d.ok) throw new Error(d.error||'OVERVIEW_NOT_OK');
+          if(d.schema!=='FE_V2_APP_OVERVIEW_V1') throw new Error('WRONG_SCHEMA');
+          if(!Array.isArray(d.matches)) throw new Error('MATCHES_NOT_ARRAY');
+          if(!d.collector || !d.validation) throw new Error('MISSING_STATUS_BLOCKS');
+          console.log('OVERVIEW_PASS matches='+d.matches.length+' raw='+d.collector.counts.raw_snapshots+' stats='+d.collector.evidence.stats_payloads);
+          NODE
