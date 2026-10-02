@@ -1,3 +1,5 @@
+import {v2AppHtml} from './v2-app.js';
+import {buildV2Overview, buildV2Match} from './v2-engine.js';
 const BASE = 'https://v3.football.api-sports.io';
 const WORKER_VERSION = 'RAW_COLLECTOR_V0.4.1';
 const CAPTURE_SCHEMA_VERSION = 'RAW_CAPTURE_V0.4';
@@ -436,10 +438,26 @@ export default {
   async scheduled(controller, env, ctx) { ctx.waitUntil(capture(env,'SCHEDULED')); },
   async fetch(request, env) {
     const u = new URL(request.url);
-    if (u.pathname === '/' || u.pathname === '/app' || u.pathname === '/dashboard') {
+    if (u.pathname === '/' || u.pathname === '/app' || u.pathname === '/v2') {
+      return new Response(v2AppHtml(),{headers:{'content-type':'text/html; charset=utf-8','cache-control':'no-store'}});
+    }
+    if (u.pathname === '/dashboard') {
       return new Response(dashboardHtml(),{headers:{'content-type':'text/html; charset=utf-8','cache-control':'no-store'}});
     }
-    if (u.pathname === '/health') return json({ok:true,worker_version:WORKER_VERSION,capture_schema_version:CAPTURE_SCHEMA_VERSION});
+    if (u.pathname === '/v2-manifest.webmanifest') {
+      return new Response(JSON.stringify({name:'Football Edge V2',short_name:'FE V2',start_url:'/v2',display:'standalone',background_color:'#f3f7fb',theme_color:'#2378ee',description:'Live Football Intelligence'}),{headers:{'content-type':'application/manifest+json; charset=utf-8','cache-control':'public,max-age=3600'}});
+    }
+    if (u.pathname === '/v2-sw.js') {
+      return new Response("self.addEventListener('install',e=>self.skipWaiting());self.addEventListener('activate',e=>e.waitUntil(self.clients.claim()));self.addEventListener('fetch',e=>{if(e.request.method!=='GET')return;e.respondWith(fetch(e.request).catch(()=>new Response('Offline',{status:503})))})",{headers:{'content-type':'application/javascript; charset=utf-8','cache-control':'no-store'}});
+    }
+    if (u.pathname === '/api/v2/overview') {
+      try{return json(await buildV2Overview(env));}catch(e){return json({ok:false,error:String(e?.message||e),schema:'FE_V2_APP_OVERVIEW_V1'},500);}
+    }
+    if (u.pathname === '/api/v2/match') {
+      const id=Number(u.searchParams.get('id')); if(!Number.isFinite(id))return json({ok:false,error:'FIXTURE_ID_REQUIRED'},400);
+      try{const m=await buildV2Match(env,id);return m?json({ok:true,match:m}):json({ok:false,error:'FIXTURE_NOT_FOUND'},404);}catch(e){return json({ok:false,error:String(e?.message||e)},500);}
+    }
+    if (u.pathname === '/health') return json({ok:true,worker_version:WORKER_VERSION,capture_schema_version:CAPTURE_SCHEMA_VERSION,app_version:'V2.0.0-ALPHA'});
     if (u.pathname === '/status') return json(await status(env));
     if (u.pathname === '/capture-now') {
       if (!authorized(request,env)) return json({ok:false,error:'UNAUTHORIZED'},401);
