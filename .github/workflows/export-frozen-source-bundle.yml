@@ -1,0 +1,139 @@
+name: Export Frozen Source Bundle
+
+on:
+  push:
+    branches:
+      - freeze/background-push-v137-2026-10-02
+    paths:
+      - '.github/workflows/export-frozen-source-bundle.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  bundle:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout frozen baseline
+        uses: actions/checkout@v4
+
+      - name: Build sanitized source bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          ROOT="FOOTBALL_EDGE_CURRENT_SOURCE_SANITIZED_2026-10-02"
+          mkdir -p "$ROOT/frontend" "$ROOT/worker"
+
+          curl -fL --retry 3 --retry-delay 2 \
+            "https://shiny-silence-d892.ngophuonghuy.workers.dev/" \
+            -o "$ROOT/frontend/index.html"
+
+          test "$(wc -c < "$ROOT/frontend/index.html")" -gt 100000
+          grep -qi "<html" "$ROOT/frontend/index.html"
+
+          for f in \
+            worker_notify_v137_quota50000.js \
+            worker_notify_v136_hot_priority.js \
+            worker_notify_v135_full_pause.js \
+            worker_notify_v132_native.js \
+            worker_notify_v131.js \
+            worker_notify_v130.js \
+            worker_notify_v128.js \
+            worker_notify_v127.js \
+            worker_notify_v126.js \
+            worker_notify_v125.js \
+            worker_notify.js \
+            worker_v124.js \
+            worker_v123.js \
+            worker_v122.js \
+            worker.js \
+            notify-core.js \
+            notify-core-h1.js \
+            notify-transport.js \
+            package.json \
+            schema_v1231.sql \
+            schema_v1233_history.sql
+          do
+            cp "$f" "$ROOT/worker/$f"
+          done
+
+          python - <<'PY'
+          from pathlib import Path
+          import re
+          src = Path("wrangler.toml").read_text(encoding="utf-8")
+          src = re.sub(r'database_id\s*=\s*"[^"]*"', 'database_id = "<YOUR_D1_DATABASE_ID>"', src)
+          Path("FOOTBALL_EDGE_CURRENT_SOURCE_SANITIZED_2026-10-02/worker/wrangler.example.toml").write_text(src, encoding="utf-8")
+          PY
+
+          python - <<'PY'
+          from pathlib import Path
+          import re
+          root = Path("FOOTBALL_EDGE_CURRENT_SOURCE_SANITIZED_2026-10-02")
+          patterns = [
+              (re.compile(r'cfat_[A-Za-z0-9_-]{20,}'), '<REDACTED_CLOUDFLARE_TOKEN>'),
+              (re.compile(r'AIza[0-9A-Za-z_-]{30,}'), '<REDACTED_GOOGLE_KEY>'),
+              (re.compile(r'sk-[A-Za-z0-9_-]{20,}'), '<REDACTED_SECRET_KEY>'),
+          ]
+          for p in root.rglob("*"):
+              if not p.is_file() or p.suffix.lower() not in {".html",".js",".json",".toml",".md",".sql",".yml",".yaml"}:
+                  continue
+              s = p.read_text(encoding="utf-8", errors="ignore")
+              for rx, rep in patterns:
+                  s = rx.sub(rep, s)
+              p.write_text(s, encoding="utf-8")
+          PY
+
+          cat > "$ROOT/README_FREEZE.md" <<'EOF'
+          # Football Edge current source — sanitized freeze bundle
+
+          This bundle is for handoff/review in a new chat.
+
+          ## What is inside
+          - frontend/index.html: fetched from the live frontend URL at bundle-build time.
+          - worker/: complete runtime source chain for the frozen v137 Background Push baseline.
+          - worker/notify-core.js and worker/notify-core-h1.js: scoring engine modules explicitly requested.
+          - worker/wrangler.example.toml: sanitized deployment template.
+          - SHA256SUMS.txt: integrity hashes.
+
+          ## Frozen production baseline
+          - Worker service: football-edge-background-watch
+          - Worker entrypoint: worker_notify_v137_quota50000.js
+          - Worker URL: https://football-edge-background-watch.ngophuonghuy.workers.dev
+          - Cloudflare Version ID: 6c1b74e6-4327-4ce2-b5d7-5dc42803cf13
+          - Git commit baseline: e8ce008bcf567ee71880f0cf16323d774382494e
+          - Freeze branch: freeze/background-push-v137-2026-10-02
+          - API-Football hard cap: 50,000 calls/day
+          - HOT cadence target: 20s
+          - Normal cadence target: 30s
+          - Full background pause: enabled
+          - Push test on iPhone: user confirmed it arrived almost immediately.
+
+          ## Secrets intentionally excluded
+          This archive does NOT contain:
+          - CLOUDFLARE_API_TOKEN
+          - CLOUDFLARE_ACCOUNT_ID
+          - BACKGROUND_TOKEN
+          - APISPORTS_KEY
+          - user localStorage/config values
+          - GitHub Actions secret values
+          - production D1 database ID in the deployment template
+
+          Do not infer that signal effectiveness is proven. This freeze only establishes the current source and working background-push infrastructure.
+          EOF
+
+          (
+            cd "$ROOT"
+            find . -type f -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS.txt
+          )
+
+          zip -qr "$ROOT.zip" "$ROOT"
+
+      - name: Upload sanitized source bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: FOOTBALL_EDGE_CURRENT_SOURCE_SANITIZED_2026-10-02
+          path: FOOTBALL_EDGE_CURRENT_SOURCE_SANITIZED_2026-10-02.zip
+          if-no-files-found: error
+          retention-days: 30
