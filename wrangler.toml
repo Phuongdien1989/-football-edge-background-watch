@@ -1,54 +1,20 @@
-name = "ancient-butterfly-f4b0"
-main = "worker_notify_v137_quota50000.js"
-compatibility_flags = ["nodejs_compat"]
-compatibility_date = "2026-09-11"
+name = "football-edge-v2-raw-capture"
+main = "worker.js"
+compatibility_date = "2026-10-02"
 
 [vars]
-# API-Football current plan: 50,000 calls/day TOTAL.
-# P1.3 adds a global hard cap across Notification + Smart Follow + Evidence + Validation.
-# It does NOT pace or slow requests while quota remains available.
-API_TOTAL_DAILY_BUDGET = "50000"
-NOTIFY_DAILY_BUDGET = "43000"
-VALIDATION_DAILY_BUDGET = "3000"
-APISPORTS_BASE = "https://v3.football.api-sports.io"
-TZ = "Asia/Ho_Chi_Minh"
+CAPTURE_ENABLED = "true"
+API_SHARED_RESERVE = "10000"
+CAPTURE_MAX_REQUESTS_PER_CYCLE = "8"
+QUOTA_PROBE_MINUTES = "30"
 
-# P1.2 notification latency scheduler remains unchanged.
-# HOT fixtures get priority slots and a 20s cadence; normal rotation remains 30s.
-NOTIFY_HOT_INTERVAL_MS = "20000"
-NOTIFY_NORMAL_INTERVAL_MS = "30000"
-NOTIFY_HOT_SLOTS = "6"
-NOTIFY_HOT_GAP_MARGIN = "10"
-NOTIFY_HOT_H1_MARGIN = "8"
+[triggers]
+crons = ["* * * * *"]
 
-# Stable Smart Follow cadence/breadth.
-FOCUS_INTERVAL_MS = "30000"
-SCREEN_INTERVAL_MS = "60000"
-DETAIL_FOCUS_MS = "60000"
-DETAIL_SCREEN_MS = "180000"
-MAX_DETAIL_PER_TICK = "6"
-MAX_ACTIVE_WATCHES = "120"
-MAX_FOCUS_WATCHES = "16"
-WATCH_PERSIST_HEARTBEAT_MS = "300000"
-LOOKUP_FOCUS_MS = "120000"
-LOOKUP_SCREEN_MS = "300000"
-APNS_BUNDLE_ID = "vn.footballedge.app"
-APNS_ENV = "sandbox"
-
-[durable_objects]
-bindings = [
-  { name = "BACKGROUND_WATCHER", class_name = "BackgroundWatcher" }
-]
-
-[[migrations]]
-tag = "v1"
-new_sqlite_classes = ["BackgroundWatcher"]
-
-# V1.23.1 core D1 + V1.23.3 history tables; no D1 schema change
 [[d1_databases]]
-binding = "FOOTBALL_DB"
-database_name = "football-edge-db"
-database_id = "0d12a7cc-12a9-4c71-b55b-61dfd2dac4d4"
+binding = "DB"
+database_name = "football-edge-v2-raw"
+database_id = "__D1_DATABASE_ID__"
 
 [observability]
 enabled = true
