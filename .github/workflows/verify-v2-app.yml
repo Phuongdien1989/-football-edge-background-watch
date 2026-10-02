@@ -36,4 +36,6 @@ jobs:
           if(!d.system || !d.scan) throw new Error('MISSING_SYSTEM_OR_SCAN');
           if(!d.collector || !d.validation) throw new Error('MISSING_STATUS_BLOCKS');
           console.log('OVERVIEW_PASS live='+d.matches.length+' pre='+d.pre_matches.length+' raw='+d.collector.counts.raw_snapshots+' stats='+d.collector.evidence.stats_payloads+' lineups='+d.collector.evidence.lineups_payloads+' health='+d.system.health+' scorable='+d.scan.live_scorable);
+          console.log('TOP_LIVE='+JSON.stringify(d.scan.top_live||[]));
+          console.log('PRE_READY='+d.pre_matches.filter(x=>x.pre_context?.status==='READY').length+' PRE_PARTIAL='+d.pre_matches.filter(x=>x.pre_context?.status==='PARTIAL').length);
           NODE
