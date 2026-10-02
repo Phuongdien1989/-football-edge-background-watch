@@ -228,6 +228,17 @@ async function capture(env, triggerType='SCHEDULED') {
       await recordCycleEnd(env,cycleId,summary); return summary;
     }
 
+    if (triggerType === 'SCHEDULED') {
+      const lastAttempt = await getState(env,'last_capture_attempt_at');
+      const lastAttemptAt = num(lastAttempt?.value);
+      const intervalMs = Math.max(60000,Math.min(15*60*1000,num(env.CAPTURE_INTERVAL_MS,180000)));
+      if (lastAttemptAt != null && Date.now()-lastAttemptAt < intervalMs) {
+        summary.status='SKIPPED'; summary.stop_reason='CADENCE_GUARD';
+        await recordCycleEnd(env,cycleId,summary); return summary;
+      }
+      await setState(env,'last_capture_attempt_at',Date.now());
+    }
+
     const pre = await quotaGuard(env);
     summary.daily_limit = pre.provider.limit_day;
     summary.daily_remaining = pre.provider.remaining;
@@ -299,6 +310,7 @@ async function capture(env, triggerType='SCHEDULED') {
       if (d.quota.minute_remaining != null) summary.minute_remaining = d.quota.minute_remaining;
     }
     if (!summary.stop_reason && ids.length > selected.length) summary.stop_reason='BOUNDED_EVIDENCE_SAMPLING';
+    await setState(env,'last_capture_success_at',Date.now()).catch(()=>{});
     await recordCycleEnd(env,cycleId,summary);
     return summary;
   } catch (e) {
