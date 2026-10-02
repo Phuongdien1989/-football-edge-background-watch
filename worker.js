@@ -1,5 +1,5 @@
 const BASE = 'https://v3.football.api-sports.io';
-const WORKER_VERSION = 'RAW_COLLECTOR_V0.3';
+const WORKER_VERSION = 'RAW_COLLECTOR_V0.3.1';
 const CAPTURE_SCHEMA_VERSION = 'RAW_CAPTURE_V0.3';
 const API_VERSION = 'v3';
 const PROVIDER = 'API_FOOTBALL';
@@ -7,6 +7,8 @@ const SOURCE = 'CLOUDFLARE_V2_RAW_CAPTURE';
 const iso = () => new Date().toISOString();
 const num = (v, d = null) => { if (v === null || v === undefined || v === '') return d; const n = Number(v); return Number.isFinite(n) ? n : d; };
 const flag = (v, d = false) => v == null ? d : /^(1|true|yes|on)$/i.test(String(v));
+const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+const isRateLimitError = e => /rateLimit|API_HTTP_429|Too many requests/i.test(String(e?.message||e||''));
 const stable = async s => Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s))))
   .map(b => b.toString(16).padStart(2, '0')).join('');
 const json = (data, status = 200) => new Response(JSON.stringify(data), {
@@ -99,6 +101,18 @@ async function apiGet(env, endpoint, params) {
   }
   return {payload, requestId, received, quota, detailFixtureCount, fixturesWithStats, fixturesWithEvents};
 }
+async function apiGetWithRetry(env, endpoint, params, retries=1) {
+  let last;
+  for (let attempt=0; attempt<=retries; attempt++) {
+    try { return await apiGet(env, endpoint, params); }
+    catch (e) {
+      last=e;
+      if (!isRateLimitError(e) || attempt>=retries) throw e;
+      await sleep(3500*(attempt+1));
+    }
+  }
+  throw last;
+}
 function chunks(a,n){ const out=[]; for(let i=0;i<a.length;i+=n) out.push(a.slice(i,i+n)); return out; }
 async function providerQuota(env) {
   const started = iso();
@@ -155,6 +169,13 @@ async function capture(env, triggerType='SCHEDULED') {
     if (!flag(env.CAPTURE_ENABLED, true)) { summary.status='SKIPPED'; summary.stop_reason='CAPTURE_DISABLED'; await recordCycleEnd(env,cycleId,summary); return summary; }
     if (!env.APISPORTS_KEY) { summary.status='BLOCKED'; summary.stop_reason='APISPORTS_KEY_MISSING'; await recordCycleEnd(env,cycleId,summary); return summary; }
 
+    const backoff = await getState(env,'rate_backoff_until');
+    const backoffUntil = num(backoff?.value);
+    if (backoffUntil != null && Date.now() < backoffUntil) {
+      summary.status='SKIPPED'; summary.stop_reason='RATE_LIMIT_BACKOFF';
+      await recordCycleEnd(env,cycleId,summary); return summary;
+    }
+
     const pre = await quotaGuard(env);
     summary.daily_limit = pre.provider.limit_day;
     summary.daily_remaining = pre.provider.remaining;
@@ -172,7 +193,9 @@ async function capture(env, triggerType='SCHEDULED') {
 
     const maxPerCycle = Math.max(1, Math.min(20, num(env.CAPTURE_MAX_REQUESTS_PER_CYCLE, 8)));
     const requestAllowance = Math.max(1, Math.min(maxPerCycle, pre.collector_remaining));
-    const live = await apiGet(env, '/fixtures', {live:'all'});
+    const jitterMs = Math.max(0, Math.min(30000, num(env.CAPTURE_JITTER_MS,9000)));
+    if (jitterMs) await sleep(jitterMs);
+    const live = await apiGetWithRetry(env, '/fixtures', {live:'all'}, 1);
     summary.total_requests++;
     if (live.quota.daily_limit != null) summary.daily_limit = live.quota.daily_limit;
     if (live.quota.daily_remaining != null) summary.daily_remaining = live.quota.daily_remaining;
@@ -187,7 +210,9 @@ async function capture(env, triggerType='SCHEDULED') {
     for (const batch of chunks(ids,20).slice(0,detailBudget)) {
       if (summary.daily_remaining != null && summary.daily_remaining <= pre.reserve) { summary.stop_reason='PROVIDER_DAILY_RESERVE'; break; }
       if (summary.minute_remaining != null && summary.minute_remaining <= 2) { summary.stop_reason='MINUTE_RATE_LIMIT_GUARD'; break; }
-      const d = await apiGet(env, '/fixtures', {ids:batch.join('-')});
+      const spacingMs = Math.max(250, Math.min(5000, num(env.DETAIL_SPACING_MS,1200)));
+      await sleep(spacingMs);
+      const d = await apiGetWithRetry(env, '/fixtures', {ids:batch.join('-')}, 1);
       summary.detail_requests++; summary.total_requests++;
       summary.detail_fixture_count += d.detailFixtureCount;
       summary.fixtures_with_stats += d.fixturesWithStats;
@@ -201,7 +226,15 @@ async function capture(env, triggerType='SCHEDULED') {
     await recordCycleEnd(env,cycleId,summary);
     return summary;
   } catch (e) {
-    summary.status='ERROR'; summary.error_message=String(e?.message||e).slice(0,500);
+    summary.error_message=String(e?.message||e).slice(0,500);
+    if (isRateLimitError(e)) {
+      summary.status='SKIPPED';
+      summary.stop_reason='MINUTE_RATE_LIMIT_BACKOFF';
+      const backoffMs=Math.max(30000,Math.min(600000,num(env.RATE_BACKOFF_MS,120000)));
+      await setState(env,'rate_backoff_until',Date.now()+backoffMs).catch(()=>{});
+    } else {
+      summary.status='ERROR';
+    }
     await recordCycleEnd(env,cycleId,summary).catch(()=>{});
     return summary;
   }
