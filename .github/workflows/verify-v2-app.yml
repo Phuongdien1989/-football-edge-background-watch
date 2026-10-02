@@ -31,6 +31,15 @@ jobs:
           const d=JSON.parse(fs.readFileSync('push-key.json','utf8'));
           if(!d.ok || !/^[A-Za-z0-9_-]{80,100}$/.test(d.publicKey||'')) throw new Error('INVALID_VAPID_PUBLIC_KEY');
           console.log('PUSH_KEY_PASS len='+d.publicKey.length);
+          
+          NODE
+          curl -fsS https://football-edge-v2-raw-capture.ngophuonghuy.workers.dev/api/v2/push/status -o push-status.json
+          node - <<'NODE'
+          const fs=require('fs');
+          const d=JSON.parse(fs.readFileSync('push-status.json','utf8'));
+          if(!d.ok || !Number.isInteger(d.count)) throw new Error('PUSH_STATUS_BAD');
+          if('devices' in d) throw new Error('PUSH_STATUS_PRIVACY_LEAK');
+          console.log('PUSH_PRIVACY_PASS count='+d.count);
           NODE
           curl -fsS https://football-edge-v2-raw-capture.ngophuonghuy.workers.dev/v2-sw.js -o sw.js
           grep -q "addEventListener('push'" sw.js
@@ -51,6 +60,12 @@ jobs:
           if(d.schema!=='FE_V2_APP_OVERVIEW_V2') throw new Error('WRONG_SCHEMA:'+d.schema);
           if(!Array.isArray(d.matches)) throw new Error('MATCHES_NOT_ARRAY');
           if(!Array.isArray(d.pre_matches)) throw new Error('PRE_MATCHES_NOT_ARRAY');
+          if(d.pre_matches.length){
+            const p=d.pre_matches[0];
+            if(!p.pre_context || !p.pre_analysis) throw new Error('PRE_ANALYSIS_SCHEMA_MISSING');
+            if(p.pre_analysis.screen_role!=='DEEP_ATTENTION_ONLY') throw new Error('PRE_SCREEN_ROLE_WRONG');
+            console.log('PRE_SCHEMA_PASS top='+p.fixture_id+' screen='+p.pre_analysis.screen_score+' context='+p.pre_context.context_score);
+          }
           if(!d.system || !d.scan) throw new Error('MISSING_SYSTEM_OR_SCAN');
           if(!d.collector || !d.validation) throw new Error('MISSING_STATUS_BLOCKS');
           const withStats=d.matches.find(m=>Number(m.stats_evidence_count||0)>0);
