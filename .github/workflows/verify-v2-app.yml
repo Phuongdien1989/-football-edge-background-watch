@@ -22,6 +22,24 @@ jobs:
           grep -q "DATA / VALIDATION" app.html
           grep -q "SETTINGS" app.html
           echo "APP_SHELL_PASS"
+      - name: Verify V2 push transport
+        run: |
+          set -euo pipefail
+          curl -fsS https://football-edge-v2-raw-capture.ngophuonghuy.workers.dev/api/v2/push/key -o push-key.json
+          node - <<'NODE'
+          const fs=require('fs');
+          const d=JSON.parse(fs.readFileSync('push-key.json','utf8'));
+          if(!d.ok || !/^[A-Za-z0-9_-]{80,100}$/.test(d.publicKey||'')) throw new Error('INVALID_VAPID_PUBLIC_KEY');
+          console.log('PUSH_KEY_PASS len='+d.publicKey.length);
+          NODE
+          curl -fsS https://football-edge-v2-raw-capture.ngophuonghuy.workers.dev/v2-sw.js -o sw.js
+          grep -q "addEventListener('push'" sw.js
+          grep -q "notificationclick" sw.js
+          curl -fsS https://football-edge-v2-raw-capture.ngophuonghuy.workers.dev/v2 -o v2.html
+          grep -q "Background Push V2" v2.html
+          grep -q "pushManager.subscribe" v2.html
+          echo "PUSH_CLIENT_PASS"
+
       - name: Verify V2 overview API
         run: |
           set -euo pipefail
