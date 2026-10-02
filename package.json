@@ -1,11 +1,11 @@
 {
-  "name": "football-edge-background-watch",
+  "name": "football-edge-v2-raw-capture",
   "private": true,
-  "version": "1.0.0",
+  "version": "0.3.0",
   "type": "module",
   "scripts": {
-    "dev": "wrangler dev",
-    "deploy": "wrangler deploy"
+    "check": "node --check worker.js",
+    "deploy": "wrangler deploy --config wrangler.deploy.toml"
   },
   "devDependencies": {
     "wrangler": "^4.0.0"
