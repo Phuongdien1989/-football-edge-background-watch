@@ -27,16 +27,62 @@ function novelty(sig,en,feat,events,clock){if(sig.status!=='OK'||en.status!=='OK
 function flowChange(p,s,m){if(p.status!=='OK'||s.status!=='OK')return {status:'INSUFFICIENT_DATA',score:null,band:'N/A'};let score=Math.min(9,Math.abs(p.gap)*.12);if(m.status==='OK'){if(m.trend==='RISING')score+=4;if(Math.abs(m.acceleration)>=8)score+=2;}score=Math.min(15,score);return {status:'OK',score:round(score),band:score>=11?'HIGH':score>=6?'MEDIUM':'LOW'};}
 function lrs(sig,en,nov,flow,dqv){if([sig,en,nov,flow,dqv].some(x=>x.status!=='OK'))return {status:'NOT_SCORABLE',raw_lrs:null,final_lrs:null,reasons:['REQUIRED_DEPENDENCY_NOT_READY']};const sm={NONE:0,CANDIDATE:6,FORMING:12,ACTIVE:22,SUSTAINED:26};let ss=sm[sig.lifecycle]||0;if(sig.signal_type==='TWO_SIDED_ESCALATION')ss=Math.min(35,ss+7);else if(sig.signal_type==='GOAL_PRESSURE_ACTIVE')ss=Math.min(35,ss+5);const em={BLOCKED_DATA:0,WAIT_BUILDING:8,WAIT_CONFIRMING:11,OPEN_EARLY:23,OPEN_CORE:30,OPEN_FADING:21,LATE_DECAY:10,LATE_REVERSAL:5},es=em[en.substate]||0,ns=Math.min(20,nov.score||0),fs=Math.min(15,flow.score||0),raw=Math.min(100,ss+es+ns+fs),cc={HIGH:100,MEDIUM:84,LOW:69}[dqv.confidence]||69,dc=dqv.validation_status==='VALID'?100:dqv.validation_status==='CAUTION'?79:0;return {status:'OK',raw_lrs:round(raw),final_lrs:round(Math.min(raw,cc,dc)),components:{signal:ss,entry:es,novelty:round(ns),flow:round(fs)},caps:{confidence:cc,dq:dc},phase_a_eligible:false};}
 function publicFixture(item){return {fixture_id:item?.fixture?.id??null,league:{id:item?.league?.id??null,name:item?.league?.name||'Unknown',country:item?.league?.country||'',logo:item?.league?.logo||null},teams:{home:{id:item?.teams?.home?.id??null,name:item?.teams?.home?.name||'Home',logo:item?.teams?.home?.logo||null},away:{id:item?.teams?.away?.id??null,name:item?.teams?.away?.name||'Away',logo:item?.teams?.away?.logo||null}},goals:{home:item?.goals?.home??null,away:item?.goals?.away??null},status:{short:item?.fixture?.status?.short||'',elapsed:item?.fixture?.status?.elapsed??null,long:item?.fixture?.status?.long||''},venue:item?.fixture?.venue?.name||null,date:item?.fixture?.date||null};}
+function latestEvidencePayload(rows,kind){
+  const a=(rows||[]).filter(x=>x.evidence_kind===kind&&Number(x.item_count||0)>0).sort((x,y)=>Date.parse(x.received_at)-Date.parse(y.received_at));
+  return a.length?safeJson(a.at(-1).payload_json,{}):null;
+}
+function formSummary(payload,teamId){
+  const rows=Array.isArray(payload?.response)?payload.response:[],out={n:0,w:0,d:0,l:0,gf:0,ga:0,ppg:null,gd_per_match:null};
+  for(const f of rows.slice(0,5)){
+    const hid=Number(f?.teams?.home?.id),aid=Number(f?.teams?.away?.id),tid=Number(teamId);if(tid!==hid&&tid!==aid)continue;
+    const gh=Number(f?.goals?.home),ga=Number(f?.goals?.away);if(!Number.isFinite(gh)||!Number.isFinite(ga))continue;
+    const home=tid===hid,gfor=home?gh:ga,gagainst=home?ga:gh;out.n++;out.gf+=gfor;out.ga+=gagainst;if(gfor>gagainst)out.w++;else if(gfor===gagainst)out.d++;else out.l++;
+  }
+  if(out.n){out.ppg=round((out.w*3+out.d)/out.n,2);out.gd_per_match=round((out.gf-out.ga)/out.n,2);out.gf_per_match=round(out.gf/out.n,2);out.ga_per_match=round(out.ga/out.n,2);}
+  return out;
+}
+function standingSummary(payload,teamId){
+  const resp=Array.isArray(payload?.response)?payload.response:[],first=resp[0],groups=first?.league?.standings||[],flat=groups.flat?groups.flat(Infinity).filter(x=>x&&x.team):[];
+  const row=flat.find(x=>Number(x?.team?.id)===Number(teamId));if(!row)return {available:false,league_size:flat.length||null};
+  const played=Number(row?.all?.played||0),gf=Number(row?.all?.goals?.for||0),ga=Number(row?.all?.goals?.against||0);
+  return {available:true,rank:Number(row.rank)||null,points:Number(row.points)||0,played,wins:Number(row?.all?.win||0),draws:Number(row?.all?.draw||0),losses:Number(row?.all?.lose||0),gf,ga,gd:gf-ga,ppg:played?round(Number(row.points||0)/played,2):null,form:row.form||null,league_size:flat.length||null};
+}
+function h2hSummary(payload,homeId,awayId){
+  const rows=Array.isArray(payload?.response)?payload.response:[],out={n:0,home_w:0,draw:0,away_w:0,home_gf:0,away_gf:0};
+  for(const f of rows.slice(0,5)){
+    const hid=Number(f?.teams?.home?.id),aid=Number(f?.teams?.away?.id),gh=Number(f?.goals?.home),ga=Number(f?.goals?.away);if(!Number.isFinite(gh)||!Number.isFinite(ga))continue;
+    let hg,ag;if(hid===Number(homeId)&&aid===Number(awayId)){hg=gh;ag=ga}else if(hid===Number(awayId)&&aid===Number(homeId)){hg=ga;ag=gh}else continue;
+    out.n++;out.home_gf+=hg;out.away_gf+=ag;if(hg>ag)out.home_w++;else if(hg===ag)out.draw++;else out.away_w++;
+  }
+  return out;
+}
+function providerPredictionBenchmark(payload){
+  const r=Array.isArray(payload?.response)?payload.response[0]:null;if(!r)return {available:false};
+  return {available:true,role:'BENCHMARK_ONLY',advice:r?.predictions?.advice||null,winner:r?.predictions?.winner?.name||null,winner_comment:r?.predictions?.winner?.comment||null,percent:r?.predictions?.percent||null};
+}
+function seasonStrength(s){
+  if(!s?.available)return null;const rank=Number(s.rank),size=Number(s.league_size),rankScore=Number.isFinite(rank)&&size>1?clamp((size-rank)/(size-1)*100):50,ppgScore=s.ppg==null?50:clamp(Number(s.ppg)/3*100),gdScore=s.played?clamp(50+(Number(s.gd||0)/Number(s.played))*18):50;return round(rankScore*.45+ppgScore*.4+gdScore*.15,1);
+}
+function formStrength(f){
+  if(!f?.n)return null;const ppg=clamp(Number(f.ppg||0)/3*100),gd=clamp(50+Number(f.gd_per_match||0)*18),attack=clamp(Number(f.gf_per_match||0)/3*100);return round(ppg*.55+gd*.3+attack*.15,1);
+}
+function combineStrength(season,form){
+  const ss=seasonStrength(season),fs=formStrength(form);if(ss!=null&&fs!=null)return round(ss*.6+fs*.4,1);return ss??fs;
+}
 function analyzePreFixture(captureRows,evidenceRows){
-  const latest=captureRows[0],item=safeJson(latest.fixture_json,{}),pub=publicFixture(item);
+  const latest=captureRows[0],item=safeJson(latest.fixture_json,{}),pub=publicFixture(item),homeId=pub.teams.home.id,awayId=pub.teams.away.id;
   const kindCount=k=>evidenceRows.filter(x=>x.evidence_kind===k&&Number(x.item_count||0)>0).length;
   const lineups=kindCount('LINEUPS'),odds=kindCount('PRE_ODDS'),pred=kindCount('PREDICTIONS'),stand=kindCount('STANDINGS'),h2h=kindCount('H2H'),hf=kindCount('HOME_FORM'),af=kindCount('AWAY_FORM');
   const kickoff=Date.parse(pub.date||0),mins=Number.isFinite(kickoff)?Math.round((kickoff-Date.now())/60000):null;
   const contextScore=Math.min(100,10+(stand?20:0)+(hf?10:0)+(af?10:0)+(h2h?10:0)+(odds?20:0)+(lineups?15:0)+(pred?5:0));
   const blockers=[];if(!stand)blockers.push('STANDINGS');if(!hf||!af)blockers.push('RECENT_FORM');if(!odds)blockers.push('PRE_ODDS');if(mins!=null&&mins<=90&&!lineups)blockers.push('LINEUPS');
+  const standingsPayload=latestEvidencePayload(evidenceRows,'STANDINGS'),homeFormPayload=latestEvidencePayload(evidenceRows,'HOME_FORM'),awayFormPayload=latestEvidencePayload(evidenceRows,'AWAY_FORM'),h2hPayload=latestEvidencePayload(evidenceRows,'H2H'),predPayload=latestEvidencePayload(evidenceRows,'PREDICTIONS');
+  const hs=standingSummary(standingsPayload,homeId),as=standingSummary(standingsPayload,awayId),hform=formSummary(homeFormPayload,homeId),aform=formSummary(awayFormPayload,awayId),h2=h2hSummary(h2hPayload,homeId,awayId),benchmark=providerPredictionBenchmark(predPayload);
+  const homeStrength=combineStrength(hs,hform),awayStrength=combineStrength(as,aform),edge=homeStrength!=null&&awayStrength!=null?round(homeStrength-awayStrength,1):null,separation=edge==null?0:clamp(Math.abs(edge)*2),screenScore=round(contextScore*.55+separation*.3+(odds?15:0),1);
   return {...pub,received_at:latest.received_at,capture_count:captureRows.length,minutes_to_kickoff:mins,
     pre_context:{status:contextScore>=75?'READY':contextScore>=40?'PARTIAL':'COLLECTING',context_score:contextScore,lineups_payloads:lineups,pre_odds_payloads:odds,prediction_payloads:pred,standings_payloads:stand,h2h_payloads:h2h,home_form_payloads:hf,away_form_payloads:af,
       standings_status:stand?'AVAILABLE':'PENDING',recent_form_status:hf&&af?'AVAILABLE':hf||af?'PARTIAL':'PENDING',h2h_status:h2h?'AVAILABLE':'PENDING',market_status:odds?'AVAILABLE':'PENDING',prediction_role:'BENCHMARK_ONLY',blockers},
+    pre_analysis:{status:(homeStrength!=null&&awayStrength!=null)?'BASELINE_READY':'INSUFFICIENT_CONTEXT',model:'PRE_SCREEN_V0.1_SHADOW',home_strength:homeStrength,away_strength:awayStrength,strength_edge:edge,stronger_baseline:edge==null?'UNKNOWN':edge>=5?'HOME':edge<=-5?'AWAY':'BALANCED',screen_score:screenScore,screen_role:'DEEP_ATTENTION_ONLY',standings:{home:hs,away:as},recent_form:{home:hform,away:aform},h2h:h2,provider_prediction:benchmark},
     evidence:{raw_captures:captureRows.length,lineups_payloads:lineups,pre_odds_payloads:odds,prediction_payloads:pred,standings_payloads:stand,h2h_payloads:h2h,home_form_payloads:hf,away_form_payloads:af}};
 }
 
@@ -68,7 +114,7 @@ export async function buildV2Overview(env){
     }
   }
   matches.sort((a,b)=>{const la=a.engine.lrs.final_lrs,lb=b.engine.lrs.final_lrs;if(la!==null||lb!==null)return (lb??-1)-(la??-1);return Date.parse(b.received_at)-Date.parse(a.received_at);});
-  pre_matches.sort((a,b)=>(a.minutes_to_kickoff??999999)-(b.minutes_to_kickoff??999999));
+  pre_matches.sort((a,b)=>(b.pre_analysis?.screen_score??-1)-(a.pre_analysis?.screen_score??-1)||(a.minutes_to_kickoff??999999)-(b.minutes_to_kickoff??999999));
   const cycle=await env.DB.prepare('SELECT * FROM capture_cycles ORDER BY started_at DESC LIMIT 1').first(),
     counts=await env.DB.prepare(`SELECT COUNT(*) raw_snapshots,COUNT(DISTINCT fixture_id) fixtures,SUM(has_events) snapshots_with_events,SUM(has_stats) snapshots_with_stats,MIN(received_at) first_received_at,MAX(received_at) last_received_at FROM raw_fixture_captures`).first(),
     evidence=await env.DB.prepare(`SELECT COUNT(*) evidence_rows,COUNT(DISTINCT fixture_id) evidence_fixtures,SUM(CASE WHEN evidence_kind='EVENTS' AND item_count>0 THEN 1 ELSE 0 END) event_payloads,SUM(CASE WHEN evidence_kind='STATISTICS' AND non_null_value_count>0 THEN 1 ELSE 0 END) stats_payloads,SUM(CASE WHEN evidence_kind='LINEUPS' AND item_count>0 THEN 1 ELSE 0 END) lineups_payloads,SUM(CASE WHEN evidence_kind='LIVE_ODDS' AND item_count>0 THEN 1 ELSE 0 END) live_odds_payloads,SUM(CASE WHEN evidence_kind='PRE_ODDS' AND item_count>0 THEN 1 ELSE 0 END) pre_odds_payloads FROM raw_fixture_evidence`).first();
@@ -79,7 +125,7 @@ export async function buildV2Overview(env){
   const lastRaw=Date.parse(counts?.last_received_at||0),ageSec=Number.isFinite(lastRaw)?Math.max(0,Math.round((Date.now()-lastRaw)/1000)):null;
   const health=cycle?.status==='ERROR'?'ERROR':ageSec!=null&&ageSec>900?'STALE':/RATE/.test(cycle?.stop_reason||'')?'BACKOFF':'ONLINE';
   return {ok:true,schema:'FE_V2_APP_OVERVIEW_V2',app_version:'V2.1.0-ALPHA',engine_version:'DEV0.5-DATA-PLANE',generated_at:new Date().toISOString(),
-    matches,pre_matches,scan:{live_scorable:scorable.length,active_signals:active.length,entry_open:open.length,top_live},
+    matches,pre_matches,scan:{live_scorable:scorable.length,active_signals:active.length,entry_open:open.length,top_live,top_pre:pre_matches.filter(m=>m.pre_analysis?.status==='BASELINE_READY').slice(0,4).map(m=>({fixture_id:m.fixture_id,screen_score:m.pre_analysis.screen_score,context_score:m.pre_context.context_score,strength_edge:m.pre_analysis.strength_edge,stronger_baseline:m.pre_analysis.stronger_baseline}))},
     system:{health,last_raw_received_at:counts?.last_received_at||null,last_raw_age_sec:ageSec,next_capture_target_sec:180},
     collector:{last_cycle:cycle||null,counts:counts||{},evidence:evidence||{}},
     validation:{null_zero_guard:'PASS',unit_regression:'10/10 PASS',harness_regression:'20/20 PASS',phase_a:'NOT_ELIGIBLE',reason:'PHASE_A_REQUIRES_REAL_STATS_MULTI_SNAPSHOT_AND_QC'}};
