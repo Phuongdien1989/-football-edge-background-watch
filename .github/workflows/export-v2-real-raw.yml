@@ -34,5 +34,9 @@ jobs:
           name: football-edge-v2-real-raw
           path: |
             football-edge-v2-real-raw.ndjson
+            football-edge-v2-real-fixture-captures.ndjson
+            football-edge-v2-real-endpoint-evidence.ndjson
             football-edge-v2-real-raw-summary.json
           retention-days: 7
+
+# export schema v2 trigger 2026-10-02
