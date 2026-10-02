@@ -529,6 +529,13 @@ async function capturePreOnly(env) {
   }
 }
 
+async function acquireScheduledLease(env,ttlMs=55000){
+  const st=await getState(env,'scheduled_lease_until'),until=num(st?.value);
+  if(until!=null&&Date.now()<until)return false;
+  await setState(env,'scheduled_lease_until',Date.now()+ttlMs);
+  return true;
+}
+async function releaseScheduledLease(env){await setState(env,'scheduled_lease_until',0).catch(()=>{})}
 function authorized(request, env) {
   const token = request.headers.get('authorization')?.replace(/^Bearer\s+/i,'');
   return !!env.CAPTURE_TOKEN && token === env.CAPTURE_TOKEN;
@@ -711,10 +718,18 @@ async function dispatchV2Notifications(env){
 }
 export default {
   async scheduled(controller, env, ctx) {
-    const minute=new Date().getUTCMinutes();
-    if(minute%30===7) ctx.waitUntil(capturePreOnly(env));
-    else if(minute%10===7) ctx.waitUntil(capturePreContextOnly(env));
-    else ctx.waitUntil((async()=>{const r=await capture(env,'SCHEDULED');if(['OK','SKIPPED'].includes(r.status)&&!['RATE_LIMIT_BACKOFF','MINUTE_RATE_LIMIT_BACKOFF'].includes(r.stop_reason||''))await dispatchV2Notifications(env).catch(()=>{});})());
+    ctx.waitUntil((async()=>{
+      if(!(await acquireScheduledLease(env,55000)))return;
+      try{
+        const minute=new Date().getUTCMinutes();
+        if(minute%30===7) await capturePreOnly(env);
+        else if(minute%10===7) await capturePreContextOnly(env);
+        else{
+          const r=await capture(env,'SCHEDULED');
+          if(['OK','SKIPPED'].includes(r.status)&&!['RATE_LIMIT_BACKOFF','MINUTE_RATE_LIMIT_BACKOFF'].includes(r.stop_reason||''))await dispatchV2Notifications(env).catch(()=>{});
+        }
+      }finally{await releaseScheduledLease(env)}
+    })());
   },
   async fetch(request, env) {
     const u = new URL(request.url);
