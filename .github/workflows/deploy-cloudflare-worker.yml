@@ -15,7 +15,7 @@ permissions:
 
 jobs:
   deploy:
-    name: Deploy ancient-butterfly-f4b0
+    name: Deploy football-edge-background-watch
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -45,7 +45,7 @@ jobs:
         run: npm install --no-audit --no-fund
 
       - name: Deploy production Worker with Wrangler
-        run: npx wrangler deploy --name ancient-butterfly-f4b0
+        run: npx wrangler deploy --name football-edge-background-watch
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
