@@ -30,8 +30,10 @@ jobs:
           const fs=require('fs');
           const d=JSON.parse(fs.readFileSync('overview.json','utf8'));
           if(!d.ok) throw new Error(d.error||'OVERVIEW_NOT_OK');
-          if(d.schema!=='FE_V2_APP_OVERVIEW_V1') throw new Error('WRONG_SCHEMA');
+          if(d.schema!=='FE_V2_APP_OVERVIEW_V2') throw new Error('WRONG_SCHEMA:'+d.schema);
           if(!Array.isArray(d.matches)) throw new Error('MATCHES_NOT_ARRAY');
+          if(!Array.isArray(d.pre_matches)) throw new Error('PRE_MATCHES_NOT_ARRAY');
+          if(!d.system || !d.scan) throw new Error('MISSING_SYSTEM_OR_SCAN');
           if(!d.collector || !d.validation) throw new Error('MISSING_STATUS_BLOCKS');
-          console.log('OVERVIEW_PASS matches='+d.matches.length+' raw='+d.collector.counts.raw_snapshots+' stats='+d.collector.evidence.stats_payloads);
+          console.log('OVERVIEW_PASS live='+d.matches.length+' pre='+d.pre_matches.length+' raw='+d.collector.counts.raw_snapshots+' stats='+d.collector.evidence.stats_payloads+' lineups='+d.collector.evidence.lineups_payloads+' health='+d.system.health+' scorable='+d.scan.live_scorable);
           NODE
