@@ -1,0 +1,46 @@
+name: Verify V2 Raw Capture
+
+on:
+  push:
+    branches:
+      - v2-raw-capture
+    paths:
+      - ".github/workflows/verify-v2-raw-capture.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - name: Wait for Worker cron
+        run: sleep 75
+
+      - name: Verify status and API secret
+        shell: bash
+        run: |
+          set -euo pipefail
+          URL="https://football-edge-v2-raw-capture.ngophuonghuy.workers.dev/status"
+          curl -fsS "$URL" -o status.json
+          cat status.json
+          node - <<'NODE'
+          const fs=require('fs');
+          const s=JSON.parse(fs.readFileSync('status.json','utf8'));
+          if(!s.ok) throw new Error('STATUS_NOT_OK');
+          if(!s.api_key_configured) throw new Error('APISPORTS_KEY_NOT_CONFIGURED');
+          if(!s.last_cycle) throw new Error('NO_CAPTURE_CYCLE_YET');
+          if(s.last_cycle.stop_reason === 'APISPORTS_KEY_MISSING') throw new Error('LAST_CYCLE_API_KEY_MISSING');
+          console.log('worker_version=', s.worker_version);
+          console.log('last_cycle_status=', s.last_cycle.status);
+          console.log('last_cycle_stop_reason=', s.last_cycle.stop_reason);
+          console.log('live_count=', s.last_cycle.live_count);
+          console.log('stored=', JSON.stringify(s.stored));
+          NODE
+
+      - name: Summary
+        run: |
+          echo "V2 raw collector public status check passed."
+          echo "Real stats/events coverage depends on live fixtures and provider coverage at capture time."
