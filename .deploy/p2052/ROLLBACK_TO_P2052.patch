@@ -1,0 +1,147 @@
+--- /mnt/data/FOOTBALL_EDGE_PROD_LIVE_SCAN_HOTFIX_P2052_2026-10-03/ROLLBACK/index.html	2026-10-03 16:45:54.678992291 +0000
++++ /mnt/data/FOOTBALL_EDGE_PROD_LIVE_SCAN_HOTFIX_P2052_2026-10-03/DEPLOY/index.html	2026-10-03 17:08:48.535806215 +0000
+@@ -1,5 +1,6 @@
+ <!DOCTYPE html>
+ 
++<!-- FE P2.0.5.2 LIVE SCAN / API STATUS / SCAN-CONTROL HOTFIX 2026-10-03 -->
+ <html lang="vi">
+ <head>
+ <meta charset="utf-8"/>
+@@ -6732,23 +6733,43 @@
+     }
+   }
+   function apiUsageSnapshot(){
+-    const day=new Date().toISOString().slice(0,10);try{const x=JSON.parse(localStorage.getItem(API_USAGE_KEY)||'{}');if(x.day!==day)return {day,network_calls:0,remaining_header:null,limit_header:null};return x}catch{return {day,network_calls:0,remaining_header:null,limit_header:null}}
++    const day=new Date().toISOString().slice(0,10);try{const x=JSON.parse(localStorage.getItem(API_USAGE_KEY)||'{}');if(x.day!==day)return {day,network_calls:0,remaining_header:null,limit_header:null,minute_remaining_header:null,minute_limit_header:null};return x}catch{return {day,network_calls:0,remaining_header:null,limit_header:null,minute_remaining_header:null,minute_limit_header:null}}
+   }
+   function recordApiNetwork(headers){
+     const day=new Date().toISOString().slice(0,10),x=apiUsageSnapshot();x.day=day;x.network_calls=(x.network_calls||0)+1;
+     try{
+-      const rem=headers?.get?.('x-ratelimit-requests-remaining')||headers?.get?.('X-RateLimit-Requests-Remaining');
+-      const lim=headers?.get?.('x-ratelimit-requests-limit')||headers?.get?.('X-RateLimit-Requests-Limit');
++      const rem=headers?.get?.('x-ratelimit-requests-remaining');
++      const lim=headers?.get?.('x-ratelimit-requests-limit');
++      const minRem=headers?.get?.('x-ratelimit-remaining')||headers?.get?.('X-RateLimit-Remaining');
++      const minLim=headers?.get?.('x-ratelimit-limit')||headers?.get?.('X-RateLimit-Limit');
+       if(rem!=null)x.remaining_header=Number(rem);if(lim!=null)x.limit_header=Number(lim);
++      if(minRem!=null)x.minute_remaining_header=Number(minRem);if(minLim!=null)x.minute_limit_header=Number(minLim);
+     }catch{}
+     try{localStorage.setItem(API_USAGE_KEY,JSON.stringify(x))}catch{}
+   }
++  function footballApiErrors(errors){
++    if(errors==null)return [];
++    if(Array.isArray(errors))return errors.filter(v=>v!=null&&String(v).trim()!=='').map(v=>String(v));
++    if(typeof errors==='object')return Object.entries(errors).filter(([,v])=>v!=null&&String(v).trim()!=='').map(([k,v])=>`${k}: ${typeof v==='string'?v:JSON.stringify(v)}`);
++    return String(errors).trim()?[String(errors)]:[]
++  }
++  function footballQuotaLabel(){
++    const u=apiUsageSnapshot(),p=[];
++    if(Number.isFinite(Number(u.limit_header))&&Number.isFinite(Number(u.remaining_header)))p.push(`ngày còn ${Number(u.remaining_header)}/${Number(u.limit_header)}`);
++    if(Number.isFinite(Number(u.minute_limit_header))&&Number.isFinite(Number(u.minute_remaining_header)))p.push(`phút còn ${Number(u.minute_remaining_header)}/${Number(u.minute_limit_header)}`);
++    return p.join(' • ')
++  }
+   async function football(path,params={},optional=false){
+     const base=els.fbase.value.trim().replace(/\/$/,'');const u=new URL(base+path);Object.entries(params).forEach(([k,v])=>{if(v!==undefined&&v!==null&&v!=='')u.searchParams.set(k,String(v))});
+     const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),API_TIMEOUT_MS);
+     try{const r=await fetch(u,{headers:footballHeaders(),signal:controller.signal});recordApiNetwork(r.headers);const txt=await r.text();let data;try{data=JSON.parse(txt)}catch{throw new Error(`Football API trả dữ liệu không phải JSON (HTTP ${r.status})`)}
+       if(!r.ok)throw new Error(`Football API HTTP ${r.status}: ${JSON.stringify(data.errors||data).slice(0,220)}`);
+-      if(data.errors && ((Array.isArray(data.errors)&&data.errors.length)||(!Array.isArray(data.errors)&&Object.keys(data.errors).length)))log('Football API warning',data.errors);
++      const apiErrors=footballApiErrors(data?.errors);
++      if(apiErrors.length){
++        const quota=footballQuotaLabel();
++        const err=new Error(`Football API từ chối: ${apiErrors.join(' | ').slice(0,320)}${quota?` • ${quota}`:''}`);
++        err.api_errors=data.errors;err.http_status=r.status;throw err
++      }
+       return data.response??[];
+     }catch(e){const err=e?.name==='AbortError'?new Error(`Football API quá thời gian chờ ${Math.round(API_TIMEOUT_MS/1000)} giây`):e;log(`Lỗi ${path}: ${err.message}`);if(optional)return null;throw err}finally{clearTimeout(timeout)}
+   }
+@@ -7407,8 +7428,20 @@
+   }
+ 
+   $('testBtn').addEventListener('click',async()=>{
+-    saveConfig(true);loading(true,'Đang kiểm tra Football API','Kiểm tra key và khả năng tải fixture.');status(els.conn,'Đang kiểm tra...','busy');
+-    try{const d=fmtDateInTZ(new Date());const f=await football('/fixtures',{date:d,timezone:TZ});status(els.conn,`Football API: OK (${f.length} trận ngày ${d})`,'ok')}catch(e){status(els.conn,'Football API: LỖI — '+e.message,'err')}finally{loading(false)}
++    saveConfig(true);loading(true,'Đang kiểm tra Football API','Kiểm tra key, gói API và quota thực tế.');status(els.conn,'Đang kiểm tra...','busy');
++    try{
++      if(els.provider.value==='direct'){
++        const s=await football('/status',{}),req=s?.requests||{},sub=s?.subscription||{},current=Number(req.current),limit=Number(req.limit_day),remain=Number.isFinite(limit)&&Number.isFinite(current)?Math.max(0,limit-current):null;
++        const plan=String(sub.plan||'').trim(),parts=['Football API: OK'];
++        if(plan)parts.push(plan.toUpperCase());
++        if(Number.isFinite(current)&&Number.isFinite(limit))parts.push(`${current}/${limit} request hôm nay${remain!=null?` • còn ${remain}`:''}`);
++        const q=footballQuotaLabel();if(q)parts.push(q);
++        status(els.conn,parts.join(' • '),'ok')
++      }else{
++        const d=fmtDateInTZ(new Date()),f=await football('/fixtures',{date:d,timezone:TZ}),q=footballQuotaLabel();
++        status(els.conn,`Football API: OK (${Array.isArray(f)?f.length:0} trận ngày ${d})${q?` • ${q}`:''}`,'ok')
++      }
++    }catch(e){status(els.conn,'Football API: LỖI — '+e.message,'err')}finally{loading(false)}
+   });
+ 
+   function isLive(f){const s=f.fixture?.status?.short||'';return ['1H','HT','2H','ET','BT','P','INT','SUSP','LIVE'].includes(s)}
+@@ -7738,8 +7771,16 @@
+     try{
+       let fixtures;
+       if(h==='live'){
+-        const raw=await football('/fixtures',{live:'all',timezone:TZ});
+-        scanProgressStage('Đã nhận danh sách LIVE',`Football API trả về ${raw.length} fixture • đang kiểm tra từng trận.`,15);
++        let raw=await football('/fixtures',{live:'all',timezone:TZ}),liveSource='LIVE_ALL';
++        if(!Array.isArray(raw))raw=[];
++        if(raw.length===0){
++          const now=Date.now(),dates=[fmtDateInTZ(new Date(now-86400000)),fmtDateInTZ(new Date(now))];
++          scanProgressStage('LIVE feed trả 0',`Đang đối chiếu fixture theo ngày ${dates.join(' / ')} để tránh bỏ sót trận đang diễn ra.`,12);
++          const fallback=(await Promise.all([...new Set(dates)].map(d=>football('/fixtures',{date:d,timezone:TZ})))).flat();
++          raw=fallback.filter(feLiveSourceValid);liveSource='DATE_FALLBACK'
++        }
++        const q=footballQuotaLabel();
++        scanProgressStage('Đã nhận danh sách LIVE',`Nguồn ${liveSource} • ${raw.length} fixture${q?` • ${q}`:''} • đang kiểm tra từng trận.`,15);
+         fixtures=await filterFixturesProgress(raw,()=>true,'Đang kiểm tra LIVE');
+       }else{
+         const now=Date.now(),end=now+Number(h)*3600000,
+@@ -16085,7 +16126,7 @@
+     const min=Math.floor(sec/60);if(min<60)return `${min} phút trước`;return `${Math.floor(min/60)} giờ trước`
+   }
+   function feScanControlRender(control){
+-    const c=control||{},paused=c.paused===true;FE_SCAN_HEALTH.control=c;
++    const raw=control?.scan_control||control||{},paused=raw.enabled===false||raw.paused===true,c={...raw,paused};FE_SCAAN_HEALTH.control=c;
+    if(feScanControlBtn){
+       feScanControlBtn.textContent=paused?'TIẾP TỤC QUÉT':'TẠM DỪNG QUÉT';
+       feScanControlBtn.className=paused?'blue':'';
+@@ -16109,14 +16150,13 @@
+       feScanBadgeSet('CHƯA CÓ DỮ LIỆU','warn');feScanText(feScanHeartbeat,'—');feScanText(feScanLive,'—');feScanText(feScanScanned,'—');feScanText(feScanAlerts,'—');
+       feScanText(feScanLine,'Worker đã kết nối nhưng chưa ghi nhận vòng quét Push.');if(feScanErrors){feScanErrors.hidden=true;feScanErrors.textContent=''}return
+     }
+-    const age=Math.max(0,Date.now()-Number(scan.at));
+-    if(age<=90000)feScanBadgeSet('ĐANG QUÉT','ok');else if(age<=180000)feScanBadgeSet('CHẬM','warn');else feScanBadgeSet('GIÁN ĐOẠN','err');
++    const age=Math.max(0,Date.now()-Number(scan.at)),errs=Array.isArray(scan.errors)?scan.errors:[],budgetReached=errs.some(x=>/NOTIFY_DAILY_BUDGET_REACHED|API_TOTAL_DAILY_BUDGET_REACHED/i.test(String(x?.error||x||'')));
++    if(budgetReached)feScanBadgeSet('HẾT BUDGET NỀN','warn');else if(age<=90000)feScanBadgeSet('ĐANG QUÉT','ok');else if(age<=180000)feScanBadgeSet('CHẬM','warn');else feScanBadgeSet('GIÁN ĐOẠN','err');
+     feScanText(feScanHeartbeat,feScanAgeLabel(age));feScanText(feScanLive,Number.isFinite(Number(scan.live))?scan.live:'—');
+     feScanText(feScanScanned,Number.isFinite(Number(scan.scanned))?scan.scanned:'—');feScanText(feScanAlerts,Number.isFinite(Number(scan.alertsAccepted))?scan.alertsAccepted:'—');
+     const api=Number.isFinite(Number(scan.apiToday))?`${scan.apiToday}/${Number.isFinite(Number(scan.apiLimit))?scan.apiLimit:'—'}`:'—';
+     const rot=Number.isFinite(Number(scan.rotationEstimateSeconds))?`~${scan.rotationEstimateSeconds}s`:'—';
+-    feScanText(feScanLine,`Vòng gần nhất: ${new Date(Number(scan.at)).toLocaleTimeString('vi-VN')} • API hôm nay: ${api} • Chu kỳ phủ LIVE ước tính: ${rot}`);
+-    const errs=Array.isArray(scan.errors)?scan.errors:[];
++    feScanText(feScanLine,budgetReached?`Background đã chạm ngân sách riêng ${api}. QUÉT LIVE thủ công vẫn dùng API-Football trực tiếp; có thể TẠM DỪNG QUÉT NỀN để giảm tải Worker.`:`Vòng gần nhất: ${new Date(Number(scan.at)).toLocaleTimeString('vi-VN')} • API nền hôm nay: ${api} • Chu kỳ phủ LIVE ước tính: ${rot}`);
+     if(feScanErrors){if(errs.length){const e=errs.slice(0,2).map(x=>`${x.fixture?`#${x.fixture} `:''}${x.error||'Lỗi không xác định'}`).join(' • ');feScanErrors.hidden=false;feScanText(feScanErrors,`Lỗi vòng gần nhất (${errs.length}): ${e}`)}else{feScanErrors.hidden=true;feScanErrors.textContent=''}}
+   }
+   async function feScanRefresh({silent=false}={}){
+@@ -16125,7 +16165,7 @@
+       if(!silent)feScanBadgeSet('ĐANG ĐỌC','');
+       const r=await bgRequest('/api/notify/status',{timeout:12000});
+       if(r?.ok!==true)throw new Error(r?.error||'Worker không trả trạng thái Push.');
+-      feScanRender(r.scan||null,r.control||{paused:r.paused===true,state:r.scan_state||null})
++      feScanRender(r.scan||null,r.scan_control||r.control||{enabled:r.scan?.scanEnabled,paused:r.scan?.paused===true||r.paused===true,state:r.scan_state||null})
+     }catch(e){
+       if(!silent){feScanBadgeSet('LỖI KẾT NỐI','err');feScanText(feScanLine,'Không đọc được trạng thái quét: '+(e.message||e))}
+     }
+@@ -16137,9 +16177,9 @@
+     FE_SCAN_HEALTH.busy=true;if(feScanControlBtn)feScanControlBtn.disabled=true;
+     try{
+       feScanBadgeSet(paused?'ĐANG TẠM DỪNG':'ĐANG KHỞI ĐỘNG','');
+-      const r=await bgRequest('/api/notify/scan-control',{method:'POST',body:{action:paused?'pause':'resume'},timeout:15000});
++      const r=await bgRequest('/api/notify/scan-control',{method:'POST',body:{enabled:!paused},timeout:15000});
+       if(r?.ok!==true)throw new Error(r?.error||'Worker không cập nhật trạng thái quét.');
+-      feScanControlRender(r);
++      feScanControlRender(r.scan_control||r);
+       await feScanRefresh({silent:true});
+     }catch(e){
+       feScanBadgeSet('LỖI ĐIỀU KHIỂN','err');feScanText(feScanLine,'Không đổi được trạng thái quét: '+(e.message||e))
