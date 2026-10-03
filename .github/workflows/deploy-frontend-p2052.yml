@@ -1,0 +1,175 @@
+name: Deploy Frontend P2052 LIVE/API Hotfix
+
+on:
+  push:
+    branches:
+      - hotfix/frontend-p2052-live-api75k-20261003
+    paths:
+      - ".github/workflows/deploy-frontend-p2052.yml"
+
+concurrency:
+  group: football-edge-frontend-p2052-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  deploy:
+    name: Deploy shiny-silence-d892 P2052
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    env:
+      SERVICE_NAME: shiny-silence-d892
+      SERVICE_URL: https://shiny-silence-d892.ngophuonghuy.workers.dev
+      BASE_ARTIFACT_RUN_ID: "36998717198"
+      BASE_ARTIFACT_NAME: FOOTBALL_EDGE_CURRENT_SOURCE_SANITIZED_2026-10-02
+      EXPECTED_BASE_SHA256: f2d5c471c247ed77b07e3cb9096e5c04ae9c69b4d8af1b25a4fbe7ca955bfb5c
+      EXPECTED_P2052_SHA256: a82bf87e1db875fb975b94ac9b6df9e785818de37b7bb55fec6f290efca9c844
+      HOTFIX_MARKER: FE P2.0.5.2 LIVE SCAN / API STATUS / SCAN-CONTROL HOTFIX 2026-10-03
+
+    steps:
+      - name: Checkout hotfix branch
+        uses: actions/checkout@v4
+
+      - name: Guard branch and target
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF_NAME" = "hotfix/frontend-p2052-live-api75k-20261003"
+          test "$SERVICE_NAME" = "shiny-silence-d892"
+          test "$SERVICE_NAME" != "football-edge-background-watch"
+          echo "Branch/target guard PASS"
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Validate Cloudflare credentials
+        shell: bash
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          test -n "$CLOUDFLARE_API_TOKEN"
+          test -n "$CLOUDFLARE_ACCOUNT_ID"
+          echo "Cloudflare credential presence PASS"
+
+      - name: Install pinned Wrangler
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install --no-save --no-audit --no-fund wrangler@4.119.0
+          npx wrangler --version
+
+      - name: Download frozen production frontend baseline
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ env.BASE_ARTIFACT_NAME }}
+          path: /tmp/fe-base-artifact
+          github-token: ${{ github.token }}
+          run-id: ${{ env.BASE_ARTIFACT_RUN_ID }}
+
+      - name: Reconstruct exact P2052 frontend
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/fe-source /tmp/fe-p2052/public /tmp/fe-evidence
+
+          INNER="/tmp/fe-base-artifact/FOOTBALL_EDGE_CURRENT_SOURCE_SANITIZED_2026-10-02.zip"
+          test -f "$INNER"
+          unzip -q "$INNER" -d /tmp/fe-source
+
+          BASE="/tmp/fe-source/frontend/index.html"
+          test -f "$BASE"
+
+          BASE_SHA="$(sha256sum "$BASE" | awk '{print $1}')"
+          echo "$BASE_SHA  baseline/index.html" | tee /tmp/fe-evidence/baseline.sha256
+          test "$BASE_SHA" = "$EXPECTED_BASE_SHA256"
+
+          cp "$BASE" /tmp/fe-p2052/public/index.html
+          patch -p5 -d /tmp/fe-p2052/public < "$GITHUB_WORKSPACE/.deploy/p2052/ROLLBACK_TO_P2052.patch"
+
+          NEW_SHA="$(sha256sum /tmp/fe-p2052/public/index.html | awk '{print $1}')"
+          echo "$NEW_SHA  P2052/index.html" | tee /tmp/fe-evidence/p2052.sha256
+          test "$NEW_SHA" = "$EXPECTED_P2052_SHA256"
+          grep -Fq "$HOTFIX_MARKER" /tmp/fe-p2052/public/index.html
+
+          cat > /tmp/fe-p2052/wrangler.jsonc <<'JSON'
+          {
+            "name": "shiny-silence-d892",
+            "compatibility_date": "2026-10-03",
+            "assets": {
+              "directory": "./public"
+            }
+          }
+          JSON
+
+          echo "Exact P2052 reconstruction PASS"
+
+      - name: Snapshot current frontend deployment
+        shell: bash
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/fe-evidence
+          npx wrangler deployments list --name "$SERVICE_NAME" --json > /tmp/fe-evidence/deployments-before.json
+          echo "Current deployment snapshot captured"
+
+      - name: Deploy P2052 and smoke test with automatic rollback
+        shell: bash
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          DEPLOYED=0
+
+          rollback_previous() {
+            if [ "$DEPLOYED" = "1" ]; then
+              echo "::warning::P2052 smoke test failed; rolling back to immediately previous frontend version"
+              npx wrangler rollback --name "$SERVICE_NAME" --message "Automatic rollback: P2052 frontend smoke test failed"                 | tee /tmp/fe-evidence/rollback.log
+            fi
+          }
+
+          cd /tmp/fe-p2052
+          npx "$GITHUB_WORKSPACE/node_modules/wrangler/bin/wrangler.js" deploy --config wrangler.jsonc --name "$SERVICE_NAME"             | tee /tmp/fe-evidence/deploy.log
+          DEPLOYED=1
+
+          cd "$GITHUB_WORKSPACE"
+          PASS=0
+          for i in $(seq 1 15); do
+            if curl -fLsS -H 'Cache-Control: no-cache' "$SERVICE_URL/?_fe_p2052_smoke=$i-$(date +%s)"                  -o /tmp/fe-evidence/live-index.html; then
+              LIVE_SHA="$(sha256sum /tmp/fe-evidence/live-index.html | awk '{print $1}')"
+              echo "attempt=$i sha256=$LIVE_SHA"
+              if [ "$LIVE_SHA" = "$EXPECTED_P2052_SHA256" ] && grep -Fq "$HOTFIX_MARKER" /tmp/fe-evidence/live-index.html; then
+                PASS=1
+                echo "$LIVE_SHA  live/index.html" > /tmp/fe-evidence/live.sha256
+                break
+              fi
+            fi
+            sleep 2
+          done
+
+          if [ "$PASS" != "1" ]; then
+            rollback_previous
+            exit 31
+          fi
+
+          npx wrangler deployments list --name "$SERVICE_NAME" --json > /tmp/fe-evidence/deployments-after.json
+          echo "P2052 production smoke PASS"
+
+      - name: Upload deployment evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: football-edge-p2052-frontend-deploy-evidence
+          path: /tmp/fe-evidence/
+          if-no-files-found: warn
+          retention-days: 30
