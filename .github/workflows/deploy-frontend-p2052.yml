@@ -80,11 +80,13 @@ jobs:
           set -euo pipefail
           mkdir -p /tmp/fe-source /tmp/fe-p2052/public /tmp/fe-evidence
 
-          INNER="/tmp/fe-base-artifact/FOOTBALL_EDGE_CURRENT_SOURCE_SANITIZED_2026-10-02.zip"
-          test -f "$INNER"
+          find /tmp/fe-base-artifact -maxdepth 4 -type f -print | sort | tee /tmp/fe-evidence/base-artifact-files.txt
+          INNER="$(find /tmp/fe-base-artifact -type f -name '*.zip' -print -quit)"
+          test -n "$INNER"
           unzip -q "$INNER" -d /tmp/fe-source
 
-          BASE="/tmp/fe-source/frontend/index.html"
+          BASE="$(find /tmp/fe-source -type f -path '*/frontend/index.html' -print -quit)"
+          test -n "$BASE"
           test -f "$BASE"
 
           BASE_SHA="$(sha256sum "$BASE" | awk '{print $1}')"
