@@ -94,7 +94,7 @@ jobs:
           test "$BASE_SHA" = "$EXPECTED_BASE_SHA256"
 
           cp "$BASE" /tmp/fe-p2052/public/index.html
-          patch -p5 -d /tmp/fe-p2052/public < "$GITHUB_WORKSPACE/.deploy/p2052/ROLLBACK_TO_P2052.patch"
+          patch -p1 -d /tmp/fe-p2052/public < "$GITHUB_WORKSPACE/.deploy/p2052/site.patch"
 
           NEW_SHA="$(sha256sum /tmp/fe-p2052/public/index.html | awk '{print $1}')"
           echo "$NEW_SHA  P2052/index.html" | tee /tmp/fe-evidence/p2052.sha256
@@ -121,8 +121,12 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p /tmp/fe-evidence
+          curl -fLsS --retry 5 --retry-delay 2 -H 'Cache-Control: no-cache' "$SERVICE_URL/?_fe_predeploy=$(date +%s)" -o /tmp/fe-evidence/live-before.html
+          LIVE_BEFORE_SHA="$(sha256sum /tmp/fe-evidence/live-before.html | awk '{print $1}')"
+          echo "$LIVE_BEFORE_SHA  live-before/index.html" | tee /tmp/fe-evidence/live-before.sha256
+          test "$LIVE_BEFORE_SHA" = "$EXPECTED_BASE_SHA256"
           npx wrangler deployments list --name "$SERVICE_NAME" --json > /tmp/fe-evidence/deployments-before.json
-          echo "Current deployment snapshot captured"
+          echo "Current live frontend hash + deployment snapshot captured"
 
       - name: Deploy P2052 and smoke test with automatic rollback
         shell: bash
