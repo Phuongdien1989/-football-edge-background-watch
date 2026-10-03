@@ -102,8 +102,8 @@
    }
    function feScanControlRender(control){
 -    const c=control||{},paused=c.paused===true;FE_SCAN_HEALTH.control=c;
-+    const raw=control?.scan_control||control||{},paused=raw.enabled===false||raw.paused===true,c={...raw,paused};FE_SCAAN_HEALTH.control=c;
-    if(feScanControlBtn){
++    const raw=control?.scan_control||control||{},paused=raw.enabled===false||raw.paused===true,c={...raw,paused};FE_SCAN_HEALTH.control=c;
+     if(feScanControlBtn){
        feScanControlBtn.textContent=paused?'TIẾP TỤC QUÉT':'TẠM DỪNG QUÉT';
        feScanControlBtn.className=paused?'blue':'';
 @@ -16109,14 +16150,13 @@
