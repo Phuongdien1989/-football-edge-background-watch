@@ -6,6 +6,7 @@ on:
       - hotfix/frontend-p2052-live-api75k-20261003
     paths:
       - ".github/workflows/deploy-frontend-p2052.yml"
+      - ".deploy/p2052/**"
 
 concurrency:
   group: football-edge-frontend-p2052-production
