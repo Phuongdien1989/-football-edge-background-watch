@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import {calibrationMetrics,stratifiedCalibration,opportunityMetrics,settlementReturn,marketValidation,validationDashboard} from './validation-metrics.js';
 import {compareOldNew,buildPairedObservation} from './old-vs-new-comparator.js';
 import {createPaperMarketRecord,settlePaperMarketRecord} from './paper-market-evidence.js';
+import {runShadowUniverse} from './shadow-universe-runner.js';
 
 const rows=[
  {p_goal_5m:20,p_goal_10m:40,p_goal_15m:60,confidence_band:'HIGH',minute:61,outcome:{goal_5m:false,goal_10m:true,goal_15m:true},league:'A'},
@@ -48,3 +49,20 @@ const ahSet=settlePaperMarketRecord(ah,{finalHome:1,finalAway:1});
 assert.equal(ahSet.settlement_result,'HALF_LOSS');assert.equal(ahSet.realized_return,-.5);
 
 console.log('B5 tests PASS');
+
+
+const liveItem={id:77,latest:{minute:62,status:'2H',goals:{home:0,away:0},fresh_at:Date.now()-5000,dq:82,stats_presence:{coverage:5},
+ metrics:{home:{shots:11,sot:5,inbox:6,corners:5,xg:1.2},away:{shots:4,sot:1,inbox:2,corners:2,xg:.3}}},
+ eval:{game:13,pressure:16,chance:15,momentum:11,context:6,quality:4,accel:.3,mature:true,baselineAge:7,scoreMode:'FULL'}};
+const ctx={shadow_only:true,home:{personnel:{confidence:.8},strength:{goals_for_avg:1.7,goals_against_avg:1.0}},
+ away:{personnel:{confidence:.8},strength:{goals_for_avg:1.0,goals_against_avg:1.5}},deltas:{recent_ppg:.4,season_ppg:.3}};
+const predEv=[],pairEv=[],paperEv=[];
+const rankedUniverse=runShadowUniverse({items:[liveItem],contexts:new Map([[77,ctx]]),
+ marketRowsByFixture:new Map([[77,[{category:'over_under',market:'Goals Over/Under',integrity:{valid:true},values:[
+  {value:'Over 0.5',handicap:.5,odd:2.05,main:true},{value:'Under 0.5',handicap:.5,odd:1.75,main:true}
+ ]}]]]),oldRankMetaByFixture:new Map([[77,{eligible:false,primary:{stateRank:2}}]]),
+ predictionEvidence:predEv,pairedEvidence:pairEv,paperEvidence:paperEv});
+assert.equal(rankedUniverse.length,1);assert.equal(liveItem.predictionV2RankShadow.rank,1);
+assert.equal(predEv.length,1);assert.equal(pairEv.length,1);assert.equal(paperEv.length,1);
+assert.equal(liveItem.eval.game,13); // old engine untouched
+console.log('B5 shadow universe PASS');
