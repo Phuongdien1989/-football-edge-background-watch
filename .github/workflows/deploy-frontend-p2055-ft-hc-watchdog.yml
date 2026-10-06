@@ -132,7 +132,7 @@ jobs:
             'function h1WatchEvaluate(item,s){',
             'function hcEvaluate(item,s){',
             'function feMasterRankRows(rows){',
-            'function feMasterRankMeta(row){',
+            'function feMasterRankMeta(x){',
           ]
           def fn_slice(s,start):
             i=s.find(start)
