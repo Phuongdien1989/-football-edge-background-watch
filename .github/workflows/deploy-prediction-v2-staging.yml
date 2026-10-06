@@ -122,9 +122,11 @@ jobs:
               echo "attempt=$i live_sha=$LIVE_SHA expected=$EXPECTED_STAGING_SHA"
               if [ "$LIVE_SHA" = "$EXPECTED_STAGING_SHA" ] && grep -Fq "$STAGING_MARKER" /tmp/fe-evidence/live-index.html; then
                 curl -fLsS -H 'Cache-Control: no-cache, no-store' "$SERVICE_URL/prediction_v2/staging-sidecar.js?_=$i-$(date +%s%N)" -o /tmp/fe-evidence/staging-sidecar.js
+                curl -fLsS -H 'Cache-Control: no-cache, no-store' "$SERVICE_URL/prediction_v2/validation-sync.js?_=$i-$(date +%s%N)" -o /tmp/fe-evidence/validation-sync.js
                 grep -Fq 'FE_PV2_RUNTIME' /tmp/fe-evidence/staging-sidecar.js
                 grep -Fq 'FE_PV2_HIDE_FMD_MTI_V2' /tmp/fe-evidence/staging-sidecar.js
-                grep -Fq 'PV2_PREDICTION' /tmp/fe-evidence/staging-sidecar.js
+                grep -Fq 'buildValidationEvents' /tmp/fe-evidence/staging-sidecar.js
+                grep -Fq 'PV2_PREDICTION' /tmp/fe-evidence/validation-sync.js
                 grep -Fq 'fePv2ValidationBtn' /tmp/fe-evidence/live-index.html
                 PASS=1
                 break
