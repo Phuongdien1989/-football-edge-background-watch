@@ -3,7 +3,7 @@ from pathlib import Path
 import hashlib, sys
 
 EXPECTED_P2053="ab02d1eb428048bd00a69f56c3e5a16bed3c107feb66110c3ab08a9e84a05069"
-MARKER="FE P2.0.5.4 H1 SCREEN WATCHDOG 2026-10-07"
+# Runtime watchdog is UI-flow safety only; engine scoring remains unchanged.\nMARKER="FE P2.0.5.4 H1 SCREEN WATCHDOG 2026-10-07"
 p=Path(sys.argv[1] if len(sys.argv)>1 else "index.html")
 s=p.read_text(encoding="utf-8")
 sha=hashlib.sha256(s.encode()).hexdigest()
