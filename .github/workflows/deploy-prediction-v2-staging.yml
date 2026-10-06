@@ -92,6 +92,7 @@ jobs:
           node "$GITHUB_WORKSPACE/prediction_v2/test-b3.mjs"
           node "$GITHUB_WORKSPACE/prediction_v2/test-b4.mjs"
           node "$GITHUB_WORKSPACE/prediction_v2/test-b5.mjs"
+          node "$GITHUB_WORKSPACE/prediction_v2/test-b7-b9.mjs"
           sha256sum /tmp/fe-staging/public/index.html | tee /tmp/fe-evidence/staging-index.sha256
           cat > /tmp/fe-staging/wrangler.jsonc <<JSON
           {
@@ -123,6 +124,8 @@ jobs:
                 curl -fLsS -H 'Cache-Control: no-cache, no-store' "$SERVICE_URL/prediction_v2/staging-sidecar.js?_=$i-$(date +%s%N)" -o /tmp/fe-evidence/staging-sidecar.js
                 grep -Fq 'FE_PV2_RUNTIME' /tmp/fe-evidence/staging-sidecar.js
                 grep -Fq 'FE_PV2_HIDE_FMD_MTI_V2' /tmp/fe-evidence/staging-sidecar.js
+                grep -Fq 'PV2_PREDICTION' /tmp/fe-evidence/staging-sidecar.js
+                grep -Fq 'fePv2ValidationBtn' /tmp/fe-evidence/live-index.html
                 PASS=1
                 break
               fi
