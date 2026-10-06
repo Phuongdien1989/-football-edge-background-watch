@@ -1,0 +1,137 @@
+name: Deploy Prediction V2 Shadow Staging
+
+on:
+  push:
+    branches:
+      - work/prediction-v2-audit-20261006
+    paths:
+      - ".github/workflows/deploy-prediction-v2-staging.yml"
+      - "prediction_v2/**"
+  workflow_dispatch:
+
+concurrency:
+  group: football-edge-prediction-v2-staging
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      SERVICE_NAME: football-edge-pv2-staging
+      SERVICE_URL: https://football-edge-pv2-staging.ngophuonghuy.workers.dev
+      BASE_ARTIFACT_RUN_ID: "36998717198"
+      BASE_ARTIFACT_NAME: FOOTBALL_EDGE_CURRENT_SOURCE_SANITIZED_2026-10-02
+      EXPECTED_BASE_SHA256: f2d5c471c247ed77b07e3cb9096e5c04ae9c69b4d8af1b25a4fbe7ca955bfb5c
+      EXPECTED_P2052_SHA256: a82bf87e1db875fb975b94ac9b6df9e785818de37b7bb55fec6f290efca9c844
+      STAGING_MARKER: FE PREDICTION V2 B6 SHADOW STAGING 2026-10-06
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Guard staging target
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF_NAME" = "work/prediction-v2-audit-20261006"
+          test "$SERVICE_NAME" = "football-edge-pv2-staging"
+          test "$SERVICE_NAME" != "shiny-silence-d892"
+          test "$SERVICE_NAME" != "football-edge-background-watch"
+          echo "Staging guard PASS"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - name: Validate Cloudflare credentials
+        shell: bash
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          test -n "$CLOUDFLARE_API_TOKEN"
+          test -n "$CLOUDFLARE_ACCOUNT_ID"
+
+      - name: Install pinned Wrangler
+        run: npm install --no-save --no-audit --no-fund wrangler@4.119.0
+
+      - name: Download frozen frontend baseline
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ env.BASE_ARTIFACT_NAME }}
+          path: /tmp/fe-base-artifact
+          github-token: ${{ github.token }}
+          run-id: ${{ env.BASE_ARTIFACT_RUN_ID }}
+
+      - name: Build exact P2052 plus B6 sidecar
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/fe-source /tmp/fe-staging/public/prediction_v2 /tmp/fe-evidence
+          INNER="$(find /tmp/fe-base-artifact -type f -name '*.zip' -print -quit)"
+          test -n "$INNER"
+          unzip -q "$INNER" -d /tmp/fe-source
+          BASE="$(find /tmp/fe-source -type f -path '*/frontend/index.html' -print -quit)"
+          test -f "$BASE"
+          test "$(sha256sum "$BASE" | awk '{print $1}')" = "$EXPECTED_BASE_SHA256"
+          cp "$BASE" /tmp/fe-staging/public/index.html
+          patch -p1 -d /tmp/fe-staging/public < "$GITHUB_WORKSPACE/.deploy/p2052/site.patch"
+          test "$(sha256sum /tmp/fe-staging/public/index.html | awk '{print $1}')" = "$EXPECTED_P2052_SHA256"
+          python "$GITHUB_WORKSPACE/prediction_v2/patch-staging.py" /tmp/fe-staging/public/index.html
+          cp "$GITHUB_WORKSPACE"/prediction_v2/*.js /tmp/fe-staging/public/prediction_v2/
+          cp "$GITHUB_WORKSPACE"/prediction_v2/*.mjs /tmp/fe-staging/public/prediction_v2/ 2>/dev/null || true
+          grep -Fq "$STAGING_MARKER" /tmp/fe-staging/public/index.html
+          grep -Fq '/prediction_v2/staging-sidecar.js' /tmp/fe-staging/public/index.html
+          node --check /tmp/fe-staging/public/prediction_v2/staging-sidecar.js
+          node "$GITHUB_WORKSPACE/prediction_v2/test-b2.mjs"
+          node "$GITHUB_WORKSPACE/prediction_v2/test-b3.mjs"
+          node "$GITHUB_WORKSPACE/prediction_v2/test-b4.mjs"
+          node "$GITHUB_WORKSPACE/prediction_v2/test-b5.mjs"
+          sha256sum /tmp/fe-staging/public/index.html | tee /tmp/fe-evidence/staging-index.sha256
+          cat > /tmp/fe-staging/wrangler.jsonc <<JSON
+          {
+            "name": "$SERVICE_NAME",
+            "compatibility_date": "2026-10-06",
+            "assets": {
+              "directory": "./public"
+            }
+          }
+          JSON
+
+      - name: Deploy staging only
+        shell: bash
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          cd /tmp/fe-staging
+          npx "$GITHUB_WORKSPACE/node_modules/wrangler/bin/wrangler.js" deploy --config wrangler.jsonc --name "$SERVICE_NAME" | tee /tmp/fe-evidence/deploy.log
+          cd "$GITHUB_WORKSPACE"
+          PASS=0
+          for i in $(seq 1 15); do
+            if curl -fLsS -H 'Cache-Control: no-cache' "$SERVICE_URL/?_pv2_b6=$i-$(date +%s)" -o /tmp/fe-evidence/live-index.html; then
+              if grep -Fq "$STAGING_MARKER" /tmp/fe-evidence/live-index.html; then
+                curl -fLsS "$SERVICE_URL/prediction_v2/staging-sidecar.js?_=$i" -o /tmp/fe-evidence/staging-sidecar.js
+                grep -Fq 'FE_PV2_RUNTIME' /tmp/fe-evidence/staging-sidecar.js
+                PASS=1
+                break
+              fi
+            fi
+            sleep 2
+          done
+          test "$PASS" = "1"
+          echo "B6 staging smoke PASS"
+
+      - name: Upload B6 evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: football-edge-pv2-b6-staging-evidence
+          path: /tmp/fe-evidence/
+          retention-days: 30
