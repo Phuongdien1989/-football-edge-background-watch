@@ -1,4 +1,4 @@
-name: Prediction V2 B3-B5 Tests
+name: Prediction V2 B2-B9 Tests
 
 on:
   push:
@@ -33,6 +33,8 @@ jobs:
         run: node prediction_v2/test-b4.mjs
       - name: B5 validation and old-vs-new
         run: node prediction_v2/test-b5.mjs
+      - name: B7-B9 evidence and promotion
+        run: node prediction_v2/test-b7-b9.mjs
       - name: Syntax check
         run: |
           node --check prediction_v2/api-budget-manager.js
@@ -48,4 +50,7 @@ jobs:
           node --check prediction_v2/old-vs-new-comparator.js
           node --check prediction_v2/paper-market-evidence.js
           node --check prediction_v2/shadow-universe-runner.js
+          node --check prediction_v2/validation-sync.js
+          node --check prediction_v2/validation-report.js
+          node --check prediction_v2/staging-sidecar.js
           node --check worker_notify_v138_provider_quota75k.js
