@@ -9,7 +9,7 @@ const reply=(data,status=200)=>new Response(JSON.stringify(data),{status,headers
   'access-control-allow-headers':'authorization,content-type','access-control-allow-methods':'GET,POST,OPTIONS'
 }});
 const n=(v,d=0)=>Number.isFinite(Number(v))?Number(v):d;
-const finite=v=>Number.isFinite(Number(v))?Number(v):null;
+const finite=v=>v===null||v===undefined||(typeof v==='string'&&!v.trim())?null:(Number.isFinite(Number(v))?Number(v):null);
 const dayKey=()=>new Date().toISOString().slice(0,10);
 
 export class BackgroundWatcher extends HotPriorityWatcher{
