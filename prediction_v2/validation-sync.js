@@ -11,9 +11,10 @@ const stable=v=>{
 function fnv1a(str){let h=0x811c9dc5;for(let i=0;i<str.length;i++){h^=str.charCodeAt(i);h=Math.imul(h,0x01000193)}return (h>>>0).toString(16).padStart(8,'0')}
 export function evidenceSignature(row){return fnv1a(stable(row))}
 function predPayload(r){
-  return {...r,id:r.id||`pv2:pred:${r.fixture_id}:${r.engine}:${r.captured_at}`,source:'PV2_PREDICTION',sample_type:'PV2_PREDICTION',
-    outcome:r?.outcome?.settled?(r?.outcome?.goal_10m===true?'HIT':r?.outcome?.goal_10m===false?'MISS':null):null,
-    resolution:r?.outcome?.settled?'RESOLVED':'OPEN'};
+  const window_outcome=r?.outcome||null,{outcome:_drop,...base}=r||{};
+  return {...base,window_outcome,id:r.id||`pv2:pred:${r.fixture_id}:${r.engine}:${r.captured_at}`,source:'PV2_PREDICTION',sample_type:'PV2_PREDICTION',
+    outcome:window_outcome?.settled?(window_outcome?.goal_10m===true?'HIT':window_outcome?.goal_10m===false?'MISS':null):null,
+    resolution:window_outcome?.settled?'RESOLVED':'OPEN'};
 }
 function pairPayload(r){
   return {...r,id:r.observation_id||r.id||`pv2:pair:${r.fixture_id}:${r.captured_at}`,source:'PV2_OLD_NEW',sample_type:'PV2_OLD_NEW',
@@ -54,7 +55,7 @@ export function parseValidationRows(rows=[]){
   for(const r of rows||[]){
     let p=null;try{p=typeof r?.payload_json==='string'?JSON.parse(r.payload_json):r?.payload_json}catch{}
     if(!p)continue;
-    if(p.source==='PV2_PREDICTION')out.prediction.push(p);
+    if(p.source==='PV2_PREDICTION')out.prediction.push({...p,outcome:p.window_outcome||p.outcome});
     else if(p.source==='PV2_OLD_NEW')out.paired.push(p);
     else if(p.source==='PV2_PAPER_MARKET')out.paper.push(p);
   }
