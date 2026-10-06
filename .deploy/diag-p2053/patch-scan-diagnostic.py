@@ -166,6 +166,14 @@ s=s.replace(old_hc_seed,new_hc_seed,1)
 
 if "</head>" not in s:
     raise SystemExit("Missing </head>")
-s=s.replace("</head>",f"<!-- {MARKER} -->\n</head>",1)
+banner='''<style id="feDiagRibbonStyle">
+#feDiagRibbon{position:fixed;top:env(safe-area-inset-top,0);left:0;right:0;z-index:2147483647;background:#b91c1c;color:#fff;text-align:center;padding:6px 10px;font:900 11px/1.2 system-ui,-apple-system,sans-serif;letter-spacing:.4px;box-shadow:0 2px 8px rgba(0,0,0,.18)}
+body{padding-top:28px!important}
+</style>'''
+s=s.replace("</head>",banner+f"<!-- {MARKER} -->\n</head>",1)
+if "<body" not in s:
+    raise SystemExit("Missing body")
+body_end=s.find(">",s.find("<body"))
+s=s[:body_end+1]+'<div id="feDiagRibbon">DIAGNOSTIC STAGING • KHÔNG PHẢI APP CHÍNH • P2053</div>'+s[body_end+1:]
 p.write_text(s,encoding="utf-8")
 print(hashlib.sha256(s.encode()).hexdigest())
