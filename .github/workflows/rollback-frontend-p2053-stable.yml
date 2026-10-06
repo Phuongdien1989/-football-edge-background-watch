@@ -1,0 +1,139 @@
+name: Rollback Frontend to Stable P2053
+
+on:
+  push:
+    branches:
+      - rollback/frontend-p2053-stable-20261007
+    paths:
+      - ".github/workflows/rollback-frontend-p2053-stable.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: football-edge-frontend-stable-rollback
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  rollback:
+    name: Restore shiny-silence-d892 to stable P2053
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      SERVICE_NAME: shiny-silence-d892
+      SERVICE_URL: https://shiny-silence-d892.ngophuonghuy.workers.dev
+      BASE_ARTIFACT_RUN_ID: "36998717198"
+      BASE_ARTIFACT_NAME: FOOTBALL_EDGE_CURRENT_SOURCE_SANITIZED_2026-10-02
+      EXPECTED_BASE_SHA256: f2d5c471c247ed77b07e3cb9096e5c04ae9c69b4d8af1b25a4fbe7ca955bfb5c
+      EXPECTED_P2052_SHA256: a82bf87e1db875fb975b94ac9b6df9e785818de37b7bb55fec6f290efca9c844
+      EXPECTED_P2053_SHA256: ab02d1eb428048bd00a69f56c3e5a16bed3c107feb66110c3ab08a9e84a05069
+      P2052_MARKER: FE P2.0.5.2 LIVE SCAN / API STATUS / SCAN-CONTROL HOTFIX 2026-10-03
+      P2053_MARKER: FE P2.0.5.3 HIDE RESEARCH CARDS 2026-10-07
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Guard rollback branch and production target
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF_NAME" = "rollback/frontend-p2053-stable-20261007"
+          test "$SERVICE_NAME" = "shiny-silence-d892"
+          echo "Rollback target guard PASS"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - name: Validate Cloudflare credentials
+        shell: bash
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          test -n "$CLOUDFLARE_API_TOKEN"
+          test -n "$CLOUDFLARE_ACCOUNT_ID"
+
+      - name: Install pinned Wrangler
+        run: npm install --no-save --no-audit --no-fund wrangler@4.119.0
+
+      - name: Download frozen frontend baseline
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ env.BASE_ARTIFACT_NAME }}
+          path: /tmp/fe-base-artifact
+          github-token: ${{ github.token }}
+          run-id: ${{ env.BASE_ARTIFACT_RUN_ID }}
+
+      - name: Rebuild exact stable P2053
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/fe-source /tmp/fe-p2053/public /tmp/fe-evidence
+          INNER="$(find /tmp/fe-base-artifact -type f -name '*.zip' -print -quit)"
+          test -n "$INNER"
+          unzip -q "$INNER" -d /tmp/fe-source
+          BASE="$(find /tmp/fe-source -type f -path '*/frontend/index.html' -print -quit)"
+          test -f "$BASE"
+          test "$(sha256sum "$BASE" | awk '{print $1}')" = "$EXPECTED_BASE_SHA256"
+
+          cp "$BASE" /tmp/fe-p2053/public/index.html
+          patch -p1 -d /tmp/fe-p2053/public < "$GITHUB_WORKSPACE/.deploy/p2052/site.patch"
+          test "$(sha256sum /tmp/fe-p2053/public/index.html | awk '{print $1}')" = "$EXPECTED_P2052_SHA256"
+          grep -Fq "$P2052_MARKER" /tmp/fe-p2053/public/index.html
+
+          python "$GITHUB_WORKSPACE/.deploy/p2053/patch-hide-research.py" /tmp/fe-p2053/public/index.html
+          test "$(sha256sum /tmp/fe-p2053/public/index.html | awk '{print $1}')" = "$EXPECTED_P2053_SHA256"
+          grep -Fq "$P2053_MARKER" /tmp/fe-p2053/public/index.html
+          grep -Fq '.fmd-card,.mt-intel' /tmp/fe-p2053/public/index.html
+
+          curl -fLsS -H 'Cache-Control: no-cache, no-store' "$SERVICE_URL/?_before_rollback=$(date +%s%N)" -o /tmp/fe-evidence/live-before.html
+          sha256sum /tmp/fe-evidence/live-before.html | tee /tmp/fe-evidence/live-before.sha256
+
+          cat > /tmp/fe-p2053/wrangler.jsonc <<JSON
+          {
+            "name": "$SERVICE_NAME",
+            "compatibility_date": "2026-10-07",
+            "assets": { "directory": "./public" }
+          }
+          JSON
+
+      - name: Deploy exact P2053
+        shell: bash
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          cd /tmp/fe-p2053
+          npx "$GITHUB_WORKSPACE/node_modules/wrangler/bin/wrangler.js" deploy --config wrangler.jsonc --name "$SERVICE_NAME" | tee /tmp/fe-evidence/deploy.log
+          cd "$GITHUB_WORKSPACE"
+
+          PASS=0
+          for i in $(seq 1 40); do
+            if curl -fLsS -H 'Cache-Control: no-cache, no-store' "$SERVICE_URL/?_stable_p2053=$i-$(date +%s%N)" -o /tmp/fe-evidence/live-index.html; then
+              LIVE_SHA="$(sha256sum /tmp/fe-evidence/live-index.html | awk '{print $1}')"
+              echo "attempt=$i live_sha=$LIVE_SHA expected=$EXPECTED_P2053_SHA256"
+              if [ "$LIVE_SHA" = "$EXPECTED_P2053_SHA256" ] \
+                 && grep -Fq "$P2053_MARKER" /tmp/fe-evidence/live-index.html \
+                 && grep -Fq '.fmd-card,.mt-intel' /tmp/fe-evidence/live-index.html; then
+                PASS=1
+                break
+              fi
+            fi
+            sleep 3
+          done
+          test "$PASS" = "1"
+          npx wrangler deployments list --name "$SERVICE_NAME" --json > /tmp/fe-evidence/deployments-after.json
+          echo "Stable P2053 restore PASS"
+
+      - name: Upload rollback evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: football-edge-rollback-stable-p2053-evidence
+          path: /tmp/fe-evidence/
+          retention-days: 30
