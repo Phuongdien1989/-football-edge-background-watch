@@ -6,9 +6,10 @@ import {settlementReturn} from './validation-metrics.js';
 const finite=v=>v===null||v===undefined||(typeof v==='string'&&!v.trim())?null:(Number.isFinite(Number(v))?Number(v):null);
 export function createPaperMarketRecord({fixtureId,capturedAt,state,bestMarket,confidence,league=null}={}){
   if(!bestMarket?.edge?.valid)return null;
-  return {schema:'FE_PREDICTION_V2_PAPER_MARKET_B5',fixture_id:Number(fixtureId)||null,captured_at:capturedAt||Date.now(),league,
+  const ts=capturedAt||Date.now(),fid=Number(fixtureId)||null,market=bestMarket.market,selection=bestMarket.selection,line=finite(bestMarket.line),odds=finite(bestMarket.odds);
+  return {schema:'FE_PREDICTION_V2_PAPER_MARKET_B5',id:`pv2:paper:${fid}:${ts}:${market}:${selection}:${line}`,fixture_id:fid,captured_at:ts,league,
     minute:finite(state?.minute),score_home:finite(state?.score_home)||0,score_away:finite(state?.score_away)||0,
-    market:bestMarket.market,selection:bestMarket.selection,line:finite(bestMarket.line),odds:finite(bestMarket.odds),bookmaker:bestMarket.bookmaker||null,
+    market,selection,line,odds,bookmaker:bestMarket.bookmaker||null,
     fair_odds:finite(bestMarket.edge.fair_odds),expected_return:finite(bestMarket.edge.expected_return),confidence:finite(confidence),
     settlement_result:null,realized_return:null,settled:false};
 }
