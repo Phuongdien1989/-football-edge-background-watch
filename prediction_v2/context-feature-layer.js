@@ -2,7 +2,7 @@
  * Context / personnel feature extraction.
  * SHADOW ONLY: produces evidence features, never PASS/FAIL and never emits a bet decision.
  */
-const finite=v=>Number.isFinite(Number(v))?Number(v):null;
+const finite=v=>v===null||v===undefined||(typeof v==='string'&&!v.trim())?null:(Number.isFinite(Number(v))?Number(v):null);
 const clamp=(v,a=0,b=1)=>Math.max(a,Math.min(b,v));
 const round=(v,d=3)=>{const n=finite(v);if(n==null)return null;const p=10**d;return Math.round(n*p)/p};
 const arr=v=>Array.isArray(v)?v:[];
