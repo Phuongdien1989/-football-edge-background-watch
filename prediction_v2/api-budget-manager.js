@@ -7,7 +7,7 @@ export const DEFAULT_API_PLAN=Object.freeze({
   dailyLimit:75000,minuteLimit:450,resetHourUTC:0,hardReserveCalls:60,minuteReserveCalls:20,
   staleProviderMs:5*60*1000,minBackoffMs:1500,maxBackoffMs:60000
 });
-const finite=v=>Number.isFinite(Number(v))?Number(v):null;
+const finite=v=>v===null||v===undefined||(typeof v==='string'&&!v.trim())?null:(Number.isFinite(Number(v))?Number(v):null);
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 function getHeader(headers,name){
   if(!headers)return null;
