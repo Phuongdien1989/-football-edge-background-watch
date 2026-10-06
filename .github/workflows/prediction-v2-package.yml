@@ -1,0 +1,67 @@
+name: Package Prediction V2 Candidate
+
+on:
+  push:
+    branches:
+      - work/prediction-v2-audit-20261006
+    paths:
+      - ".github/workflows/prediction-v2-package.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build candidate package
+        shell: bash
+        run: |
+          set -euo pipefail
+          ROOT="FOOTBALL_EDGE_PREDICTION_V2_B2_B5_CANDIDATE_2026-10-06"
+          mkdir -p "/tmp/$ROOT/docs" "/tmp/$ROOT/prediction_v2"
+          cp prediction_v2/*.js prediction_v2/*.mjs "/tmp/$ROOT/prediction_v2/"
+          cp docs/FOOTBALL_EDGE_B1_AUDIT_2026-10-06.md "/tmp/$ROOT/docs/"
+          cp docs/FOOTBALL_EDGE_B2_DATA_FOUNDATION_2026-10-06.md "/tmp/$ROOT/docs/"
+          cp docs/FOOTBALL_EDGE_B3_SHADOW_PROBABILITY_2026-10-06.md "/tmp/$ROOT/docs/"
+          cp docs/FOOTBALL_EDGE_B4_MARKET_EDGE_RANKING_2026-10-06.md "/tmp/$ROOT/docs/"
+          cp docs/FOOTBALL_EDGE_B5_VALIDATION_2026-10-06.md "/tmp/$ROOT/docs/"
+          cp docs/PREDICTION_V2_BASELINE_LOCK_2026-10-06.md "/tmp/$ROOT/docs/"
+          cp worker_notify_v138_provider_quota75k.js "/tmp/$ROOT/"
+          cp .github/workflows/prediction-v2-b3-test.yml "/tmp/$ROOT/"
+          cat > "/tmp/$ROOT/README_CANDIDATE.txt" <<'EOF'
+          FOOTBALL EDGE PREDICTION V2 — B2..B5 CANDIDATE
+          Date: 2026-10-06
+          Production deploy: NO
+          Current TOP replacement: NO
+
+          Contains:
+          - provider-aware API budget candidate
+          - player/lineup/context feature layer
+          - shadow probability engine
+          - actual-market Asian Total/AH edge math
+          - relative opportunity ranking
+          - calibration / OLD-vs-NEW validation
+          - compact shadow/paper evidence
+          - automated tests
+
+          Frozen production rollback remains on:
+          freeze/frontend-p2052-production-before-prediction-v2-20261006
+
+          Candidate source branch:
+          work/prediction-v2-audit-20261006
+          EOF
+          (cd /tmp && zip -qr "$ROOT.zip" "$ROOT")
+          sha256sum "/tmp/$ROOT.zip" | tee "/tmp/$ROOT.zip.sha256"
+          cp "/tmp/$ROOT.zip" "$GITHUB_WORKSPACE/$ROOT.zip"
+          cp "/tmp/$ROOT.zip.sha256" "$GITHUB_WORKSPACE/$ROOT.zip.sha256"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: FOOTBALL_EDGE_PREDICTION_V2_B2_B5_CANDIDATE_2026-10-06
+          path: |
+            FOOTBALL_EDGE_PREDICTION_V2_B2_B5_CANDIDATE_2026-10-06.zip
+            FOOTBALL_EDGE_PREDICTION_V2_B2_B5_CANDIDATE_2026-10-06.zip.sha256
+          retention-days: 30
