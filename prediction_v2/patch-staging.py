@@ -15,6 +15,7 @@ if MARKER in s:
 
 style=r'''
 <style id="fe-pv2-b6-style">
+.fmd-card,.mt-intel{display:none !important}
 .fe-pv2-shadow{margin:10px 0;border:1px solid rgba(70,115,145,.22);border-radius:14px;background:rgba(246,251,255,.88);overflow:hidden}
 .fe-pv2-head{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 12px;border-bottom:1px solid rgba(70,115,145,.14)}
 .fe-pv2-head b{font-size:11px}.fe-pv2-head small{font-size:8px;color:var(--muted)}
