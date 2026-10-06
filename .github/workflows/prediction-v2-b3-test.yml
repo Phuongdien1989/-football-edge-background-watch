@@ -1,4 +1,4 @@
-name: Prediction V2 B3 Tests
+name: Prediction V2 B3-B4 Tests
 
 on:
   push:
@@ -7,6 +7,7 @@ on:
     paths:
       - "prediction_v2/**"
       - "docs/FOOTBALL_EDGE_B3_SHADOW_PROBABILITY_2026-10-06.md"
+      - "docs/FOOTBALL_EDGE_B4_MARKET_EDGE_RANKING_2026-10-06.md"
       - "worker_notify_v138_provider_quota75k.js"
       - ".github/workflows/prediction-v2-b3-test.yml"
   workflow_dispatch:
@@ -27,6 +28,8 @@ jobs:
         run: node prediction_v2/test-b2.mjs
       - name: B3 shadow probability
         run: node prediction_v2/test-b3.mjs
+      - name: B4 market edge and ranking
+        run: node prediction_v2/test-b4.mjs
       - name: Syntax check
         run: |
           node --check prediction_v2/api-budget-manager.js
@@ -35,4 +38,7 @@ jobs:
           node --check prediction_v2/probability-engine.js
           node --check prediction_v2/shadow-evidence.js
           node --check prediction_v2/shadow-live-bridge.js
+          node --check prediction_v2/market-edge.js
+          node --check prediction_v2/market-adapter.js
+          node --check prediction_v2/opportunity-ranking.js
           node --check worker_notify_v138_provider_quota75k.js
