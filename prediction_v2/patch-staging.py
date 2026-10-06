@@ -20,7 +20,7 @@ style=r'''
 .fe-pv2-head{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 12px;border-bottom:1px solid rgba(70,115,145,.14)}
 .fe-pv2-head b{font-size:11px}.fe-pv2-head small{font-size:8px;color:var(--muted)}
 .fe-pv2-actions{display:flex;gap:6px;flex-wrap:wrap}.fe-pv2-actions button{padding:6px 8px;font-size:8px}
-.fe-pv2-meta{padding:7px 12px;font-size:8px;color:var(--muted)}
+.fe-pv2-meta{padding:7px 12px;font-size:8px;color:var(--muted)}\n#fePv2ValidationPanel{border-top:1px dashed rgba(70,115,145,.18);line-height:1.55;background:rgba(255,255,255,.52)}
 .fe-pv2-rows{display:grid;gap:6px;padding:0 8px 8px}
 .fe-pv2-row{display:grid;grid-template-columns:48px 1fr 70px;gap:8px;align-items:center;padding:8px;border-radius:11px;background:#fff;border:1px solid rgba(70,115,145,.12)}
 .fe-pv2-row.positive{border-color:rgba(39,155,99,.30)}.fe-pv2-row.negative{opacity:.86}
@@ -37,9 +37,10 @@ panel=r'''
 <div class="fe-pv2-shadow" id="fePv2Shadow">
   <div class="fe-pv2-head">
     <div><b>PREDICTION V2 • SHADOW STAGING</b><br><small>BASE → LIVE → CONFIDENCE → REAL MARKET → EDGE → RANK. Không thay TOP production.</small></div>
-    <div class="fe-pv2-actions"><span class="fe-pv2-badge" id="fePv2ShadowStatus">CHỜ DỮ LIỆU</span><button id="fePv2RunBtn" type="button">↻ RUN</button><button id="fePv2ExportBtn" type="button">EXPORT</button></div>
+    <div class="fe-pv2-actions"><span class="fe-pv2-badge" id="fePv2ShadowStatus">CHỜ DỮ LIỆU</span><button id="fePv2RunBtn" type="button">↻ RUN</button><button id="fePv2ValidationBtn" type="button">VALIDATION</button><button id="fePv2ExportBtn" type="button">EXPORT</button></div>
   </div>
   <div class="fe-pv2-meta" id="fePv2ShadowMeta">0 cơ hội • shadow only</div>
+  <div class="fe-pv2-meta" id="fePv2ValidationPanel" hidden></div>
   <div class="fe-pv2-rows" id="fePv2ShadowRows"><div class="fe-pv2-empty">Chưa có H1/FT/HC candidate trong Master Opportunity.</div></div>
 </div>
 '''
@@ -94,11 +95,19 @@ bridge=r'''
     for(const it of items){const rows=it?.latest?.market_rows||it?.lastMarketRows;if(Array.isArray(rows)&&rows.length)return rows}
     return [];
   }
+  function eventRows(id){
+    const entry=ULTRA_HUB?.entries?.get?.(String(id)),raw=entry?.fields?.events?.data||[];
+    return eventsCompact(raw||[]);
+  }
+  function fixtureSnapshot(id){return fixtureNow(id)}
+  async function dbSync(events){return bgRequest('/api/db/sync',{method:'POST',body:{events},timeout:15000})}
+  async function dbValidation(limit=10000){return bgRequest('/api/db/validation?limit='+Math.max(1,Math.min(10000,Number(limit)||10000)),{timeout:15000})}
   window.FE_PV2_RUNTIME={
-    staging:true,version:'B6-2026-10-06',
+    staging:true,version:'B7-B9-2026-10-06',
     masterRows:()=>feMasterRankRows(feMasterMergeFixtures()),
     oldRank:id=>rowNow(id)?.__rank||null,
-    contextInput,marketRows,
+    contextInput,marketRows,eventRows,fixtureSnapshot,dbSync,dbValidation,
+    backgroundReady:()=>!!bgBase(),
     apiUsage:()=>apiUsageSnapshot(),
     productionUntouched:true
   };
