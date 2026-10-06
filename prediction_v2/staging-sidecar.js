@@ -13,6 +13,12 @@ const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&
 const finite=v=>v===null||v===undefined||(typeof v==='string'&&!v.trim())?null:(Number.isFinite(Number(v))?Number(v):null);
 const round=(v,d=1)=>{const n=finite(v);if(n==null)return null;const p=10**d;return Math.round(n*p)/p};
 const STORE_KEY='FE_PREDICTION_V2_STAGING_EVIDENCE_V1';
+const HIDE_RESEARCH_MARKER='FE_PV2_HIDE_FMD_MTI_V2';
+function enforceHiddenResearchCards(){
+  let style=document.getElementById('fe-pv2-hide-research-cards');
+  if(!style){style=document.createElement('style');style.id='fe-pv2-hide-research-cards';style.textContent='.fmd-card,.mt-intel{display:none!important;visibility:hidden!important;height:0!important;min-height:0!important;margin:0!important;padding:0!important;border:0!important;overflow:hidden!important}';document.head.appendChild(style)}
+  document.querySelectorAll('.fmd-card,.mt-intel').forEach(el=>{el.hidden=true;el.style.setProperty('display','none','important');el.setAttribute('data-fe-pv2-hidden','1')});
+}
 function loadEvidence(){
   try{const x=JSON.parse(localStorage.getItem(STORE_KEY)||'{}');STATE.predictionEvidence=Array.isArray(x.prediction)?x.prediction:[];STATE.pairedEvidence=Array.isArray(x.paired)?x.paired:[];STATE.paperEvidence=Array.isArray(x.paper)?x.paper:[]}catch{}
 }
@@ -101,6 +107,8 @@ function exportEvidence(){
   const payload={schema:'FE_PREDICTION_V2_STAGING_EXPORT_V1',exported_at:new Date().toISOString(),staging:true,prediction:STATE.predictionEvidence,paired:STATE.pairedEvidence,paper:STATE.paperEvidence};
   const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(payload,null,2)],{type:'application/json'}));a.download=`football-edge-pv2-shadow-${Date.now()}.json`;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),1000);
 }
+enforceHiddenResearchCards();
+new MutationObserver(()=>enforceHiddenResearchCards()).observe(document.documentElement,{childList:true,subtree:true});
 loadEvidence();
 $('fePv2RunBtn')?.addEventListener('click',()=>run());
 $('fePv2ExportBtn')?.addEventListener('click',exportEvidence);
