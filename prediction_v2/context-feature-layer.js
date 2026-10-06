@@ -55,7 +55,7 @@ export function buildPersonnelFeatures({teamId,seasonPlayers,lineups,injuries,li
   const lp=arr(liveTeam?.players).filter(p=>finite(p.rating)!=null),liveRatings=lp.map(p=>finite(p.rating)).filter(v=>v!=null),
     liveTop=lp.sort((a,b)=>(finite(b.rating)||0)-(finite(a.rating)||0)).slice(0,3).map(p=>({id:p.id,name:p.name,rating:finite(p.rating),minutes:finite(p.minutes),position:p.position})),
     coverage={season_players:ranked.length,lineup_xi:li.xi.length,injury_rows:inj.size,live_rated_players:liveRatings.length},
-    confidence=round(clamp((Math.min(ranked.length,15)/15*.45)+(Math.min(li.xi.length,11)/11*.30)+(Math.min(liveRatings.length,11)/11*.15)+(injuries!=null?.10:0)),3);
+    confidence=round(clamp((Math.min(ranked.length,15)/15*.45)+(Math.min(li.xi.length,11)/11*.30)+(Math.min(liveRatings.length,11)/11*.15)+(injuries!=null ? .10 : 0)),3);
   return {team_id:Number(teamId),coverage,confidence,formation:li.formation,coach:li.coach,squad_sample:ranked.length,
     expected_core:expectedCore.map(p=>({id:p.id,name:p.name,importance:p.importance_index,position:p.position,minutes:p.minutes,rating:p.rating})),
     stars:star.map(p=>({id:p.id,name:p.name,importance:p.importance_index,position:p.position,minutes:p.minutes,rating:p.rating})),
