@@ -21,7 +21,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          ROOT="FOOTBALL_EDGE_PREDICTION_V2_B2_B5_CANDIDATE_2026-10-06"
+          ROOT="FOOTBALL_EDGE_PREDICTION_V2_B2_B9_CANDIDATE_2026-10-06"
           mkdir -p "/tmp/$ROOT/docs" "/tmp/$ROOT/prediction_v2"
           cp prediction_v2/*.js prediction_v2/*.mjs "/tmp/$ROOT/prediction_v2/"
           cp docs/FOOTBALL_EDGE_B1_AUDIT_2026-10-06.md "/tmp/$ROOT/docs/"
@@ -29,11 +29,14 @@ jobs:
           cp docs/FOOTBALL_EDGE_B3_SHADOW_PROBABILITY_2026-10-06.md "/tmp/$ROOT/docs/"
           cp docs/FOOTBALL_EDGE_B4_MARKET_EDGE_RANKING_2026-10-06.md "/tmp/$ROOT/docs/"
           cp docs/FOOTBALL_EDGE_B5_VALIDATION_2026-10-06.md "/tmp/$ROOT/docs/"
+          cp docs/FOOTBALL_EDGE_B7_B9_COMPLETION_2026-10-06.md "/tmp/$ROOT/docs/"
           cp docs/PREDICTION_V2_BASELINE_LOCK_2026-10-06.md "/tmp/$ROOT/docs/"
           cp worker_notify_v138_provider_quota75k.js "/tmp/$ROOT/"
+          cp prediction_v2/patch-staging.py "/tmp/$ROOT/prediction_v2/"
+          cp .github/workflows/deploy-prediction-v2-staging.yml "/tmp/$ROOT/"
           cp .github/workflows/prediction-v2-b3-test.yml "/tmp/$ROOT/"
           cat > "/tmp/$ROOT/README_CANDIDATE.txt" <<'EOF'
-          FOOTBALL EDGE PREDICTION V2 — B2..B5 CANDIDATE
+          FOOTBALL EDGE PREDICTION V2 — B2..B9 CANDIDATE
           Date: 2026-10-06
           Production deploy: NO
           Current TOP replacement: NO
@@ -46,7 +49,7 @@ jobs:
           - relative opportunity ranking
           - calibration / OLD-vs-NEW validation
           - compact shadow/paper evidence
-          - automated tests
+          - persistent validation sync using existing D1 validation_results\n          - validation dashboard + OLD-vs-NEW comparison\n          - manual promotion gate (no auto-promotion)\n          - automated tests
 
           Frozen production rollback remains on:
           freeze/frontend-p2052-production-before-prediction-v2-20261006
@@ -60,8 +63,8 @@ jobs:
           cp "/tmp/$ROOT.zip.sha256" "$GITHUB_WORKSPACE/$ROOT.zip.sha256"
       - uses: actions/upload-artifact@v4
         with:
-          name: FOOTBALL_EDGE_PREDICTION_V2_B2_B5_CANDIDATE_2026-10-06
+          name: FOOTBALL_EDGE_PREDICTION_V2_B2_B9_CANDIDATE_2026-10-06
           path: |
-            FOOTBALL_EDGE_PREDICTION_V2_B2_B5_CANDIDATE_2026-10-06.zip
-            FOOTBALL_EDGE_PREDICTION_V2_B2_B5_CANDIDATE_2026-10-06.zip.sha256
+            FOOTBALL_EDGE_PREDICTION_V2_B2_B9_CANDIDATE_2026-10-06.zip
+            FOOTBALL_EDGE_PREDICTION_V2_B2_B9_CANDIDATE_2026-10-06.zip.sha256
           retention-days: 30
