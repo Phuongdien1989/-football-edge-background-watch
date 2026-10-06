@@ -3,7 +3,7 @@ from pathlib import Path
 import hashlib, sys
 
 EXPECTED="a82bf87e1db875fb975b94ac9b6df9e785818de37b7bb55fec6f290efca9c844"
-MARKER="FE PREDICTION V2 B6 SHADOW STAGING 2026-10-06"
+# B6 deploy workflow applies this only to the staging service; production is never targeted.\nMARKER="FE PREDICTION V2 B6 SHADOW STAGING 2026-10-06"
 p=Path(sys.argv[1] if len(sys.argv)>1 else "index.html")
 s=p.read_text(encoding="utf-8")
 sha=hashlib.sha256(s.encode()).hexdigest()
