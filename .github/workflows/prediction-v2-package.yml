@@ -50,6 +50,7 @@ jobs:
           - calibration / OLD-vs-NEW validation
           - compact shadow/paper evidence
           - persistent validation sync using existing D1 validation_results\n          - validation dashboard + OLD-vs-NEW comparison\n          - manual promotion gate (no auto-promotion)\n          - automated tests
+          - final staging smoke requires exact live hash + hide/validation markers
 
           Frozen production rollback remains on:
           freeze/frontend-p2052-production-before-prediction-v2-20261006
