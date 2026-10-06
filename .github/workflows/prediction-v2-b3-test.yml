@@ -47,4 +47,5 @@ jobs:
           node --check prediction_v2/validation-metrics.js
           node --check prediction_v2/old-vs-new-comparator.js
           node --check prediction_v2/paper-market-evidence.js
+          node --check prediction_v2/shadow-universe-runner.js
           node --check worker_notify_v138_provider_quota75k.js
