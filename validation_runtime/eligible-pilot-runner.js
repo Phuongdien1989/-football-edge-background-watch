@@ -1,0 +1,6 @@
+import {selectEligibleFixture,matchPhaseFromFixture} from './fixture-eligibility-selector.js';
+export const ELIGIBLE_PILOT_BUDGET=Object.freeze({total:40,reserve_ticks:4,requests_per_tick:5,reserve_requests:20,selection_request_cap:20});
+export function assertRemoteMutationAllowed({approved=false,durableBudget=null}={}){if(!approved)throw new Error('REMOTE_PILOT_APPROVAL_REQUIRED');if(durableBudget?.stop_reason)throw new Error('DURABLE_STOP_ACTIVE');if(Number(durableBudget?.total_requests||0)>=ELIGIBLE_PILOT_BUDGET.total)throw new Error('DURABLE_BUDGET_EXHAUSTED');return true}
+export function selectionBudgetRemaining(totalRequests){return Math.max(0,ELIGIBLE_PILOT_BUDGET.selection_request_cap-Number(totalRequests||0))}
+export function choosePinFromCaptured({fixtures,records,cutoff,totalRequests=0}={}){if(selectionBudgetRemaining(totalRequests)<=0)return {status:'NO_ELIGIBLE_FIXTURE_WITHIN_BUDGET',selected:null};const selected=selectEligibleFixture({candidates:fixtures,records,cutoff});if(!selected)return {status:'SEARCH_CONTINUES',selected:null};return {status:'PIN',selected:{...selected,match_phase:matchPhaseFromFixture(selected.fixture)}}}
+export function phaseStampedState(fixture){return {status:fixture?.fixture?.status?.short??null,minute:fixture?.fixture?.status?.elapsed??null,match_phase:matchPhaseFromFixture(fixture)}}
