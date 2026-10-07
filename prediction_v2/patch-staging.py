@@ -90,23 +90,50 @@ bridge=r'''
       homeRecent:recentCompact(homeRecentRaw||[]),awayRecent:recentCompact(awayRecentRaw||[])
     };
   }
+  function explicitReceived(v){return v?.received_at??v?.meta?.received_at??null}
   function marketRows(id){
-    const row=rowNow(id),items=[row?.ft,row?.h1,row?.hc,row?.latest].filter(Boolean);
-    for(const it of items){const rows=it?.latest?.market_rows||it?.lastMarketRows;if(Array.isArray(rows)&&rows.length)return rows}
+    const row=rowNow(id),items=[row?.ft,row?.h1,row?.hc,row?.latest].filter(Boolean),entry=ULTRA_HUB?.entries?.get?.(String(id)),marketField=entry?.fields?.market;
+    for(const it of items){
+      const rows=it?.latest?.market_rows||it?.lastMarketRows;
+      if(Array.isArray(rows)&&rows.length)return rows.map(x=>({...x,received_at:explicitReceived(x)??explicitReceived(marketField),__observed_at:marketField?.at||null}));
+    }
     return [];
   }
   function eventRows(id){
-    const entry=ULTRA_HUB?.entries?.get?.(String(id)),raw=entry?.fields?.events?.data||[];
-    return eventsCompact(raw||[]);
+    const entry=ULTRA_HUB?.entries?.get?.(String(id)),field=entry?.fields?.events,raw=field?.data||[],received=explicitReceived(field);
+    return eventsCompact(raw||[]).map((x,i)=>({...x,received_at:explicitReceived(raw?.[i])??received,__observed_at:field?.at||null}));
+  }
+  function sourceRefs(id){
+    const entry=ULTRA_HUB?.entries?.get?.(String(id)),row=rowNow(id),item=itemNow(row),refs=[];
+    const add=(kind,key,required=true)=>{const f=entry?.fields?.[key],d=f?.data;refs.push({kind,provider:'API_FOOTBALL',sourceId:f?.sig?`${kind}:${f.sig}`:null,payloadHash:f?.sig||null,
+      receivedAt:explicitReceived(f)??explicitReceived(d),providerUpdatedAt:d?.update??null,observedAt:f?.at||null,required})};
+    add('FIXTURE','fixture',true);add('LIVE_STATISTICS','stats',true);add('EVENTS','events',false);add('PLAYERS','players',false);add('LINEUPS','lineups',false);
+    refs.push({kind:'CONTEXT_AGGREGATE',provider:'API_FOOTBALL',sourceId:null,receivedAt:item?.latest?.context_received_at??null,providerUpdatedAt:null,
+      observedAt:item?.latest?.captured_at??null,required:true,metadata:{provenance_note:'P2052 context cache has no provable received_at; strict replay must quarantine until raw-capture provenance is wired.'}});
+    return refs;
+  }
+  function outcomeSnapshots(id){
+    const row=rowNow(id),items=[row?.ft,row?.h1,row?.hc].filter(Boolean),out=[];
+    for(const it of items)for(const h of (it?.history||[]))out.push({...h,received_at:h?.received_at??null});
+    const cur=itemNow(row)?.latest;if(cur)out.push({...cur,received_at:cur?.received_at??null});
+    return out;
+  }
+  function periodResult(id,period){
+    const f=fixtureNow(id),p=String(period||'').toUpperCase(),st=String(f?.fixture?.status?.short||'').toUpperCase(),entry=ULTRA_HUB?.entries?.get?.(String(id)),received=explicitReceived(entry?.fields?.fixture),
+      hh=Number(f?.score?.halftime?.home),ha=Number(f?.score?.halftime?.away),fh=Number(f?.goals?.home),fa=Number(f?.goals?.away),h1ok=Number.isFinite(hh)&&Number.isFinite(ha)&&['HT','2H','FT','AET','PEN'].includes(st),ftok=Number.isFinite(fh)&&Number.isFinite(fa)&&['FT','AET','PEN'].includes(st);
+    if(p==='H1')return {period:'H1',home:hh,away:ha,status:st,received_at:received,confirmed:h1ok};
+    if(p==='FT')return {period:'FT',home:fh,away:fa,status:st,received_at:received,confirmed:ftok};
+    if(p==='H2'&&h1ok&&ftok&&fh>=hh&&fa>=ha)return {period:'H2',home:fh-hh,away:fa-ha,status:st,received_at:received,confirmed:true};
+    return {period:p||null,home:null,away:null,status:st,received_at:received,confirmed:false};
   }
   function fixtureSnapshot(id){return fixtureNow(id)}
   async function dbSync(events){return bgRequest('/api/db/sync',{method:'POST',body:{events},timeout:15000})}
   async function dbValidation(limit=10000){return bgRequest('/api/db/validation?limit='+Math.max(1,Math.min(10000,Number(limit)||10000)),{timeout:15000})}
   window.FE_PV2_RUNTIME={
-    staging:true,version:'B7-B9-2026-10-06',
+    staging:true,version:'B10-BATCH02-STRICT-OBSERVATION-2026-10-07',
     masterRows:()=>feMasterRankRows(feMasterMergeFixtures()),
     oldRank:id=>rowNow(id)?.__rank||null,
-    contextInput,marketRows,eventRows,fixtureSnapshot,dbSync,dbValidation,
+    contextInput,marketRows,eventRows,sourceRefs,outcomeSnapshots,periodResult,fixtureSnapshot,dbSync,dbValidation,
     backgroundReady:()=>!!bgBase(),
     apiUsage:()=>apiUsageSnapshot(),
     productionUntouched:true
