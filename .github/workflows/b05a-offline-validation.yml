@@ -1,0 +1,15 @@
+name: B05A Offline Validation
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  offline:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - name: Offline selector/phase/runner regression only
+        run: node validation_runtime/test-eligible-pilot-runner.mjs
