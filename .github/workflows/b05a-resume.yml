@@ -1,4 +1,4 @@
-name: B05A Resume Smoke
+name: B05A Pilot Fixture 2
 
 on:
   push:
@@ -38,6 +38,15 @@ jobs:
           echo "ROOT=$ROOT" >> "$GITHUB_ENV"
           cd "$ROOT"
           sha256sum -c SHA256SUMS_FINAL_FIXED.txt
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path("staging_kit/batch04-collector-worker.js")
+          s=p.read_text()
+          old="const selected=pinnedFixtureId==null?(ids[0]??null):Number(pinnedFixtureId);"
+          new="const selected=pinnedFixtureId==null?(ids[1]??null):Number(pinnedFixtureId);"
+          assert old in s, "selection patch target missing"
+          p.write_text(s.replace(old,new,1))
+          PY
           test -n "$CLOUDFLARE_API_TOKEN"
           test -n "$CLOUDFLARE_ACCOUNT_ID"
           test -n "$APISPORTS_KEY"
@@ -81,7 +90,7 @@ jobs:
           EOF
 
           cat > "$ROOT/staging_kit/batch05a-final-staging-config.json" <<EOF
-          {"bridge_base_url":"$BRIDGE_URL","bridge_token_env":"BATCH05A3_BRIDGE_TOKEN","api_key_env":"APISPORTS_KEY","pilot_id":"FE-B05A-RESUME-${GITHUB_RUN_ID}","owner_id":"gha-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}","max_ticks":8,"hard_limits":{"fixtures":1,"duration_ms":600000,"provider_attempts":40},"staging_target_confirmed":true,"production_target_forbidden":true}
+          {"bridge_base_url":"$BRIDGE_URL","bridge_token_env":"BATCH05A3_BRIDGE_TOKEN","api_key_env":"APISPORTS_KEY","pilot_id":"FE-B05A-PILOT-FX2-${GITHUB_RUN_ID}","owner_id":"gha-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}","max_ticks":8,"hard_limits":{"fixtures":1,"duration_ms":600000,"provider_attempts":40},"staging_target_confirmed":true,"production_target_forbidden":true}
           EOF
 
       - name: Redeploy bridge and rotate token
@@ -136,7 +145,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: b05a-resume-evidence-${{ github.run_id }}
+          name: b05a-pilot-fx2-evidence-${{ github.run_id }}
           if-no-files-found: warn
           path: |
             PREFLIGHT.json
