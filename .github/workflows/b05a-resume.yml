@@ -38,15 +38,6 @@ jobs:
           echo "ROOT=$ROOT" >> "$GITHUB_ENV"
           cd "$ROOT"
           sha256sum -c SHA256SUMS_FINAL_FIXED.txt
-          python3 - <<'PY'
-          from pathlib import Path
-          p=Path("staging_kit/batch04-collector-worker.js")
-          s=p.read_text()
-          old="const selected=pinnedFixtureId==null?(ids[0]??null):Number(pinnedFixtureId);"
-          new="const selected=pinnedFixtureId==null?(ids[1]??null):Number(pinnedFixtureId);"
-          assert old in s, "selection patch target missing"
-          p.write_text(s.replace(old,new,1))
-          PY
           test -n "$CLOUDFLARE_API_TOKEN"
           test -n "$CLOUDFLARE_ACCOUNT_ID"
           test -n "$APISPORTS_KEY"
@@ -54,6 +45,15 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "24"
+
+      - name: Offline regression suite
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$ROOT"
+          for test_file in prediction_v2/test-*.mjs; do node "$test_file"; done
+          node --check staging_kit/batch05a3-http-d1-bridge.js
+          node --check staging_kit/batch05a-final-remote-cli.mjs
 
       - run: npm install --no-save wrangler@4.119.0
 
@@ -90,7 +90,7 @@ jobs:
           EOF
 
           cat > "$ROOT/staging_kit/batch05a-final-staging-config.json" <<EOF
-          {"bridge_base_url":"$BRIDGE_URL","bridge_token_env":"BATCH05A3_BRIDGE_TOKEN","api_key_env":"APISPORTS_KEY","pilot_id":"FE-B05A-PILOT-FX2-${GITHUB_RUN_ID}","owner_id":"gha-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}","max_ticks":8,"hard_limits":{"fixtures":1,"duration_ms":600000,"provider_attempts":40},"staging_target_confirmed":true,"production_target_forbidden":true}
+          {"bridge_base_url":"$BRIDGE_URL","bridge_token_env":"BATCH05A3_BRIDGE_TOKEN","api_key_env":"APISPORTS_KEY","pilot_id":"FE-B05A-PILOT-FX2","owner_id":"gha-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}","max_ticks":8,"hard_limits":{"fixtures":1,"duration_ms":600000,"provider_attempts":40},"staging_target_confirmed":true,"production_target_forbidden":true}
           EOF
 
       - name: Redeploy bridge and rotate token
@@ -102,27 +102,38 @@ jobs:
           printf '%s' "$BATCH05A3_BRIDGE_TOKEN" | npx wrangler secret put BATCH05A3_BRIDGE_TOKEN --config staging_kit/batch05a-final.toml
           sleep 5
 
-      - name: Authenticated readiness gate
+      - name: Exact runner auth and budget gate
         shell: bash
         run: |
           set -euo pipefail
-          ok=0
-          for i in $(seq 1 20); do
-            code="$(curl -sS -o READY_BODY.txt -w '%{http_code}' -X POST "$BRIDGE_URL/__fe_batch05a3/budget/load" -H "Authorization: Bearer $BATCH05A3_BRIDGE_TOKEN" -H "Content-Type: application/json" --data '{"pilot_id":"readiness","owner_id":"readiness"}' || true)"
-            if [ "$code" = "200" ] && jq -e . READY_BODY.txt >/dev/null 2>&1; then
-              ok=1
-              break
-            fi
-            sleep 2
-          done
-          test "$ok" = "1"
           cd "$ROOT"
-          node - <<'NODE'
-          const u=process.env.BRIDGE_URL+"/__fe_batch05a3/budget/load";
-          const r=await fetch(u,{method:"POST",headers:{Authorization:"Bearer "+process.env.BATCH05A3_BRIDGE_TOKEN,"Content-Type":"application/json"},body:JSON.stringify({pilot_id:"node-auth-gate",owner_id:"node-auth-gate"})});
-          if(r.status!==200) throw new Error("NODE_AUTH_GATE_"+r.status+":"+await r.text());
-          JSON.parse(await r.text().catch(()=>'' )||'{}');
+          node --input-type=module <<'NODE' | tee "$GITHUB_WORKSPACE/AUTH_GATE.json"
+          import fs from 'node:fs';
+          import {createNodeHttpD1BridgeA3} from './staging_kit/batch05a3-http-d1-bridge.js';
+          const cfg=JSON.parse(fs.readFileSync('./staging_kit/batch05a-final-staging-config.json','utf8'));
+          const token=process.env[cfg.bridge_token_env];
+          if(!token) throw new Error('AUTH_GATE_TOKEN_MISSING');
+          const meta={path:'/__fe_batch05a3/budget/load',method:'POST',authorization_header:'Bearer <redacted>',token_env:cfg.bridge_token_env,token_present:true,token_length:token.length,pilot_id:cfg.pilot_id,owner_id:cfg.owner_id};
+          const client=createNodeHttpD1BridgeA3({baseUrl:cfg.bridge_base_url,token,pilotId:cfg.pilot_id,ownerId:cfg.owner_id});
+          let budget=null;
+          for(let i=0;i<3;i++){ budget=await client.budgetStore.load(); if(i<2) await new Promise(r=>setTimeout(r,5000)); }
+          console.log(JSON.stringify({...meta,exact_runner_client:true,consecutive_passes:3,prior_budget:budget},null,2));
           NODE
+
+      - name: Patch fixture-2 selector after offline gates
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$ROOT"
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path("staging_kit/batch04-collector-worker.js")
+          s=p.read_text()
+          old="const selected=pinnedFixtureId==null?(ids[0]??null):Number(pinnedFixtureId);"
+          new="const selected=pinnedFixtureId==null?(ids[1]??null):Number(pinnedFixtureId);"
+          assert old in s, "selection patch target missing"
+          p.write_text(s.replace(old,new,1))
+          PY
 
       - name: Preflight
         shell: bash
@@ -137,6 +148,14 @@ jobs:
           set -o pipefail
           cd "$ROOT"
           CFG=staging_kit/batch05a-final-staging-config.json bash staging_kit/batch05a-final-ops.sh run | tee "$GITHUB_WORKSPACE/REMOTE_SMOKE.json"
+
+      - name: Smoke evidence gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          jq -e '.failure == null' "$GITHUB_WORKSPACE/REMOTE_SMOKE.json" >/dev/null
+          jq -e '.provider_attempts > 0 and .invocation_provider_attempts > 0' "$GITHUB_WORKSPACE/REMOTE_SMOKE.json" >/dev/null
+          jq -e '.pinned_fixture_id != null and .detailed_fixture_count == 1' "$GITHUB_WORKSPACE/REMOTE_SMOKE.json" >/dev/null
 
       - name: Stop and export
         if: always()
@@ -157,6 +176,6 @@ jobs:
           if-no-files-found: warn
           path: |
             PREFLIGHT.json
+            AUTH_GATE.json
             REMOTE_*.json
-            READY_BODY.txt
             D1_STATE.json
