@@ -26,14 +26,14 @@ export function createPaperMarketRecord({fixtureId,capturedAt,state,bestMarket,c
     source:bestMarket.source||null,market_name:bestMarket.market_name||null,provider_updated_at:bestMarket.provider_updated_at||null,received_at:bestMarket.received_at||null,
     market_freshness_age_ms:finite(bestMarket.freshness_age_ms),market_provenance_status:bestMarket.provenance_status||null,
     fair_odds:finite(bestMarket.edge.fair_odds),expected_return:finite(bestMarket.edge.expected_return),confidence:finite(confidence),
-    strict_replay_eligible:observation?.strict_replay_eligible===true&&bestMarket.provenance_status===STRICT_VALID,
+    strict_record:strict===true,strict_replay_eligible:observation?.strict_replay_eligible===true&&bestMarket.provenance_status===STRICT_VALID,
     strict_metrics_eligible:observation?.strict_metrics_eligible===true&&bestMarket.provenance_status===STRICT_VALID,
     persisted_at:null,persistence_status:'UNVERIFIED',settlement_result:null,realized_return:null,settled:false,settlement_state:'OPEN',settlement_revision:0,settlement_history:[]};
 }
 function voidSettlement(row,status,changedAt){
   const prior={result:row.settlement_result,realized_return:row.realized_return,state:row.settlement_state,revision:row.settlement_revision||0};
   return {...row,settled:true,settlement_state:'VOID',settlement_result:'VOID',realized_return:null,terminal_status:status,
-    settlement_revision:(row.settlement_revision||0)+1,settlement_history:[...(row.settlement_history||[]),{revision:(row.settlement_revision||0)+1,changed_at:timestampIso(changedAt||Date.now()),reason:`VOID_${status}`,prior,next:{result:'VOID',state:'VOID'}}]};
+    settlement_provenance_status:'UNKNOWN_PROVENANCE',strict_metrics_eligible:false,settlement_revision:(row.settlement_revision||0)+1,settlement_history:[...(row.settlement_history||[]),{revision:(row.settlement_revision||0)+1,changed_at:timestampIso(changedAt||Date.now()),reason:`VOID_${status}`,prior,next:{result:'VOID',state:'VOID'}}]};
 }
 export function settlePaperMarketRecord(row,{periodResult=null,finalHome=null,finalAway=null,status=null,changedAt=Date.now(),allowCorrection=false}={}){
   if(!row)return row;const period=normalizeMarketPeriod(row.market_period),st=String(status??periodResult?.status??'').toUpperCase();
@@ -41,15 +41,15 @@ export function settlePaperMarketRecord(row,{periodResult=null,finalHome=null,fi
   if(!period){
     const h=finite(finalHome),a=finite(finalAway);if(row.settled||h==null||a==null)return row;
     let result=null;if(row.market==='TOTAL')result=asianTotalResult(h+a,row.line,row.selection);else if(row.market==='ASIAN_HANDICAP')result=asianHandicapResult(h,a,row.line,row.selection);
-    if(!result)return row;return {...row,settlement_result:result,realized_return:settlementReturn(result,row.odds),settled:true,settlement_state:'SETTLED_LEGACY_UNKNOWN_PERIOD',final_home:h,final_away:a};
+    if(!result)return row;return {...row,settlement_result:result,realized_return:settlementReturn(result,row.odds),settled:true,settlement_state:'SETTLED_LEGACY_UNKNOWN_PERIOD',settlement_provenance_status:'UNKNOWN_PROVENANCE',strict_metrics_eligible:false,final_home:h,final_away:a};
   }
   const rp=normalizeMarketPeriod(periodResult?.period);if(rp!==period||periodResult?.confirmed!==true)return row;
   const h=finite(periodResult?.home),a=finite(periodResult?.away);if(h==null||a==null)return row;
   let result=null;if(row.market==='TOTAL')result=asianTotalResult(h+a,row.line,row.selection);else if(row.market==='ASIAN_HANDICAP')result=asianHandicapResult(h,a,row.line,row.selection);
   if(!result)return row;
-  const realized=settlementReturn(result,row.odds),same=row.settled&&row.settlement_result===result&&finite(row.final_home)===h&&finite(row.final_away)===a;
+  const settlementProvenance=periodResult?.provenance_status||'UNKNOWN_PROVENANCE',realized=settlementReturn(result,row.odds),same=row.settled&&row.settlement_result===result&&finite(row.final_home)===h&&finite(row.final_away)===a;
   if(same||row.settled&&!allowCorrection)return row;
   const rev=(row.settlement_revision||0)+1,prior={result:row.settlement_result,realized_return:row.realized_return,state:row.settlement_state,final_home:row.final_home,final_away:row.final_away};
-  return {...row,settlement_result:result,realized_return:realized,settled:true,settlement_state:row.settled?'CORRECTED':'SETTLED',settlement_revision:rev,
+  return {...row,settlement_result:result,realized_return:realized,settled:true,settlement_state:row.settled?'CORRECTED':'SETTLED',settlement_provenance_status:settlementProvenance,strict_metrics_eligible:row.strict_metrics_eligible===true&&settlementProvenance===STRICT_VALID,settlement_revision:rev,
     final_home:h,final_away:a,terminal_status:st||null,settlement_history:[...(row.settlement_history||[]),{revision:rev,changed_at:timestampIso(changedAt),reason:row.settled?'PERIOD_RESULT_CORRECTION':'PERIOD_RESULT_CONFIRMED',prior,next:{result,realized_return:realized,final_home:h,final_away:a}}]};
 }
