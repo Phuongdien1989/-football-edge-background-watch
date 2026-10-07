@@ -2,7 +2,9 @@ import {buildMatchContextFeatures} from './context-feature-layer.js';
 import {buildLiveFeaturePacket} from './live-feature-adapter.js';
 import {predictShadowProbability} from './probability-engine.js';
 import {rankOpportunities} from './opportunity-ranking.js';
-import {compactShadowEvidence,shouldRecordShadow,settleShadowEvidence} from './shadow-evidence.js';
+import {compactShadowEvidence,shouldRecordShadow} from './shadow-evidence.js';
+import {resolveStrictGoalWindows} from './strict-outcome-resolver.js';
+import {marketPeriodForEngine} from './observation-contract.js';
 import {buildPairedObservation} from './old-vs-new-comparator.js';
 import {createPaperMarketRecord,settlePaperMarketRecord} from './paper-market-evidence.js';
 import {buildValidationEvents,syncValidationEvents,parseValidationRows} from './validation-sync.js';
@@ -12,12 +14,14 @@ const RUNTIME=window.FE_PV2_RUNTIME;
 const STATE={busy:false,lastAt:0,timer:null,rows:[],errors:[],predictionEvidence:[],pairedEvidence:[],paperEvidence:[],
   syncHashes:{},syncStatus:'LOCAL',lastSyncAt:0,validationVisible:false,lastReport:null};
 const $=id=>document.getElementById(id);
-const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#39;'}[c]));
 const finite=v=>v===null||v===undefined||(typeof v==='string'&&!v.trim())?null:(Number.isFinite(Number(v))?Number(v):null);
 const round=(v,d=1)=>{const n=finite(v);if(n==null)return null;const p=10**d;return Math.round(n*p)/p};
 const STORE_KEY='FE_PREDICTION_V2_STAGING_EVIDENCE_V2';
 const LEGACY_STORE_KEY='FE_PREDICTION_V2_STAGING_EVIDENCE_V1';
 const HIDE_RESEARCH_MARKER='FE_PV2_HIDE_FMD_MTI_V2';
+const MODEL_VERSION='PREDICTION_V2_B2_B9_BATCH02_OBSERVATION_V1';
+const CONFIG_VERSION='PV2_BATCH02_NO_MODEL_WEIGHT_CHANGE';
 
 function enforceHiddenResearchCards(){
   let style=document.getElementById('fe-pv2-hide-research-cards');
@@ -50,25 +54,6 @@ function pickPredictionItem(row){
   return null;
 }
 function isTerminal(status){return ['FT','AET','PEN','CANC','ABD','AWD','WO'].includes(String(status||'').toUpperCase())}
-function effectiveEventMinute(e){const m=finite(e?.time),x=finite(e?.extra);return m==null?null:m+(x&&x>0?x:0)}
-function goalMinutes(events=[]){
-  return (events||[]).filter(e=>String(e?.type||'').toUpperCase()==='GOAL'&&!/CANCEL|MISSED/i.test(String(e?.detail||'')))
-    .map(effectiveEventMinute).filter(v=>v!=null).sort((a,b)=>a-b);
-}
-function settleByEvents(row,events,current,ended=false){
-  if(!row||row?.outcome?.settled)return row;
-  const mins=goalMinutes(events),start=finite(row.minute)??0,out={...(row.outcome||{})},first=mins.find(m=>m>start);
-  if(first!=null&&out.first_goal_min==null)out.first_goal_min=first;
-  const cur=finite(current?.minute);
-  for(const h of [5,10,15]){
-    const k=`goal_${h}m`;if(typeof out[k]==='boolean')continue;
-    if(first!=null&&first-start<=h)out[k]=true;
-    else if(ended||(cur!=null&&cur>=start+h))out[k]=false;
-  }
-  if(ended){for(const h of [5,10,15])if(typeof out[`goal_${h}m`]!=='boolean')out[`goal_${h}m`]=false}
-  out.settled=[5,10,15].every(h=>typeof out[`goal_${h}m`]==='boolean');
-  return {...row,outcome:out};
-}
 function currentStateFor(id,masterBy){
   const row=masterBy.get(Number(id)),pick=pickPredictionItem(row);
   if(pick)return {snapshot:pick.item?.latest||{},engine:pick.engine,row};
@@ -78,23 +63,20 @@ function currentStateFor(id,masterBy){
 function reconcileEvidence(masterRows){
   const by=new Map((masterRows||[]).map(r=>[Number(r.id),r]));
   STATE.predictionEvidence=STATE.predictionEvidence.map(e=>{
-    if(e?.outcome?.settled)return e;
     const cur=currentStateFor(e.fixture_id,by),s=cur.snapshot||{},status=String(s.status||'').toUpperCase();
-    const h1=String(e.engine).toUpperCase()==='H1',ended=h1?(status==='HT'||isTerminal(status)||Number(s.minute)>45):isTerminal(status);
-    let next=settleShadowEvidence(e,s,{ended});
-    const events=RUNTIME?.eventRows?.(e.fixture_id)||[];if(events.length)next=settleByEvents(next,events,s,ended);
-    return next;
+    const h1=String(e.engine).toUpperCase()==='H1',ended=h1?(status==='HT'||isTerminal(status)||Number(s.minute)>45):isTerminal(status),
+      events=RUNTIME?.eventRows?.(e.fixture_id)||[],snapshots=RUNTIME?.outcomeSnapshots?.(e.fixture_id)||[];
+    return resolveStrictGoalWindows(e,{events,snapshots,currentSnapshot:s,ended,changedAt:Date.now()});
   });
   const predMap=new Map(STATE.predictionEvidence.map(e=>[`${e.fixture_id}:${e.captured_at}`,e]));
   STATE.pairedEvidence=STATE.pairedEvidence.map(p=>{
-    if(p.hit===0||p.hit===1||typeof p.hit==='boolean')return p;
-    const e=predMap.get(`${p.fixture_id}:${p.captured_at}`),hit=e?.outcome?.goal_10m;
-    return typeof hit==='boolean'?{...p,hit:hit?1:0}:p;
+    const e=predMap.get(`${p.fixture_id}:${p.captured_at}`);if(!e)return p;const hit=e?.outcome?.goal_10m;
+    return {...p,hit:typeof hit==='boolean'?(hit?1:0):p.hit,strict_metrics_eligible:e.strict_metrics_eligible===true,
+      strict_replay_status:e.strict_replay_status||p.strict_replay_status,persistence_status:e.persistence_status||p.persistence_status};
   });
   STATE.paperEvidence=STATE.paperEvidence.map(p=>{
-    if(p?.settled)return p;const cur=currentStateFor(p.fixture_id,by),s=cur.snapshot||{};
-    if(!isTerminal(s.status))return p;const h=finite(s?.goals?.home),a=finite(s?.goals?.away);
-    return h!=null&&a!=null?settlePaperMarketRecord(p,{finalHome:h,finalAway:a}):p;
+    const cur=currentStateFor(p.fixture_id,by),s=cur.snapshot||{},status=String(s.status||'').toUpperCase(),periodResult=RUNTIME?.periodResult?.(p.fixture_id,p.market_period)||null;
+    return settlePaperMarketRecord(p,{periodResult,status,changedAt:Date.now(),allowCorrection:true});
   });
 }
 async function modelOne(row,now){
@@ -102,20 +84,21 @@ async function modelOne(row,now){
   const contextInput=await RUNTIME.contextInput(row.id);
   const context=buildMatchContextFeatures(contextInput||{});
   const packet=buildLiveFeaturePacket({fixtureId:row.id,engine:pick.engine,item:pick.item,context,now});
-  const prediction=predictShadowProbability(packet);
-  const marketRows=RUNTIME.marketRows(row.id)||[];
-  return {id:Number(row.id),row,item:pick.item,engine:pick.engine,context,packet,prediction,state:packet.state,marketRows};
+  const prediction=predictShadowProbability(packet),marketPeriod=marketPeriodForEngine(pick.engine),marketRows=RUNTIME.marketRows(row.id)||[],sourceRefs=RUNTIME?.sourceRefs?.(row.id,pick.engine)||[];
+  return {id:Number(row.id),row,item:pick.item,engine:pick.engine,marketPeriod,evaluationCutoff:now,sourceRefs,context,packet,prediction,state:packet.state,marketRows};
 }
 function recordEvidence(ranked,now){
   for(const x of ranked){
-    const row=compactShadowEvidence({item:x.item,packet:x.packet,prediction:x.prediction,context:x.context,now});
-    const prev=[...STATE.predictionEvidence].reverse().find(e=>Number(e.fixture_id)===Number(row.fixture_id)&&String(e.engine)===String(row.engine));
+    const row=compactShadowEvidence({item:x.item,packet:x.packet,prediction:x.prediction,context:x.context,now,sourceRefs:x.sourceRefs||[],marketPeriod:x.marketPeriod,
+      evaluationCutoff:x.evaluationCutoff??now,modelVersion:MODEL_VERSION,configVersion:CONFIG_VERSION,persistedAt:null});
+    const prev=[...STATE.predictionEvidence].reverse().find(e=>Number(e.fixture_id)===Number(row.fixture_id)&&String(e.engine)===String(row.engine)&&String(e.market_period)===String(row.market_period));
     if(!shouldRecordShadow(prev,row))continue;
     STATE.predictionEvidence.push(row);
     const old=x.row?.__rank||RUNTIME.oldRank(x.id);
-    STATE.pairedEvidence.push(buildPairedObservation({id:`pv2:pair:${x.id}:${now}`,fixtureId:x.id,capturedAt:now,oldRankMeta:old,newOpportunity:x,hit:null,league:x.row?.league||null,minute:x.state?.minute}));
+    STATE.pairedEvidence.push(buildPairedObservation({id:`pv2:pair:${row.observation_id}`,fixtureId:x.id,capturedAt:now,oldRankMeta:old,newOpportunity:x,hit:null,observation:row.observation,league:x.row?.league||null,minute:x.state?.minute}));
     if(x.top&&x.best_market){
-      const p=createPaperMarketRecord({fixtureId:x.id,capturedAt:now,state:x.state,bestMarket:x.best_market,confidence:x.prediction?.confidence?.score_100,league:x.row?.league||null});
+      const p=createPaperMarketRecord({fixtureId:x.id,capturedAt:now,state:x.state,bestMarket:x.best_market,marketPeriod:x.marketPeriod,targetPeriod:x.marketPeriod,evaluationCutoff:x.evaluationCutoff??now,
+        observation:row.observation,strict:true,confidence:x.prediction?.confidence?.score_100,league:x.row?.league||null});
       if(p)STATE.paperEvidence.push(p);
     }
   }
@@ -130,7 +113,7 @@ async function syncEvidence(){
     const events=buildValidationEvents({prediction:STATE.predictionEvidence,paired:STATE.pairedEvidence,paper:STATE.paperEvidence});
     const res=await syncValidationEvents({events,hashes:STATE.syncHashes,request:RUNTIME.dbSync,maxBatch:60});
     STATE.syncHashes=res.hashes||STATE.syncHashes;STATE.lastSyncAt=Date.now();
-    STATE.syncStatus=res.skipped?'D1 SYNCED':'D1 +'+Number(res.synced||0);saveEvidence();
+    STATE.syncStatus=res.skipped?'D1 SYNCED • PERSIST ACK UNVERIFIED':'D1 SENT +'+Number(res.synced||0)+' • PERSIST ACK UNVERIFIED';saveEvidence();
   }catch(e){STATE.syncStatus='D1 ERROR';STATE.errors.push('D1: '+(e?.message||e))}
 }
 function fmtMarket(x){
@@ -181,7 +164,7 @@ async function refreshValidation(){
       data={prediction:mergeEvidence(server.prediction,data.prediction,'id'),paired:mergeEvidence(server.paired,data.paired,'observation_id'),paper:mergeEvidence(server.paper,data.paper,'id')};
     }catch(e){STATE.errors.push('VALIDATION D1: '+(e?.message||e))}
   }
-  STATE.lastReport=buildValidationReport(data);render();
+  STATE.lastReport=buildValidationReport(data,{strictMode:true});render();
 }
 async function run(){
   if(STATE.busy||!RUNTIME)return;STATE.busy=true;STATE.errors=[];render();
@@ -191,13 +174,13 @@ async function run(){
     for(const row of master.slice(0,15)){
       try{const m=await modelOne(row,now);if(m)modeled.push(m)}catch(e){STATE.errors.push(`#${row?.id}: ${e?.message||e}`)}
     }
-    STATE.rows=rankOpportunities(modeled);recordEvidence(STATE.rows,now);reconcileEvidence(master);await syncEvidence();STATE.lastAt=now;
+    STATE.rows=rankOpportunities(modeled,{strictMarket:true});recordEvidence(STATE.rows,now);reconcileEvidence(master);await syncEvidence();STATE.lastAt=now;
     if(STATE.validationVisible)await refreshValidation();
   }catch(e){STATE.errors.push(e?.message||String(e))}
   finally{STATE.busy=false;saveEvidence();render()}
 }
 function exportEvidence(){
-  const report=buildValidationReport({prediction:STATE.predictionEvidence,paired:STATE.pairedEvidence,paper:STATE.paperEvidence});
+  const report=buildValidationReport({prediction:STATE.predictionEvidence,paired:STATE.pairedEvidence,paper:STATE.paperEvidence},{strictMode:true});
   const payload={schema:'FE_PREDICTION_V2_STAGING_EXPORT_B9',exported_at:new Date().toISOString(),staging:true,report,prediction:STATE.predictionEvidence,paired:STATE.pairedEvidence,paper:STATE.paperEvidence};
   const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(payload,null,2)],{type:'application/json'}));a.download=`football-edge-pv2-shadow-${Date.now()}.json`;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),1000);
 }
