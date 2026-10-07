@@ -78,8 +78,14 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          npx wrangler d1 create "$STAGING_DB_NAME" --json > D1_CREATE.json
-          DB_ID="$(jq -r '.uuid // .database_id // .id // empty' D1_CREATE.json)"
+          HTTP_CODE="$(curl -sS -o D1_CREATE.json -w '%{http_code}' -X POST \
+            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/d1/database" \
+            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            -H "Content-Type: application/json" \
+            --data "$(jq -nc --arg n "$STAGING_DB_NAME" '{name:$n}')")"
+          test "$HTTP_CODE" = "200"
+          jq -e '.success == true' D1_CREATE.json >/dev/null
+          DB_ID="$(jq -r '.result.uuid // .result.id // empty' D1_CREATE.json)"
           test -n "$DB_ID"
           test "$DB_ID" != "$FORBIDDEN_PROD_DB_ID"
           TOKEN="$(openssl rand -hex 32)"
