@@ -5,4 +5,5 @@ let s=await scenario({stop:'OPERATOR_STOP'});await assert.rejects(s.run(),/STOP/
 s=await scenario({start:40});await assert.rejects(s.run(),/EXHAUSTED/);assert.equal(s.get().mut,0);assert.equal(s.get().calls,0);
 s=await scenario({eligibleAt:2});let out=await s.run();assert.equal(out.status,'COMPLETED_SCOPE');assert.equal(out.ticks.length,4);assert.equal(out.eligibility.match_phase,'H2');assert.equal(out.eligibility.events_state,'VALID_NO_EVENTS');assert.equal(out.eligibility.market_state,'SUPPORTED');assert.equal(s.get().acks,4);assert.ok(out.used<=40);
 s=await scenario({eligibleAt:99});out=await s.run();assert.equal(out.status,'NO_ELIGIBLE_FIXTURE_WITHIN_BUDGET');assert.ok(out.selectionUsed<=20);assert.ok(out.used<=20);assert.equal(s.get().calls,out.used);
+s=await scenario({eligibleAt:1,retry:true});out=await s.run();assert.equal(out.status,'COMPLETED_SCOPE');assert.ok(out.used<=40);
 console.log('entrypoint fake-provider full path PASS',JSON.stringify({success_used:out.used,selection_cap:20,reserve:20}));
