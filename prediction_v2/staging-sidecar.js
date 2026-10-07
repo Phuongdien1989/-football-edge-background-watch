@@ -54,6 +54,25 @@ function pickPredictionItem(row){
   return null;
 }
 function isTerminal(status){return ['FT','AET','PEN','CANC','ABD','AWD','WO'].includes(String(status||'').toUpperCase())}
+function effectiveEventMinute(e){const m=finite(e?.time),x=finite(e?.extra);return m==null?null:m+(x&&x>0?x:0)}
+function goalMinutes(events=[]){
+  return (events||[]).filter(e=>String(e?.type||'').toUpperCase()==='GOAL'&&!/CANCEL|MISSED/i.test(String(e?.detail||'')))
+    .map(effectiveEventMinute).filter(v=>v!=null).sort((a,b)=>a-b);
+}
+function settleByEvents(row,events,current,ended=false){
+  if(!row||row?.outcome?.settled)return row;
+  const mins=goalMinutes(events),start=finite(row.minute)??0,out={...(row.outcome||{})},first=mins.find(m=>m>start);
+  if(first!=null&&out.first_goal_min==null)out.first_goal_min=first;
+  const cur=finite(current?.minute);
+  for(const h of [5,10,15]){
+    const k=`goal_${h}m`;if(typeof out[k]==='boolean')continue;
+    if(first!=null&&first-start<=h)out[k]=true;
+    else if(ended||(cur!=null&&cur>=start+h))out[k]=false;
+  }
+  if(ended){for(const h of [5,10,15])if(typeof out[`goal_${h}m`]!=='boolean')out[`goal_${h}m`]=false}
+  out.settled=[5,10,15].every(h=>typeof out[`goal_${h}m`]==='boolean');
+  return {...row,outcome:out};
+}
 function currentStateFor(id,masterBy){
   const row=masterBy.get(Number(id)),pick=pickPredictionItem(row);
   if(pick)return {snapshot:pick.item?.latest||{},engine:pick.engine,row};
@@ -70,9 +89,9 @@ function reconcileEvidence(masterRows){
   });
   const predMap=new Map(STATE.predictionEvidence.map(e=>[`${e.fixture_id}:${e.captured_at}`,e]));
   STATE.pairedEvidence=STATE.pairedEvidence.map(p=>{
-    const e=predMap.get(`${p.fixture_id}:${p.captured_at}`);if(!e)return p;const hit=e?.outcome?.goal_10m;
-    return {...p,hit:typeof hit==='boolean'?(hit?1:0):p.hit,strict_metrics_eligible:e.strict_metrics_eligible===true,
-      strict_replay_status:e.strict_replay_status||p.strict_replay_status,persistence_status:e.persistence_status||p.persistence_status};
+    const e=predMap.get(`${p.fixture_id}:${p.captured_at}`);if(!e)return p;const hit=e?.outcome?.goal_10m,we=e?.outcome?.window_evidence?.goal_10m,refs=we?.refs||[],times=refs.map(r=>Date.parse(r?.received_at||'')).filter(Number.isFinite),received=times.length?new Date(Math.min(...times)).toISOString():null;
+    return {...p,hit:typeof hit==='boolean'?(hit?1:0):p.hit,outcome_provenance_status:we?.strict_provenance===true?'STRICT_VALID':'UNKNOWN_PROVENANCE',outcome_received_at:received,
+      new_evaluation_status:e?.observation?.strict_replay_status==='STRICT_VALID'?'STRICT_VALID':(e?.observation?.strict_replay_status||'UNKNOWN_PROVENANCE'),strict_metrics_eligible:null};
   });
   STATE.paperEvidence=STATE.paperEvidence.map(p=>{
     const cur=currentStateFor(p.fixture_id,by),s=cur.snapshot||{},status=String(s.status||'').toUpperCase(),periodResult=RUNTIME?.periodResult?.(p.fixture_id,p.market_period)||null;
