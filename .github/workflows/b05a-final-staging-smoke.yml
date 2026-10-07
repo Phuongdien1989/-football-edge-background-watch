@@ -1,16 +1,11 @@
-name: B05A FINAL Staging Smoke
+name: B05A FINAL Staging Smoke One Shot
 
 on:
-  workflow_dispatch:
-    inputs:
-      approval:
-        description: 'Exact approval phrase required'
-        required: true
-        default: 'NO'
-      package_ref:
-        description: 'GitHub artifact id containing exact FINAL FIXED package (optional until source handoff)'
-        required: false
-        default: ''
+  push:
+    branches:
+      - staging/b05a-final-smoke-ready-20261007
+    paths:
+      - .github/workflows/b05a-final-staging-smoke.yml
 
 permissions:
   contents: read
@@ -20,27 +15,8 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  gate:
-    runs-on: ubuntu-latest
-    outputs:
-      approved: ${{ steps.gate.outputs.approved }}
-    steps:
-      - name: Scope gate
-        id: gate
-        shell: bash
-        run: |
-          set -euo pipefail
-          test "${{ github.ref_name }}" = "staging/b05a-final-smoke-ready-20261007"
-          if [ "${{ inputs.approval }}" = "RUN_STAGING_SMOKE_1FIXTURE_600S_40ATTEMPTS" ]; then
-            echo "approved=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "approved=false" >> "$GITHUB_OUTPUT"
-            echo "Preparation-only dispatch: no Cloudflare mutation and no provider call."
-          fi
-
   smoke:
-    needs: gate
-    if: needs.gate.outputs.approved == 'true'
+    if: github.repository == 'Phuongdien1989/-football-edge-background-watch' && github.ref == 'refs/heads/staging/b05a-final-smoke-ready-20261007'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
@@ -48,6 +24,7 @@ jobs:
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       APISPORTS_KEY: ${{ secrets.APISPORTS_KEY }}
       EXPECTED_ZIP_SHA256: 68f2a8a9b0233a9fcf4cba9c53961ca9dd9dd06deeb533f8f78fe74c9ed0f03f
+      ZIP_PATH: FOOTBALL_EDGE_FINAL_PRESTAGING_FIXED_SHA68F2.zip
       STAGING_DB_NAME: football-edge-b05a-staging
       STAGING_WORKER_NAME: football-edge-b05a-staging-bridge
       STAGING_URL: https://football-edge-b05a-staging-bridge.ngophuonghuy.workers.dev
@@ -56,36 +33,21 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Refuse until exact FINAL ZIP is supplied as workflow artifact
-        if: inputs.package_ref == ''
-        run: |
-          echo "::error::Exact FINAL FIXED ZIP artifact is not attached to this workflow yet. Refusing remote operations."
-          exit 1
-
-      - name: Download exact package artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: football-edge-final-prestaging-fixed
-          path: _input
-          run-id: \${{ inputs.package_ref }}
-          github-token: \${{ github.token }}
-
-      - name: Verify immutable ZIP and extract
+      - name: Immutable FINAL source gate
         shell: bash
         run: |
           set -euo pipefail
-          ZIP="$(find _input -type f -name '*.zip' -print -quit)"
-          test -n "$ZIP"
-          echo "$EXPECTED_ZIP_SHA256  $ZIP" | sha256sum -c -
-          mkdir work
-          unzip -q "$ZIP" -d work
-          ROOT="$(find work -type f -name START_HERE_FINAL_FIXED.md -printf '%h\n' -quit)"
+          test -f "$ZIP_PATH"
+          echo "$EXPECTED_ZIP_SHA256  $ZIP_PATH" | sha256sum -c -
+          rm -rf _b05a_final && mkdir _b05a_final
+          unzip -q "$ZIP_PATH" -d _b05a_final
+          ROOT="$(find _b05a_final -type f -name START_HERE_FINAL_FIXED.md -printf '%h\n' -quit)"
           test -n "$ROOT"
           echo "ROOT=$ROOT" >> "$GITHUB_ENV"
           cd "$ROOT"
           sha256sum -c SHA256SUMS_FINAL_FIXED.txt
 
-      - name: Verify secrets presence without printing values
+      - name: Secret presence gate
         shell: bash
         run: |
           set -euo pipefail
@@ -93,100 +55,108 @@ jobs:
           test -n "$CLOUDFLARE_ACCOUNT_ID"
           test -n "$APISPORTS_KEY"
 
-      - name: Install Node and Wrangler
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: '24'
-      - run: npm install --no-save wrangler@latest
 
-      - name: Reconfirm target isolation before mutation
+      - name: Install pinned Wrangler
+        run: npm install --no-save wrangler@4.119.0
+
+      - name: Reconfirm isolated target
         shell: bash
         run: |
           set -euo pipefail
-          npx wrangler d1 list --json > d1-before.json
-          if jq -e --arg id "$FORBIDDEN_PROD_DB_ID" '.[] | select(.uuid==$id and .name=="football-edge-b05a-staging")' d1-before.json >/dev/null; then
-            echo "::error::Forbidden production D1 identity collision"; exit 1
+          npx wrangler d1 list --json > D1_BEFORE.json
+          if jq -e --arg n "$STAGING_DB_NAME" '.[] | select(.name==$n)' D1_BEFORE.json >/dev/null; then
+            echo "::error::Dedicated staging D1 already exists; refusing unreviewed reuse."; exit 1
           fi
-          if jq -e --arg n "$STAGING_DB_NAME" '.[] | select(.name==$n)' d1-before.json >/dev/null; then
-            echo "::error::Dedicated staging D1 unexpectedly already exists; refuse unreviewed reuse"; exit 1
+          if jq -e --arg id "$FORBIDDEN_PROD_DB_ID" '.[] | select((.uuid // .id)==$id and .name==$ENV.STAGING_DB_NAME)' D1_BEFORE.json >/dev/null 2>&1; then
+            echo "::error::Production D1 collision."; exit 1
           fi
 
-      - name: Create dedicated D1 and private runtime config
-        id: d1
+      - name: Create dedicated D1 and runtime files
         shell: bash
         run: |
           set -euo pipefail
-          npx wrangler d1 create "$STAGING_DB_NAME" --json > d1-create.json
-          DB_ID="$(jq -r '.uuid // .database_id // .id' d1-create.json)"
-          test -n "$DB_ID" && test "$DB_ID" != "null" && test "$DB_ID" != "$FORBIDDEN_PROD_DB_ID"
+          npx wrangler d1 create "$STAGING_DB_NAME" --json > D1_CREATE.json
+          DB_ID="$(jq -r '.uuid // .database_id // .id // empty' D1_CREATE.json)"
+          test -n "$DB_ID"
+          test "$DB_ID" != "$FORBIDDEN_PROD_DB_ID"
           TOKEN="$(openssl rand -hex 32)"
           echo "::add-mask::$TOKEN"
           echo "BATCH05A3_BRIDGE_TOKEN=$TOKEN" >> "$GITHUB_ENV"
-          cat > staging.toml <<EOF
+          OWNER="gha-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          cat > "$ROOT/staging_kit/batch05a-final.toml" <<EOF
           name = "$STAGING_WORKER_NAME"
-          main = "$ROOT/staging_kit/batch05a3-staging-worker-entry.js"
-          compatibility_date = "2026-10-01"
+          main = "batch05a3-staging-worker-entry.js"
+          compatibility_date = "2026-10-07"
           workers_dev = true
+
           [[d1_databases]]
           binding = "BATCH05A3_STAGING_DB"
           database_name = "$STAGING_DB_NAME"
           database_id = "$DB_ID"
+
+          [vars]
+          BATCH05A3_LEASE_MS = 120000
           EOF
-          cat > staging-config.json <<EOF
+          cat > "$ROOT/staging_kit/batch05a-final-staging-config.json" <<EOF
           {
-            "bridge_url":"$STAGING_URL",
-            "pilot_id":"b05a-final-${GITHUB_RUN_ID}",
-            "owner_id":"gha-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}",
-            "max_fixtures":1,
-            "max_duration_ms":600000,
-            "max_provider_requests":40
+            "bridge_base_url": "$STAGING_URL",
+            "bridge_token_env": "BATCH05A3_BRIDGE_TOKEN",
+            "api_key_env": "APISPORTS_KEY",
+            "pilot_id": "FE-B05A-FINAL-SMOKE-${GITHUB_RUN_ID}",
+            "owner_id": "$OWNER",
+            "max_ticks": 8,
+            "hard_limits": {"fixtures": 1, "duration_ms": 600000, "provider_attempts": 40},
+            "staging_target_confirmed": true,
+            "production_target_forbidden": true
           }
           EOF
 
-      - name: Initialize fresh schema exactly once
+      - name: Fresh schema exactly once
         shell: bash
         run: |
           set -euo pipefail
           cd "$ROOT"
-          WRANGLER="$GITHUB_WORKSPACE/staging.toml" bash staging_kit/batch05a-final-ops.sh db-init
+          WRANGLER=staging_kit/batch05a-final.toml bash staging_kit/batch05a-final-ops.sh db-init
 
-      - name: Bind bridge token and deploy dedicated Worker
+      - name: Deploy dedicated bridge
         shell: bash
         run: |
           set -euo pipefail
-          printf '%s' "$BATCH05A3_BRIDGE_TOKEN" | npx wrangler secret put BATCH05A3_BRIDGE_TOKEN --config staging.toml
           cd "$ROOT"
-          WRANGLER="$GITHUB_WORKSPACE/staging.toml" bash staging_kit/batch05a-final-ops.sh deploy
+          WRANGLER=staging_kit/batch05a-final.toml bash staging_kit/batch05a-final-ops.sh deploy
+          printf '%s' "$BATCH05A3_BRIDGE_TOKEN" | npx wrangler secret put BATCH05A3_BRIDGE_TOKEN --config staging_kit/batch05a-final.toml
 
       - name: Authenticated preflight
         shell: bash
         run: |
           set -euo pipefail
           cd "$ROOT"
-          CFG="$GITHUB_WORKSPACE/staging-config.json" bash staging_kit/batch05a-final-ops.sh preflight | tee "$GITHUB_WORKSPACE/PREFLIGHT.json"
+          CFG=staging_kit/batch05a-final-staging-config.json bash staging_kit/batch05a-final-ops.sh preflight | tee "$GITHUB_WORKSPACE/PREFLIGHT.json"
 
-      - name: Run one-fixture guarded smoke
-        id: run
+      - name: Guarded smoke — one fixture only
         shell: bash
         run: |
           set -o pipefail
           cd "$ROOT"
-          CFG="$GITHUB_WORKSPACE/staging-config.json" bash staging_kit/batch05a-final-ops.sh run | tee "$GITHUB_WORKSPACE/REMOTE_SMOKE.json"
+          CFG=staging_kit/batch05a-final-staging-config.json bash staging_kit/batch05a-final-ops.sh run | tee "$GITHUB_WORKSPACE/REMOTE_SMOKE.json"
 
       - name: Stop and export evidence
         if: always()
         shell: bash
         run: |
           set +e
-          if [ -n "${ROOT:-}" ] && [ -f "$GITHUB_WORKSPACE/staging-config.json" ]; then
+          if [ -n "${ROOT:-}" ] && [ -f "$ROOT/staging_kit/batch05a-final-staging-config.json" ]; then
             cd "$ROOT"
-            CFG="$GITHUB_WORKSPACE/staging-config.json" bash staging_kit/batch05a-final-ops.sh stop > "$GITHUB_WORKSPACE/REMOTE_STOP.json" 2>&1
-            CFG="$GITHUB_WORKSPACE/staging-config.json" bash staging_kit/batch05a-final-ops.sh export > "$GITHUB_WORKSPACE/REMOTE_EXPORT.json" 2>&1
+            CFG=staging_kit/batch05a-final-staging-config.json bash staging_kit/batch05a-final-ops.sh stop > "$GITHUB_WORKSPACE/REMOTE_STOP.json" 2>&1
+            CFG=staging_kit/batch05a-final-staging-config.json bash staging_kit/batch05a-final-ops.sh export > "$GITHUB_WORKSPACE/REMOTE_EXPORT.json" 2>&1
           fi
           cd "$GITHUB_WORKSPACE"
-          sha256sum REMOTE_*.json PREFLIGHT.json 2>/dev/null > REMOTE_EVIDENCE_SHA256.txt || true
+          sha256sum PREFLIGHT.json REMOTE_*.json 2>/dev/null > REMOTE_EVIDENCE_SHA256.txt || true
 
-      - name: Upload evidence even on failure
+      - name: Upload audit evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -196,10 +166,5 @@ jobs:
             PREFLIGHT.json
             REMOTE_*.json
             REMOTE_EVIDENCE_SHA256.txt
-            d1-before.json
-            d1-create.json
-
-      - name: Preserve staging on failure for audit
-        if: failure()
-        run: |
-          echo "Smoke failed or stopped. Evidence/D1 retained. Dedicated Worker is not promoted and production is untouched."
+            D1_BEFORE.json
+            D1_CREATE.json
