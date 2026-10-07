@@ -91,6 +91,7 @@ assert.equal(rightPeriod.settled,true);assert.equal(rightPeriod.final_home,1);as
 const unprovenPeriod=settlePaperMarketRecord({...h1Paper,id:'h1-unproven'},{periodResult:{period:'H1',home:1,away:0,confirmed:true,status:'HT'}});
 assert.equal(unprovenPeriod.settled,true);assert.notEqual(unprovenPeriod.strict_metrics_eligible,true);assert.equal(unprovenPeriod.settlement_provenance_status,'UNKNOWN_PROVENANCE');
 
+
 // 8b) H2/FT settlement remains period-specific; cancelled/postponed/abandoned are VOID, not fabricated results.
 const h2Legacy={...h1Paper,id:'h2-test',market_period:'H2',settled:false,settlement_state:'OPEN',settlement_revision:0,settlement_history:[]};
 assert.equal(settlePaperMarketRecord(h2Legacy,{periodResult:{period:'FT',home:3,away:1,confirmed:true,status:'FT'}}).settled,false);
