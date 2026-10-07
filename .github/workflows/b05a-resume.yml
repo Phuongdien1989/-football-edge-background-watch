@@ -1,11 +1,7 @@
 name: B05A Pilot Fixture 2
 
 on:
-  push:
-    branches:
-      - staging/b05a-final-smoke-ready-20261007
-    paths:
-      - .github/workflows/b05a-resume.yml
+  workflow_dispatch:
 
 permissions:
   contents: read
