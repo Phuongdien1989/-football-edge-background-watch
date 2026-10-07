@@ -75,12 +75,14 @@ const h1Paper=createPaperMarketRecord({fixtureId:1,capturedAt:Date.parse(cutoff)
 assert.ok(h1Paper&&!h1Paper.settled);
 const wrongPeriod=settlePaperMarketRecord(h1Paper,{periodResult:{period:'FT',home:2,away:1,confirmed:true,status:'FT'},status:'FT'});
 assert.equal(wrongPeriod.settled,false);
-const rightPeriod=settlePaperMarketRecord(h1Paper,{periodResult:{period:'H1',home:1,away:0,confirmed:true,status:'HT'},status:'HT'});
+const rightPeriod=settlePaperMarketRecord(h1Paper,{periodResult:{period:'H1',home:1,away:0,confirmed:true,status:'HT',provenance_status:'STRICT_VALID',received_at:'2026-10-07T10:50:00Z'},status:'HT'});
 assert.equal(rightPeriod.settled,true);assert.equal(rightPeriod.final_home,1);assert.equal(rightPeriod.final_away,0);
+const unprovenPeriod=settlePaperMarketRecord({...h1Paper,id:'h1-unproven'},{periodResult:{period:'H1',home:1,away:0,confirmed:true,status:'HT'}});
+assert.equal(unprovenPeriod.settled,true);assert.equal(unprovenPeriod.strict_metrics_eligible,false);assert.equal(unprovenPeriod.settlement_provenance_status,'UNKNOWN_PROVENANCE');
 
 const h2Legacy={...h1Paper,id:'h2-test',market_period:'H2',settled:false,settlement_state:'OPEN',settlement_revision:0,settlement_history:[]};
 assert.equal(settlePaperMarketRecord(h2Legacy,{periodResult:{period:'FT',home:3,away:1,confirmed:true,status:'FT'}}).settled,false);
-const h2Settled=settlePaperMarketRecord(h2Legacy,{periodResult:{period:'H2',home:2,away:1,confirmed:true,status:'FT'}});
+const h2Settled=settlePaperMarketRecord(h2Legacy,{periodResult:{period:'H2',home:2,away:1,confirmed:true,status:'FT',provenance_status:'STRICT_VALID',received_at:'2026-10-07T12:00:00Z'}});
 assert.equal(h2Settled.settled,true);assert.equal(h2Settled.final_home,2);assert.equal(h2Settled.final_away,1);
 for(const terminalStatus of ['CANC','PST','ABD']){
   const voided=settlePaperMarketRecord({...h1Paper,id:'void-'+terminalStatus},{status:terminalStatus});
