@@ -45,6 +45,7 @@ export function observationInputFingerprint(input){return contentFingerprint(inp
 
 function hasOwn(o,k){return !!o&&Object.prototype.hasOwnProperty.call(o,k)}
 function stringOrNull(v){if(v===null||v===undefined||String(v).trim()==='')return null;return String(v)}
+function boolOrDefault(v,d=true){return v===undefined?d:v!==false}
 function aliasValue(input,camel,snake,normalizer=x=>x){
   const hc=hasOwn(input,camel),hs=hasOwn(input,snake),cv=hc?normalizer(input[camel]):null,sv=hs?normalizer(input[snake]):null;
   if(hc&&hs&&cv!==sv)return {value:null,conflict:{field:snake,camel_key:camel,snake_key:snake,camel_value:cv,snake_value:sv}};
