@@ -14,7 +14,7 @@ const RUNTIME=window.FE_PV2_RUNTIME;
 const STATE={busy:false,lastAt:0,timer:null,rows:[],errors:[],predictionEvidence:[],pairedEvidence:[],paperEvidence:[],
   syncHashes:{},syncStatus:'LOCAL',lastSyncAt:0,validationVisible:false,lastReport:null};
 const $=id=>document.getElementById(id);
-const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#39;'}[c]));
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const finite=v=>v===null||v===undefined||(typeof v==='string'&&!v.trim())?null:(Number.isFinite(Number(v))?Number(v):null);
 const round=(v,d=1)=>{const n=finite(v);if(n==null)return null;const p=10**d;return Math.round(n*p)/p};
 const STORE_KEY='FE_PREDICTION_V2_STAGING_EVIDENCE_V2';
