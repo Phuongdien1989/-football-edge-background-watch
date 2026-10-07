@@ -67,6 +67,8 @@ jobs:
         with:
           name: football-edge-final-prestaging-fixed
           path: _input
+          run-id: \${{ inputs.package_ref }}
+          github-token: \${{ github.token }}
 
       - name: Verify immutable ZIP and extract
         shell: bash
