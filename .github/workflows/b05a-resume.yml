@@ -1,0 +1,145 @@
+name: B05A Resume Smoke
+
+on:
+  push:
+    branches:
+      - staging/b05a-final-smoke-ready-20261007
+    paths:
+      - .github/workflows/b05a-resume.yml
+
+permissions:
+  contents: read
+
+jobs:
+  resume:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      APISPORTS_KEY: ${{ secrets.APISPORTS_KEY }}
+      DB_ID: 7d503048-9118-4b29-b662-4e1ba6e32167
+      PROD_DB_ID: 0d12a7cc-12a9-4c71-b55b-61dfd2dac4d4
+      BRIDGE_URL: https://football-edge-b05a-staging-bridge.ngophuonghuy.workers.dev
+      FE_APPROVE_REMOTE_SMOKE: YES
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: FINAL source gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "68f2a8a9b0233a9fcf4cba9c53961ca9dd9dd06deeb533f8f78fe74c9ed0f03f  FOOTBALL_EDGE_FINAL_PRESTAGING_FIXED_SHA68F2.zip" | sha256sum -c -
+          rm -rf _final && mkdir _final
+          unzip -q FOOTBALL_EDGE_FINAL_PRESTAGING_FIXED_SHA68F2.zip -d _final
+          ROOT="$(find _final -type f -name START_HERE_FINAL_FIXED.md -printf '%h\n' -quit)"
+          test -n "$ROOT"
+          echo "ROOT=$ROOT" >> "$GITHUB_ENV"
+          cd "$ROOT"
+          sha256sum -c SHA256SUMS_FINAL_FIXED.txt
+          test -n "$CLOUDFLARE_API_TOKEN"
+          test -n "$CLOUDFLARE_ACCOUNT_ID"
+          test -n "$APISPORTS_KEY"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - run: npm install --no-save wrangler@4.119.0
+
+      - name: Staging identity gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx wrangler d1 list --json > D1_STATE.json
+          ACTUAL="$(jq -r '.[] | select(.name=="football-edge-b05a-staging") | .uuid' D1_STATE.json)"
+          test "$ACTUAL" = "$DB_ID"
+          test "$ACTUAL" != "$PROD_DB_ID"
+
+      - name: Runtime config
+        shell: bash
+        run: |
+          set -euo pipefail
+          TOKEN="$(openssl rand -hex 32)"
+          echo "::add-mask::$TOKEN"
+          echo "BATCH05A3_BRIDGE_TOKEN=$TOKEN" >> "$GITHUB_ENV"
+
+          cat > "$ROOT/staging_kit/batch05a-final.toml" <<EOF
+          name = "football-edge-b05a-staging-bridge"
+          main = "batch05a3-staging-worker-entry.js"
+          compatibility_date = "2026-10-07"
+          workers_dev = true
+
+          [[d1_databases]]
+          binding = "BATCH05A3_STAGING_DB"
+          database_name = "football-edge-b05a-staging"
+          database_id = "$DB_ID"
+
+          [vars]
+          BATCH05A3_LEASE_MS = 120000
+          EOF
+
+          cat > "$ROOT/staging_kit/batch05a-final-staging-config.json" <<EOF
+          {"bridge_base_url":"$BRIDGE_URL","bridge_token_env":"BATCH05A3_BRIDGE_TOKEN","api_key_env":"APISPORTS_KEY","pilot_id":"FE-B05A-RESUME-${GITHUB_RUN_ID}","owner_id":"gha-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}","max_ticks":8,"hard_limits":{"fixtures":1,"duration_ms":600000,"provider_attempts":40},"staging_target_confirmed":true,"production_target_forbidden":true}
+          EOF
+
+      - name: Redeploy bridge and rotate token
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$ROOT"
+          WRANGLER=staging_kit/batch05a-final.toml bash staging_kit/batch05a-final-ops.sh deploy
+          printf '%s' "$BATCH05A3_BRIDGE_TOKEN" | npx wrangler secret put BATCH05A3_BRIDGE_TOKEN --config staging_kit/batch05a-final.toml
+
+      - name: Authenticated readiness gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          ok=0
+          for i in $(seq 1 20); do
+            code="$(curl -sS -o READY_BODY.txt -w '%{http_code}' -X POST "$BRIDGE_URL/__fe_batch05a3/budget/load" -H "Authorization: Bearer $BATCH05A3_BRIDGE_TOKEN" -H "Content-Type: application/json" --data '{"pilot_id":"readiness","owner_id":"readiness"}' || true)"
+            if [ "$code" = "200" ] && jq -e . READY_BODY.txt >/dev/null 2>&1; then
+              ok=1
+              break
+            fi
+            sleep 2
+          done
+          test "$ok" = "1"
+
+      - name: Preflight
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$ROOT"
+          CFG=staging_kit/batch05a-final-staging-config.json bash staging_kit/batch05a-final-ops.sh preflight | tee "$GITHUB_WORKSPACE/PREFLIGHT.json"
+
+      - name: Smoke
+        shell: bash
+        run: |
+          set -o pipefail
+          cd "$ROOT"
+          CFG=staging_kit/batch05a-final-staging-config.json bash staging_kit/batch05a-final-ops.sh run | tee "$GITHUB_WORKSPACE/REMOTE_SMOKE.json"
+
+      - name: Stop and export
+        if: always()
+        shell: bash
+        run: |
+          set +e
+          if [ -n "${ROOT:-}" ] && [ -f "$ROOT/staging_kit/batch05a-final-staging-config.json" ]; then
+            cd "$ROOT"
+            CFG=staging_kit/batch05a-final-staging-config.json bash staging_kit/batch05a-final-ops.sh stop > "$GITHUB_WORKSPACE/REMOTE_STOP.json" 2>&1
+            CFG=staging_kit/batch05a-final-staging-config.json bash staging_kit/batch05a-final-ops.sh export > "$GITHUB_WORKSPACE/REMOTE_EXPORT.json" 2>&1
+          fi
+
+      - name: Evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: b05a-resume-evidence-${{ github.run_id }}
+          if-no-files-found: warn
+          path: |
+            PREFLIGHT.json
+            REMOTE_*.json
+            READY_BODY.txt
+            D1_STATE.json
