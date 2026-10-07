@@ -45,3 +45,5 @@ jobs:
           console.log(JSON.stringify(out,null,2));
           console.log('API key validity and quota remain untested: no provider request authorized.');
           NODE
+
+# Recheck runner secret availability after user configuration, 2026-10-07T14:33Z.
