@@ -1,0 +1,29 @@
+FOOTBALL EDGE B05A ELIGIBLE ENTRYPOINT — OFFLINE VALIDATION PASS
+Date: 2026-10-07
+Base package: FOOTBALL_EDGE_FINAL_PRESTAGING_FIXED_SHA68F2.zip
+Provider/network calls: 0
+Production/model mutation: 0
+
+Command:
+for f in prediction_v2/test-*.mjs; do node "$f"; done
+node --check staging_kit/fixture-selector-runtime.js
+node --check staging_kit/b05a-eligible-pilot-entrypoint.mjs
+
+Result: 31/31 test programs PASS; syntax PASS.
+New full-entrypoint probe:
+entrypoint fake-provider full path PASS {"success_used":26,"selection_cap":20,"reserve":20}
+
+Covered:
+- durable stop blocks before remote mutation/provider
+- durable 40/40 budget blocks before remote mutation/provider
+- live phase only 1H/HT/2H; FT/AET/PEN not eligible
+- stats zero valid; events [] = VALID_NO_EVENTS
+- freshness <=15s, fixture identity, raw SHA integrity
+- supported market validation
+- selection/pin -> collector -> OLD/NEW -> persistence/ACK -> export
+- failed provider retry counts against durable budget
+- selection cap/reserve enforcement
+- no eligible fixture stops without spending reserve
+- remote workflow on implementation branch is workflow_dispatch-only
+
+No pilot authorization implied. NEW > OLD remains unproven.
