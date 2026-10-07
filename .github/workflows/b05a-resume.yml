@@ -141,6 +141,31 @@ jobs:
           p.write_text(s.replace(old,new,1))
           PY
 
+      - name: Offline fixture eligibility selector regression
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$ROOT"
+          cat > /tmp/fixture-selector-test.mjs <<'NODE'
+          import assert from 'node:assert/strict';
+          const usableStats=r=>Array.isArray(r)&&r.some(team=>Array.isArray(team?.statistics)&&team.statistics.some(s=>s?.value!==null&&s?.value!==''&&Number.isFinite(Number(String(s.value).replace('%','')))));
+          const validEvents=r=>Array.isArray(r)&&r.every(e=>e&&e.time&&Number.isFinite(Number(e.time.elapsed))&&e.team&&typeof e.type==='string');
+          const classify=x=>{
+            const stats=usableStats(x.stats);
+            const eventsPresent=Array.isArray(x.events);
+            const eventsValid=eventsPresent&&validEvents(x.events);
+            const market=Array.isArray(x.market)&&x.market.length>0;
+            return {football_eligible:stats&&eventsPresent&&eventsValid,market_eligible:stats&&eventsPresent&&eventsValid&&market,events_state:!eventsPresent?'ENDPOINT_MISSING':eventsValid?(x.events.length?'VALID_EVENTS':'VALID_NO_EVENTS'):'INVALID_EVENTS',stats_state:stats?'USABLE':'NOT_USABLE',market_state:market?'AVAILABLE':'UNAVAILABLE'};
+          };
+          assert.deepEqual(classify({stats:[],events:[],market:[]}),{football_eligible:false,market_eligible:false,events_state:'VALID_NO_EVENTS',stats_state:'NOT_USABLE',market_state:'UNAVAILABLE'});
+          assert.equal(classify({stats:[{statistics:[{type:'Shots on Goal',value:0}]}],events:[],market:[]}).football_eligible,true);
+          assert.equal(classify({stats:[{statistics:[{type:'Shots on Goal',value:0}]}],events:[],market:[]}).market_eligible,false);
+          assert.equal(classify({stats:[{statistics:[{type:'Shots on Goal',value:1}]}],events:null,market:[]}).events_state,'ENDPOINT_MISSING');
+          assert.equal(classify({stats:[{statistics:[{type:'Shots on Goal',value:1}]}],events:[{time:{elapsed:12},team:{id:1},type:'Card'}],market:[{}]}).market_eligible,true);
+          console.log('fixture eligibility selector regression PASS');
+          NODE
+          node /tmp/fixture-selector-test.mjs
+
       - name: Preflight
         shell: bash
         run: |
