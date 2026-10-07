@@ -1,0 +1,43 @@
+{
+  "source_artifact_id": 11496021709,
+  "source_sha256": "682a4f9cfe1d4121bacd771c53ea8498515eafff294eeac1adad93978a1b7c23",
+  "fixture_id": 1627266,
+  "discovery_ticks": [
+    {
+      "status": "2H",
+      "elapsed": 66
+    },
+    {
+      "status": "2H",
+      "elapsed": 67
+    },
+    {
+      "status": "2H",
+      "elapsed": 68
+    },
+    {
+      "status": "2H",
+      "elapsed": 69
+    },
+    {
+      "status": "2H",
+      "elapsed": 70
+    },
+    {
+      "status": "2H",
+      "elapsed": 71
+    },
+    {
+      "status": "2H",
+      "elapsed": 72
+    },
+    {
+      "status": "2H",
+      "elapsed": 73
+    }
+  ],
+  "observation_ids": [
+    "pv2:obs:1627266:FT:FT:2026-10-07T15:57:31.028Z:FE_CANONICAL_FNV1A32_V1:34dbd3d6",
+    "pv2:obs:1627266:FT:FT:2026-10-07T15:58:38.987Z:FE_CANONICAL_FNV1A32_V1:f9fc582c"
+  ]
+}
