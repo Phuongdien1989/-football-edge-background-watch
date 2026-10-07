@@ -55,6 +55,8 @@ export function parseValidationRows(rows=[]){
   for(const r of rows||[]){
     let p=null;try{p=typeof r?.payload_json==='string'?JSON.parse(r.payload_json):r?.payload_json}catch{}
     if(!p)continue;
+    const legacy=!p.observation_id&&!p.observation;
+    if(legacy){p.strict_metrics_eligible=false;p.strict_replay_status=p.strict_replay_status||'UNKNOWN_PROVENANCE';p.persistence_status=p.persistence_status||'UNVERIFIED';p.legacy_evidence=true}
     if(p.source==='PV2_PREDICTION')out.prediction.push({...p,outcome:p.window_outcome||p.outcome});
     else if(p.source==='PV2_OLD_NEW')out.paired.push(p);
     else if(p.source==='PV2_PAPER_MARKET')out.paper.push(p);
