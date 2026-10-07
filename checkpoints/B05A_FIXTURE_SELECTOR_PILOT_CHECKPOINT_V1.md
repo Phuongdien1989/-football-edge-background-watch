@@ -1,81 +1,56 @@
-# FOOTBALL EDGE — FIXTURE ELIGIBILITY + NEXT PILOT CHECKPOINT V1
+# FOOTBALL EDGE — FIXTURE SELECTOR / PILOT CHECKPOINT V2
 
-Status: READY_FOR_USER_APPROVAL
-Created: 2026-10-07
+Status: READY_FOR_SINGLE_USER_APPROVAL
 Production/model: FROZEN / UNCHANGED
-No provider calls authorized by this manifest until explicit approval.
+Provider calls in this preparation batch: 0
 
-## Evidence baseline
-- Successful real smoke run: 37648059824
-- Evidence artifact: 11496021709
-- Artifact digest: sha256:682a4f9cfe1d4121bacd771c53ea8498515eafff294eeac1adad93978a1b7c23
-- Fixture: 1627266
-- Provider attempts: 40
-- Raw captures: 40
-- Locked observations: 8
-- OLD exact outputs: 8
-- Result: pipeline PASS; predictive comparison INSUFFICIENT_EVIDENCE.
-- Missing source data on all 8 ticks: statistics EMPTY_VALID, events EMPTY_VALID, live odds EMPTY_VALID. Market status NO_SUPPORTED_MARKET / NO_ENTRY. Outcome unresolved.
+## Independent smoke baseline
+Run 37648059824; artifact 11496021709; SHA256 682a4f9cfe1d4121bacd771c53ea8498515eafff294eeac1adad93978a1b7c23.
+40 attempts, 40 captures, 8 locked observations, 8 OLD exact outputs.
+Fixture 1627266 source discovery: 2H minutes 66,67,68,69,70,71,72,73.
+Observation ID FT:FT fields are engine=FT and market_period=FT, NOT match phase. V2 selector/runner now derives and carries match_phase=H2 explicitly. Regression is bound to the artifact digest.
 
-## Fixture eligibility contract
-A candidate is evaluated from real provider payloads; scoreline/activity is never a proxy for data completeness.
+## Real selector module
+validation_runtime/fixture-eligibility-selector.js is the canonical selector.
+validation_runtime/eligible-pilot-runner.js imports that module directly and is the pin gate.
+No ids[0]/ids[1] positional selection is permitted in the approved pilot path.
 
-FOOTBALL_ELIGIBLE requires:
-1. Fixture is live and has stable fixture_id/status/minute/teams.
-2. Statistics endpoint is present and contains usable values. Zero is a valid statistic. Empty/null-only statistics are NOT usable.
-3. Events endpoint is present and structurally valid.
-   - [] is VALID_NO_EVENTS and is allowed.
-   - Missing endpoint/capture is ENDPOINT_MISSING and is not equivalent to no events.
-   - Malformed event rows are INVALID_EVENTS.
-4. received_at <= evaluation_cutoff for every feature used.
-5. Capture integrity/hash and persistence/ACK checks pass.
+FOOTBALL_ELIGIBLE:
+- live fixture with derivable match phase;
+- statistics payload has at least one usable numeric value; zero is valid;
+- events payload exists and is structurally valid; [] = VALID_NO_EVENTS and remains eligible;
+- no future received_at beyond cutoff.
+MARKET_ELIGIBLE adds usable supported live market. Missing market does not remove football eligibility.
+Low activity, 0-0, zero shots/goals/cards are never rejection reasons.
 
-MARKET_ELIGIBLE additionally requires a valid supported live-market payload at the same cutoff.
-Missing market does NOT disqualify FOOTBALL_ELIGIBLE; it makes market evaluation ineligible and must be reported explicitly.
+## Remote-mutation guard
+Offline workflow is .github/workflows/b05a-offline-validation.yml and is workflow_dispatch-only.
+The next remote workflow must also be workflow_dispatch-only and require explicit approval.
+Before deploy/secret mutation/provider access it must read durable budget/stop. Active stop or exhausted budget fails closed before avoidable remote mutation.
+The old push-trigger staging workflow is not an approved pilot path and must not be used for further commits/runs.
 
-## Anti-selection-bias rules
-Do not reject a fixture because it has few/no shots, 0-0 score, no cards, no goals, or low event count.
-Low-activity is a required situation, not a failure mode.
-Coverage targets remain: one-sided, balanced, pressure-high/threat-low, reversal, red-card, low-activity.
-Stratum assignment occurs after eligibility; it must not be used to manufacture eligibility.
+## Exact 40-attempt budget
+TOTAL = 40.
+RESERVE = 20 attempts for 4 comparable OLD+NEW ticks.
+Each post-pin tick costs exactly 5 attempts on the current path:
+1 /status + 1 /fixtures discovery + 1 /fixtures/statistics + 1 /fixtures/events + 1 /odds/live.
+4 ticks = 20 reserved attempts.
 
-## Offline regression locked
-Regression cases:
-- stats=[] + events=[] => football ineligible because stats unusable; events state VALID_NO_EVENTS.
-- usable stats containing zero + events=[] => football eligible; low activity preserved.
-- usable stats + missing events capture => ENDPOINT_MISSING / football ineligible.
-- usable stats + structurally valid event + market => football+market eligible.
-Existing full offline suite must PASS before any provider call.
+PRE-PIN SELECTION CAP = 20 attempts total, INCLUDING status/discovery, all eligibility probes and any retry.
+Selection must stop before consuming attempt 21.
+A candidate probe is counted by actual provider attempt, not logical request. Retry consumes another attempt.
+If no football-eligible fixture is pinned by the selection cap, stop NO_ELIGIBLE_FIXTURE_WITHIN_BUDGET; reserved 20 are not spent.
+After pin, no retries may cause the four-tick reserve to be violated; if remaining budget cannot fund the next complete 5-attempt tick, stop before starting it.
 
-## Specific fixture evidence / candidate policy
-- 1627266 is a negative eligibility reference: DO NOT select again for predictive validation from this smoke; stats/events/market detail endpoints were EMPTY_VALID.
-- From the same captured discovery universe, fixture 1517361 (York United vs Supra du Quebec) is the first concrete discovery candidate for selector replay because its /fixtures payload contained 7 valid embedded events at the captured cutoff. It is NOT pre-declared eligible: statistics detail was not captured for it, so it may only become FOOTBALL_ELIGIBLE if the pre-detail stats gate returns usable values in an approved pilot.
-- Selector must choose the first candidate satisfying the eligibility contract at run time; no manual preference for high-event/high-scoring matches.
+## Freshness / candidate rule
+Historical candidate 1517361 is only a discovery hint, never a prequalified fixture.
+At approved pilot time it must be rediscovered live, pass current freshness/status, stats and events gates, and compete under the same selector as every other live fixture.
 
-## Proposed next pilot — requires explicit approval
-Scope: one pilot only, one selected fixture only, staging only.
-Pilot ID: FE-B05A-ELIGIBLE-PILOT-01 (fixed across retries; never rotate ID to bypass budget).
-Discovery/status/retry are included in the SAME total request budget.
-Hard cap proposed: 40 provider attempts total, <=10 minutes, <=1 detailed fixture.
-Selection sequence:
-1. status/quota gate;
-2. one live discovery snapshot;
-3. inspect discovery candidates without excluding low activity;
-4. perform the minimum stats/events eligibility probes needed to find one FOOTBALL_ELIGIBLE fixture, within the same cap;
-5. prefer a candidate with supported live market, but do not reject football-eligible candidate solely for missing market;
-6. once selected, pin exactly one fixture and collect OLD+NEW on identical raw captures/cutoffs;
-7. stop on cap, auth/persistence/integrity failure, fixture disappearance, or inability to find eligible candidate without exhausting reserve.
-Reserve rule: do not spend the full budget searching. Keep enough requests to collect at least 4 comparable ticks for the selected fixture; otherwise stop as NO_ELIGIBLE_FIXTURE_WITHIN_BUDGET.
-No automatic second pilot.
+## Required pilot output
+attempts total + by endpoint; selected fixture and eligibility; captures; observations; OLD exact outputs; match_phase per tick; stats/events/market states; received_at leakage audit; persistence/ACK/readback; separate football and market eligibility; outcome/settlement; OLD vs NEW on identical raw/cutoff only.
+No outcome or insufficient sample => CHUA_DU_BANG_CHUNG. Technical smoke never means NEW > OLD.
 
-Required output:
-- attempts total and by endpoint;
-- selected fixture and eligibility reason;
-- raw captures / observations / OLD exact outputs;
-- stats/events/market states per tick;
-- received_at/cutoff leakage audit;
-- persistence/ACK/readback result;
-- football evaluation eligibility and separate market eligibility;
-- outcome/settlement status;
-- OLD vs NEW only on same raw universe/cutoff.
-No outcome or insufficient sample => CHUA_DU_BANG_CHUNG. Smoke success never implies NEW > OLD.
+## Offline verification
+Existing 30 prediction_v2 test programs PASS after selector addition.
+Direct runner-import + artifact phase regression PASS.
+No provider call was made by these tests.
