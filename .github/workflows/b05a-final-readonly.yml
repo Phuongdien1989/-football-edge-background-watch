@@ -1,0 +1,47 @@
+name: Verify Final Prestaging Read Only
+on:
+  push:
+    branches: [checkpoint/b05a-final-readonly-20261007]
+    paths: [.github/workflows/b05a-final-readonly.yml]
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      CF_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CF_ACCOUNT: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      BRIDGE_TOKEN: ${{ secrets.BATCH05A3_BRIDGE_TOKEN }}
+      SPORTS_KEY: ${{ secrets.APISPORTS_KEY }}
+    steps:
+      - name: Inspect staging metadata without mutations or provider calls
+        shell: bash
+        run: |
+          node --input-type=module <<'NODE'
+          const present = name => Boolean(process.env[name]?.trim());
+          const out = {mode:'READ_ONLY',provider_requests:0,mutations:0,github_secret_present:{CLOUDFLARE_API_TOKEN:present('CF_TOKEN'),CLOUDFLARE_ACCOUNT_ID:present('CF_ACCOUNT'),BATCH05A3_BRIDGE_TOKEN:present('BRIDGE_TOKEN'),APISPORTS_KEY:present('SPORTS_KEY')}};
+          async function get(path) {
+            if(!present('CF_TOKEN') || !present('CF_ACCOUNT')) return {ok:false,reason:'MISSING_CLOUDFLARE_CREDENTIALS'};
+            try {
+              const r=await fetch('https://api.cloudflare.com/client/v4'+path,{headers:{Authorization:'Bearer '+process.env.CF_TOKEN},signal:AbortSignal.timeout(20000)});
+              const j=await r.json();
+              return {ok:r.ok && j.success!==false,status:r.status,result:j.result,error_codes:(j.errors||[]).map(e=>e.code)};
+            } catch {return {ok:false,reason:'NETWORK_OR_RESPONSE_ERROR'};}
+          }
+          const root='/accounts/'+encodeURIComponent(process.env.CF_ACCOUNT||'');
+          const db=await get(root+'/d1/database?per_page=100');
+          out.d1={ok:db.ok,status:db.status,error_codes:db.error_codes,reason:db.reason,matches:Array.isArray(db.result)?db.result.filter(x=>x.name==='football-edge-b05a-staging').map(x=>({name:x.name,id:x.uuid})):[],production_database_excluded:'0d12a7cc-12a9-4c71-b55b-61dfd2dac4d4'};
+          const sub=await get(root+'/workers/subdomain');
+          out.worker_subdomain={ok:sub.ok,status:sub.status,subdomain:sub.result?.subdomain};
+          for(const name of ['football-edge-b05a-staging-bridge','football-edge-background-watch']) {
+            const s=await get(root+'/workers/scripts/'+name+'/secrets');
+            out[name]={secret_listing_ok:s.ok,status:s.status,error_codes:s.error_codes,secret_names:Array.isArray(s.result)?s.result.map(x=>x.name):[]};
+            if(name==='football-edge-b05a-staging-bridge') {
+              const d=await get(root+'/workers/scripts/'+name+'/deployments');
+              out[name].deployments={ok:d.ok,status:d.status,error_codes:d.error_codes,items:Array.isArray(d.result?.deployments)?d.result.deployments.map(x=>({id:x.id,created_on:x.created_on,versions:x.versions})):[]};
+            }
+          }
+          console.log(JSON.stringify(out,null,2));
+          console.log('API key validity and quota remain untested: no provider request authorized.');
+          NODE
