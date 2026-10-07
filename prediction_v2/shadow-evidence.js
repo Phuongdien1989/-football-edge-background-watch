@@ -2,23 +2,24 @@
  * Compact evidence journal for shadow predictions. No production D1 schema change required.
  * captured_at remains for legacy compatibility, but it is NEVER treated as source received_at.
  */
-import {buildObservationEnvelope,marketPeriodForEngine} from './observation-contract.js';
+import {buildObservationEnvelope,marketPeriodForEngine,buildGoalWindowTarget} from './observation-contract.js';
 const finite=v=>v===null||v===undefined||(typeof v==='string'&&!v.trim())?null:(Number.isFinite(Number(v))?Number(v):null);
 const round=(v,d=3)=>{const n=finite(v);if(n==null)return null;const p=10**d;return Math.round(n*p)/p};
-function defaultTarget(engine,period){return {kind:'SHADOW_GOAL_AND_PERIOD_DISTRIBUTION',engine:String(engine||'').toUpperCase()||null,market_period:period||null,goal_windows_min:[5,10,15],period_distribution:period?{period,basis:'POISSON_REMAINING'}:null}}
+function defaultTarget(engine,period,minute){return {...buildGoalWindowTarget({engine,minute}),kind:'SHADOW_GOAL_AND_PERIOD_DISTRIBUTION',market_period:period||marketPeriodForEngine(engine),period_distribution:period?{period,basis:'POISSON_REMAINING'}:null}}
 export function compactShadowEvidence({item,packet,prediction,context=null,now=Date.now(),sourceRefs=[],marketPeriod=null,target=null,
   evaluationCutoff=null,modelVersion='PREDICTION_V2_B2_B9',configVersion='UNVERSIONED_CONFIG',persistedAt=null,persistenceAckId=null}={}){
   const s=item?.latest||{},p=prediction?.probabilities||{},engine=packet?.engine||null,period=marketPeriod||marketPeriodForEngine(engine),
     state={minute:finite(s.minute??packet?.state?.minute),score_home:finite(s?.goals?.home??packet?.state?.score_home),
       score_away:finite(s?.goals?.away??packet?.state?.score_away),status:s?.status??packet?.state?.status??null},
-    observation=buildObservationEnvelope({fixtureId:Number(item?.id??packet?.fixture_id)||null,engine,marketPeriod:period,target:target||defaultTarget(engine,period),state,
-      evaluationCutoff:evaluationCutoff??now,modelVersion,configVersion,sourceRefs,predictionCreatedAt:now,persistedAt,persistenceAckId});
+    observation=buildObservationEnvelope({fixtureId:Number(item?.id??packet?.fixture_id)||null,engine,marketPeriod:period,target:target||defaultTarget(engine,period,state.minute),state,
+      evaluationCutoff:evaluationCutoff??now,modelVersion,configVersion,sourceRefs,predictionCreatedAt:now,persistedAt,persistenceAckId,featurePacket:packet,predictionPayload:prediction});
   return {
     schema:'FE_PREDICTION_V2_EVIDENCE_B10',id:observation.observation_id,observation_id:observation.observation_id,
     fixture_id:observation.fixture_id,engine:observation.engine,market_period:observation.market_period,captured_at:now,
     evaluation_cutoff:observation.evaluation_cutoff,prediction_created_at:observation.prediction_created_at,persisted_at:observation.persisted_at,
     persistence_status:observation.persistence_status,strict_replay_status:observation.strict_replay_status,
-    strict_replay_eligible:observation.strict_replay_eligible,strict_metrics_eligible:observation.strict_metrics_eligible,
+    strict_replay_eligible:observation.strict_replay_eligible,strict_input_eligible:observation.strict_replay_eligible,strict_metrics_eligible:null,
+    input_fingerprint:observation.input_fingerprint,feature_fingerprint:observation.feature_fingerprint,prediction_fingerprint:observation.prediction_fingerprint,content_fingerprint:observation.content_fingerprint,
     observation,
     minute:state.minute,score_home:state.score_home,score_away:state.score_away,status:state.status,
     p_goal_5m:finite(p.goal_5m),p_goal_10m:finite(p.goal_10m),p_goal_15m:finite(p.goal_15m),p_home_next:finite(p.home_next_goal_given_goal),
