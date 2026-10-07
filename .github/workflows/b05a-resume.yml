@@ -70,7 +70,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          TOKEN="$(openssl rand -hex 32)"
+          TOKEN="$(printf '%s' 'FOOTBALL_EDGE_B05A_BRIDGE_V1' | openssl dgst -sha256 -hmac "$CLOUDFLARE_API_TOKEN" | awk '{print $2}')"
           echo "::add-mask::$TOKEN"
           echo "BATCH05A3_BRIDGE_TOKEN=$TOKEN" >> "$GITHUB_ENV"
 
@@ -115,9 +115,15 @@ jobs:
           if(!token) throw new Error('AUTH_GATE_TOKEN_MISSING');
           const meta={path:'/__fe_batch05a3/budget/load',method:'POST',authorization_header:'Bearer <redacted>',token_env:cfg.bridge_token_env,token_present:true,token_length:token.length,pilot_id:cfg.pilot_id,owner_id:cfg.owner_id};
           const client=createNodeHttpD1BridgeA3({baseUrl:cfg.bridge_base_url,token,pilotId:cfg.pilot_id,ownerId:cfg.owner_id});
-          let budget=null;
-          for(let i=0;i<3;i++){ budget=await client.budgetStore.load(); if(i<2) await new Promise(r=>setTimeout(r,5000)); }
-          console.log(JSON.stringify({...meta,exact_runner_client:true,consecutive_passes:3,prior_budget:budget},null,2));
+          let budget=null, streak=0, attempts=0, lastError=null;
+          while(attempts<30 && streak<5){
+            attempts++;
+            try{budget=await client.budgetStore.load();streak++;lastError=null}
+            catch(e){streak=0;lastError=String(e?.message||e)}
+            if(streak<5) await new Promise(r=>setTimeout(r,2000));
+          }
+          if(streak<5) throw new Error('AUTH_PROPAGATION_NOT_CONVERGED:'+lastError);
+          console.log(JSON.stringify({...meta,exact_runner_client:true,consecutive_passes:streak,auth_probe_attempts:attempts,prior_budget:budget},null,2));
           NODE
 
       - name: Patch fixture-2 selector after offline gates
