@@ -26,12 +26,12 @@ jobs:
             try {
               const r=await fetch('https://api.cloudflare.com/client/v4'+path,{headers:{Authorization:'Bearer '+process.env.CF_TOKEN},signal:AbortSignal.timeout(20000)});
               const j=await r.json();
-              return {ok:r.ok && j.success!==false,status:r.status,result:j.result,error_codes:(j.errors||[]).map(e=>e.code)};
+              return {ok:r.ok && j.success!==false,status:r.status,result:j.result,result_info:j.result_info,error_codes:(j.errors||[]).map(e=>e.code)};
             } catch {return {ok:false,reason:'NETWORK_OR_RESPONSE_ERROR'};}
           }
           const root='/accounts/'+encodeURIComponent(process.env.CF_ACCOUNT||'');
           const db=await get(root+'/d1/database?per_page=100');
-          out.d1={ok:db.ok,status:db.status,error_codes:db.error_codes,reason:db.reason,matches:Array.isArray(db.result)?db.result.filter(x=>x.name==='football-edge-b05a-staging').map(x=>({name:x.name,id:x.uuid})):[],production_database_excluded:'0d12a7cc-12a9-4c71-b55b-61dfd2dac4d4'};
+          out.d1={returned_count:Array.isArray(db.result)?db.result.length:null,result_info:db.result_info,ok:db.ok,status:db.status,error_codes:db.error_codes,reason:db.reason,matches:Array.isArray(db.result)?db.result.filter(x=>x.name==='football-edge-b05a-staging').map(x=>({name:x.name,id:x.uuid})):[],production_database_excluded:'0d12a7cc-12a9-4c71-b55b-61dfd2dac4d4'};
           const sub=await get(root+'/workers/subdomain');
           out.worker_subdomain={ok:sub.ok,status:sub.status,subdomain:sub.result?.subdomain};
           for(const name of ['football-edge-b05a-staging-bridge','football-edge-background-watch']) {
