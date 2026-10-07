@@ -100,6 +100,7 @@ jobs:
           cd "$ROOT"
           WRANGLER=staging_kit/batch05a-final.toml bash staging_kit/batch05a-final-ops.sh deploy
           printf '%s' "$BATCH05A3_BRIDGE_TOKEN" | npx wrangler secret put BATCH05A3_BRIDGE_TOKEN --config staging_kit/batch05a-final.toml
+          sleep 5
 
       - name: Authenticated readiness gate
         shell: bash
@@ -115,6 +116,13 @@ jobs:
             sleep 2
           done
           test "$ok" = "1"
+          cd "$ROOT"
+          node - <<'NODE'
+          const u=process.env.BRIDGE_URL+"/__fe_batch05a3/budget/load";
+          const r=await fetch(u,{method:"POST",headers:{Authorization:"Bearer "+process.env.BATCH05A3_BRIDGE_TOKEN,"Content-Type":"application/json"},body:JSON.stringify({pilot_id:"node-auth-gate",owner_id:"node-auth-gate"})});
+          if(r.status!==200) throw new Error("NODE_AUTH_GATE_"+r.status+":"+await r.text());
+          JSON.parse(await r.text().catch(()=>'' )||'{}');
+          NODE
 
       - name: Preflight
         shell: bash
