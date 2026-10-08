@@ -1,0 +1,133 @@
+name: B05A QA32 Approved Single Pilot
+on:
+  push:
+    branches: [execution/b05a-qa32-approved-20261008]
+    paths: [.github/workflows/b05a-qa32-approved.yml]
+permissions:
+  contents: read
+concurrency:
+  group: b05a-eligible-pilot-01
+  cancel-in-progress: false
+jobs:
+  pilot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      APISPORTS_KEY: ${{ secrets.APISPORTS_KEY }}
+      FE_APPROVE_ELIGIBLE_PILOT: YES
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Immutable baseline and exact QA32 overlay
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p evidence-qa32
+          echo '68f2a8a9b0233a9fcf4cba9c53961ca9dd9dd06deeb533f8f78fe74c9ed0f03f  FOOTBALL_EDGE_FINAL_PRESTAGING_FIXED_SHA68F2.zip' | sha256sum -c -
+          echo '590fde0af78a11b2925ff584d4d9fe9d2a4dfdccf34999adb94549eef4436a7e  pilot_assets/qa32-runtime-overlay.json' | sha256sum -c -
+          unzip -q FOOTBALL_EDGE_FINAL_PRESTAGING_FIXED_SHA68F2.zip -d _qa32
+          ROOT="$(find _qa32 -name START_HERE_FINAL_FIXED.md -printf '%h\n' -quit)"
+          test -n "$ROOT"
+          echo "ROOT=$ROOT" >> "$GITHUB_ENV"
+          (cd "$ROOT"; sha256sum -c SHA256SUMS_FINAL_FIXED.txt)
+          ROOT="$ROOT" python3 - <<'PY'
+          import json,os,pathlib,hashlib
+          d=json.load(open('pilot_assets/qa32-runtime-overlay.json'))
+          root=pathlib.Path(os.environ['ROOT'])
+          for row in d['files']:
+              b=row['content'].encode(); assert hashlib.sha256(b).hexdigest()==row['sha256']
+              p=root/row['path']; p.parent.mkdir(parents=True,exist_ok=True); p.write_bytes(b)
+          pathlib.Path('evidence-qa32/SOURCE_LOCK.json').write_text(json.dumps({k:v for k,v in d.items() if k!='files'}))
+          PY
+      - name: Complete offline suite
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$ROOT"
+          for f in prediction_v2/test-*.mjs; do node "$f"; done 2>&1 | tee "$GITHUB_WORKSPACE/evidence-qa32/OFFLINE_TESTS.log"
+          node staging_kit/batch05a-eligible-remote-cli.mjs preflight staging_kit/b05a-eligible-pilot.example.json > "$GITHUB_WORKSPACE/evidence-qa32/PREFLIGHT.json"
+      - name: Existing bridge token and fixed pilot config
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$CLOUDFLARE_API_TOKEN"
+          test -n "$CLOUDFLARE_ACCOUNT_ID"
+          test -n "$APISPORTS_KEY"
+          TOKEN="$(printf '%s' 'FOOTBALL_EDGE_B05A_BRIDGE_V1' | openssl dgst -sha256 -hmac "$CLOUDFLARE_API_TOKEN" | awk '{print $2}')"
+          echo "::add-mask::$TOKEN"
+          echo "BATCH05A3_BRIDGE_TOKEN=$TOKEN" >> "$GITHUB_ENV"
+          python3 - <<'PY'
+          import os,json,pathlib
+          p=pathlib.Path(os.environ['ROOT'])/'staging_kit/b05a-eligible-config.json'
+          d=json.load(open(p.with_name('b05a-eligible-pilot.example.json')))
+          d['owner_id']='qa32-'+os.environ['GITHUB_RUN_ID']+'-'+os.environ['GITHUB_RUN_ATTEMPT']
+          p.write_text(json.dumps(d))
+          PY
+      - name: Read-only identity auth and durable state gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$ROOT"
+          node --input-type=module <<'NODE' | tee "$GITHUB_WORKSPACE/evidence-qa32/AUTH_DURABLE_GATE.json"
+          import fs from 'node:fs';
+          import crypto from 'node:crypto';
+          import {createNodeHttpD1BridgeA3} from './staging_kit/batch05a3-http-d1-bridge.js';
+          const cfg=JSON.parse(fs.readFileSync('staging_kit/b05a-eligible-config.json'));
+          const dbid='7d503048-9118-4b29-b662-4e1ba6e32167';
+          const r=await fetch('https://api.cloudflare.com/client/v4/accounts/'+process.env.CLOUDFLARE_ACCOUNT_ID+'/d1/database/'+dbid,{headers:{Authorization:'Bearer '+process.env.CLOUDFLARE_API_TOKEN}});
+          const db=await r.json();if(!r.ok||!db.success||db.result.name!=='football-edge-b05a-staging')throw Error('STAGING_D1_IDENTITY_FAILED');
+          const p=await fetch('https://shiny-silence-d892.ngophuonghuy.workers.dev');if(!p.ok)throw Error('PRODUCTION_READ_FAILED');
+          const sha=crypto.createHash('sha256').update(Buffer.from(await p.arrayBuffer())).digest('hex');
+          fs.writeFileSync(process.env.GITHUB_WORKSPACE+'/evidence-qa32/PRODUCTION_BEFORE.json',JSON.stringify({sha256:sha,read_only:true}));
+          if(sha!=='a82bf87e1db875fb975b94ac9b6df9e785818de37b7bb55fec6f290efca9c844')throw Error('PRODUCTION_FROZEN_HASH_MISMATCH');
+          const client=createNodeHttpD1BridgeA3({baseUrl:cfg.bridge_base_url,token:process.env.BATCH05A3_BRIDGE_TOKEN,pilotId:cfg.pilot_id,ownerId:cfg.owner_id});
+          const budget=await client.budgetStore.load(),session=await client.sessionStore.load();
+          console.log(JSON.stringify({pilot_id:cfg.pilot_id,db_id:dbid,auth_pass:true,prior_budget:budget,prior_session:session},null,2));
+          if(budget?.stop_reason||session?.stop_reason)throw Error('DURABLE_STOP_ACTIVE');
+          if(Number(budget?.total_requests||0)>=40)throw Error('DURABLE_BUDGET_EXHAUSTED');
+          if(Boolean(budget)!==Boolean(session))throw Error('DURABLE_RESTART_STATE_MISMATCH');
+          NODE
+      - name: One approved pilot within existing durable limits
+        shell: bash
+        run: |
+          set -euo pipefail
+          touch "$GITHUB_WORKSPACE/evidence-qa32/PILOT_INVOKED"
+          cd "$ROOT"
+          node staging_kit/batch05a-eligible-remote-cli.mjs run staging_kit/b05a-eligible-config.json | tee "$GITHUB_WORKSPACE/evidence-qa32/REMOTE_RUN.json"
+      - name: Stop export and production readback
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -f "$GITHUB_WORKSPACE/evidence-qa32/PILOT_INVOKED" ]; then
+            cd "$ROOT"
+            node staging_kit/batch05a-eligible-remote-cli.mjs stop staging_kit/b05a-eligible-config.json > "$GITHUB_WORKSPACE/evidence-qa32/REMOTE_STOP.json" 2> "$GITHUB_WORKSPACE/evidence-qa32/STOP_ERROR.log" || true
+            node staging_kit/batch05a-eligible-remote-cli.mjs export staging_kit/b05a-eligible-config.json > "$GITHUB_WORKSPACE/evidence-qa32/REMOTE_EXPORT.json" 2> "$GITHUB_WORKSPACE/evidence-qa32/EXPORT_ERROR.log" || true
+          fi
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';import crypto from 'node:crypto';
+          const r=await fetch('https://shiny-silence-d892.ngophuonghuy.workers.dev');if(!r.ok)throw Error('PRODUCTION_READBACK_FAILED');
+          const sha=crypto.createHash('sha256').update(Buffer.from(await r.arrayBuffer())).digest('hex');
+          const dir=process.env.GITHUB_WORKSPACE+'/evidence-qa32/';fs.writeFileSync(dir+'PRODUCTION_AFTER.json',JSON.stringify({sha256:sha,read_only:true}));
+          if(fs.existsSync(dir+'PRODUCTION_BEFORE.json')&&JSON.parse(fs.readFileSync(dir+'PRODUCTION_BEFORE.json')).sha256!==sha)throw Error('PRODUCTION_CHANGED_DURING_RUN');
+          NODE
+      - name: Evidence gate
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          jq -e '.failure == null and .provider_attempts > 0 and .provider_attempts <= 40 and .comparable_ticks == 4 and .detailed_fixture_count == 1 and .actual_elapsed_ms <= 600000' evidence-qa32/REMOTE_RUN.json
+          jq -e '.captures | length > 0' evidence-qa32/REMOTE_EXPORT.json
+          jq -e '.locked_observations | length == 4' evidence-qa32/REMOTE_EXPORT.json
+          jq -e '.old_exact_outputs | length == 4' evidence-qa32/REMOTE_EXPORT.json
+      - name: Export evidence artifact on success or failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: b05a-qa32-approved-${{ github.run_id }}
+          if-no-files-found: error
+          path: evidence-qa32/
