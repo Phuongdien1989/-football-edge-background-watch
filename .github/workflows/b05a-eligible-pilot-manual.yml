@@ -1,0 +1,94 @@
+name: B05A Eligible Pilot - Manual Only
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: b05a-eligible-pilot-01
+  cancel-in-progress: false
+jobs:
+  eligible-staging:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      APISPORTS_KEY: ${{ secrets.APISPORTS_KEY }}
+      BRIDGE_URL: https://football-edge-b05a-staging-bridge.ngophuonghuy.workers.dev
+      FE_APPROVE_ELIGIBLE_PILOT: YES
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Verify immutable SHA68F2 baseline before overlay
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo '68f2a8a9b0233a9fcf4cba9c53961ca9dd9dd06deeb533f8f78fe74c9ed0f03f  FOOTBALL_EDGE_FINAL_PRESTAGING_FIXED_SHA68F2.zip' | sha256sum -c -
+          unzip -q FOOTBALL_EDGE_FINAL_PRESTAGING_FIXED_SHA68F2.zip -d _candidate
+          ROOT="$(find _candidate -name START_HERE_FINAL_FIXED.md -printf '%h\n' -quit)"
+          test -n "$ROOT"
+          echo "ROOT=$ROOT" >> "$GITHUB_ENV"
+          cd "$ROOT"
+          sha256sum -c SHA256SUMS_FINAL_FIXED.txt
+      - name: Apply locked eligible V2 overlay
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp pilot_assets/fixture-eligibility-selector.js "$ROOT/staging_kit/fixture-eligibility-selector.js"
+          cp pilot_assets/batch05a-eligible-remote-cli.mjs "$ROOT/staging_kit/batch05a-eligible-remote-cli.mjs"
+          cp pilot_assets/test-eligible-runner.mjs "$ROOT/prediction_v2/test-eligible-runner.mjs"
+          cd "$ROOT"
+          python3 "$GITHUB_WORKSPACE/pilot_assets/apply-eligible-overlay.py"
+      - name: Full offline regression and entrypoint gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$ROOT"
+          for test_file in prediction_v2/test-*.mjs; do node "$test_file"; done
+          node --check staging_kit/fixture-eligibility-selector.js
+          node --check staging_kit/batch05a-eligible-remote-cli.mjs
+          node --check staging_kit/batch05a-smoke-orchestrator.mjs
+      - name: Preflight staging scope / derive existing stable token (no deploy)
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$CLOUDFLARE_API_TOKEN"
+          test -n "$APISPORTS_KEY"
+          TOKEN="$(printf '%s' 'FOOTBALL_EDGE_B05A_BRIDGE_V1' | openssl dgst -sha256 -hmac "$CLOUDFLARE_API_TOKEN" | awk '{print $2}')"
+          echo "::add-mask::$TOKEN"
+          echo "BATCH05A3_BRIDGE_TOKEN=$TOKEN" >> "$GITHUB_ENV"
+          python3 - <<'PY'
+          import json,os
+          cfg={'bridge_base_url':os.environ['BRIDGE_URL'],'bridge_token_env':'BATCH05A3_BRIDGE_TOKEN','api_key_env':'APISPORTS_KEY','pilot_id':'FE-B05A-ELIGIBLE-PILOT-01','owner_id':'gha-'+os.environ['GITHUB_RUN_ID']+'-'+os.environ['GITHUB_RUN_ATTEMPT'],'max_ticks':4,'hard_limits':{'fixtures':1,'duration_ms':600000,'provider_attempts':40},'staging_target_confirmed':True,'production_target_forbidden':True}
+          with open(os.path.join(os.environ['ROOT'],'staging_kit/b05a-eligible-config.json'),'w') as f:json.dump(cfg,f)
+          PY
+          cd "$ROOT"
+          node staging_kit/batch05a-eligible-remote-cli.mjs preflight staging_kit/b05a-eligible-config.json | tee "$GITHUB_WORKSPACE/PREFLIGHT.json"
+      - name: Run one eligible pilot (no Worker deploy / token rotation)
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "PILOT_STARTED=1" >> "$GITHUB_ENV"
+          cd "$ROOT"
+          node staging_kit/batch05a-eligible-remote-cli.mjs run staging_kit/b05a-eligible-config.json | tee "$GITHUB_WORKSPACE/REMOTE_ELIGIBLE_RUN.json"
+      - name: Durable stop and evidence export
+        if: always()
+        shell: bash
+        run: |
+          if [ "${PILOT_STARTED:-0}" = 1 ] && [ -n "${ROOT:-}" ]; then
+            cd "$ROOT"
+            node staging_kit/batch05a-eligible-remote-cli.mjs stop staging_kit/b05a-eligible-config.json > "$GITHUB_WORKSPACE/REMOTE_STOP.json" 2>&1 || true
+            node staging_kit/batch05a-eligible-remote-cli.mjs export staging_kit/b05a-eligible-config.json > "$GITHUB_WORKSPACE/REMOTE_EXPORT.json" 2>&1 || true
+          fi
+      - name: Store immutable run evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: b05a-eligible-pilot-01-${{ github.run_id }}
+          if-no-files-found: warn
+          path: |
+            PREFLIGHT.json
+            REMOTE_ELIGIBLE_RUN.json
+            REMOTE_STOP.json
+            REMOTE_EXPORT.json
