@@ -1,8 +1,6 @@
-name: B05A QA32 Approved Single Pilot
+name: B05A QA33 Manual Single Pilot
 on:
-  push:
-    branches: [execution/b05a-qa32-approved-20261008]
-    paths: [.github/workflows/b05a-qa32-approved.yml]
+  workflow_dispatch:
 permissions:
   contents: read
 concurrency:
@@ -28,7 +26,7 @@ jobs:
           set -euo pipefail
           mkdir -p evidence-qa32
           echo '68f2a8a9b0233a9fcf4cba9c53961ca9dd9dd06deeb533f8f78fe74c9ed0f03f  FOOTBALL_EDGE_FINAL_PRESTAGING_FIXED_SHA68F2.zip' | sha256sum -c -
-          echo '590fde0af78a11b2925ff584d4d9fe9d2a4dfdccf34999adb94549eef4436a7e  pilot_assets/qa32-runtime-overlay.json' | sha256sum -c -
+          echo 'd1452789e9c84778112728c82efea084439239b291606c8846ab1918cc1f5d69  pilot_assets/qa32-runtime-overlay.json' | sha256sum -c -
           unzip -q FOOTBALL_EDGE_FINAL_PRESTAGING_FIXED_SHA68F2.zip -d _qa32
           ROOT="$(find _qa32 -name START_HERE_FINAL_FIXED.md -printf '%h\n' -quit)"
           test -n "$ROOT"

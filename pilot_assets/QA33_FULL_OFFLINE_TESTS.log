@@ -1,0 +1,114 @@
+
+test-b05a-eligibility-wait.mjs: PASS
+ELIGIBILITY WAIT PASS: delayed arrival + four ACK ticks; time reserve; endpoint error fail closed; durable operator stop during wait; diagnostic persistence. 0 real API calls
+
+test-b05a-eligible-http-d1-e2e.mjs: PASS
+ELIGIBLE HTTP D1 full-path PASS {"selection":8,"post_pin":20,"requests":28,"observations":4,"old_outputs":4,"ack_verified":4,"phase":"H2","stop_blocks_new_calls":true}
+
+test-b05a-eligible-real-entrypoint.mjs: PASS
+ELIGIBLE REAL ENTRYPOINT OFFLINE PASS {
+  calls: 28,
+  selection: 8,
+  ticks: 4,
+  locked: 4,
+  negative_calls: 20,
+  boundary: '20 accepted; 21 blocked',
+  production_mutations: 0
+}
+REAL ARTIFACT 11496021709 phase regression 8/8 H2 PASS
+
+test-b05a-reserve-exhaustive.mjs: PASS
+EXHAUSTIVE RESERVE PASS {
+  exact_boundary_success: '20 selection + 20 post-pin = 40',
+  no_eligible: 'stop at 20',
+  failed_network_attempt: 'counted in 20',
+  calls_last: 40
+}
+
+test-b2.mjs: PASS
+B2 tests PASS
+
+test-b3.mjs: PASS
+B3 tests PASS
+
+test-b4.mjs: PASS
+B4 tests PASS
+
+test-b5.mjs: PASS
+B5 tests PASS
+B5 shadow universe PASS
+
+test-b7-b9.mjs: PASS
+B7-B9 tests PASS
+
+test-batch02.mjs: PASS
+Batch02 strict observation/market/outcome tests PASS
+
+test-batch021.mjs: PASS
+Batch02.1 contract/outcome/strict-metrics regressions PASS
+
+test-batch022-integration.mjs: PASS
+Batch02.2 local runtime-path integration PASS
+
+test-batch022.mjs: PASS
+Batch02.2 four-review-probe regressions PASS
+
+test-batch03-integration.mjs: PASS
+Batch03 local raw-path integration PASS
+
+test-batch03-real-raw.mjs: PASS
+Batch03 real-raw artifact replay test PASS
+
+test-batch03.mjs: PASS
+Batch03 same-universe / dual-ranking regressions PASS
+
+test-batch031.mjs: PASS
+Batch03.1 target/state/report regressions PASS
+
+test-batch04-collector.mjs: PASS
+Batch04 staging collector fake-transport test PASS
+
+test-batch04-integration.mjs: PASS
+Batch04 local durable end-to-end integration PASS
+
+test-batch04-real-raw.mjs: PASS
+{"status":"PASS","raw_requests":47,"capture_status":{"FETCH_ERROR":25,"OK":16,"EMPTY_VALID":6},"cutoff":"2026-10-02T09:20:43.796Z","universe_fixtures":15,"coverage":{"fixture_count":15,"with_stats":0,"stats_empty_valid":1,"stats_fetch_error":1,"stats_missing":13,"with_market":0,"market_empty_valid":0,"market_fetch_error":0,"market_missing":15},"market_note":"Existing raw artifact has no /odds/live records; no real market replay claim."}
+
+test-batch04.mjs: PASS
+Batch04 capture/feature contract tests PASS
+
+test-batch041-budget.mjs: PASS
+Batch04.1 executable pilot budget/pacing regressions PASS
+
+test-batch041-e2e.mjs: PASS
+Batch04.1 collector→capture persistence→exact OLD/NEW→locked observation→late outcome E2E PASS
+
+test-batch041-full-integration.mjs: PASS
+Batch04.1 collector→persistence→exact OLD/NEW→locked observation→outcome integration PASS
+
+test-batch041-old-runtime.mjs: PASS
+Batch04.1 exact P2.0.5.2 OLD runtime bridge offline integration PASS
+
+test-batch041-persistence.mjs: PASS
+Batch04.1 immutable local/staging persistence regressions PASS
+
+test-batch041.mjs: PASS
+Batch04.1 context isolation + live market schema regressions PASS
+
+test-batch05a-final-package.mjs: PASS
+Batch05A final package full HTTP/restart/export/isolation probe PASS
+
+test-batch05a-smoke.mjs: PASS
+Batch05A.1 per-tick immutable pinned-fixture offline smoke PASS
+
+test-batch05a1-regressions.mjs: PASS
+Batch05A.1 DQ/ACK/restart/failure-export/pinned-disappear regressions PASS
+
+test-batch05a2-regressions.mjs: PASS
+Batch05A.2 restart/ACK timeline/D1 + HTTP bridge regressions PASS
+
+test-batch05a3-regressions.mjs: PASS
+Batch05A.3 clock/fencing/isolation/full HTTP offline regressions PASS
+
+test-final-blockers-fixed.mjs: PASS
+FINAL FIX: raw/fixture/bundle tamper, concurrent budget CAS, active HTTP stop/restart/full export PASS
