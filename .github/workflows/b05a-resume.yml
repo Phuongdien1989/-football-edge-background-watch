@@ -1,4 +1,4 @@
-name: B05A Pilot Fixture 2
+name: B05A Eligible Pilot - Manual Safety Gate
 
 on:
   workflow_dispatch:
@@ -17,7 +17,7 @@ jobs:
       DB_ID: 7d503048-9118-4b29-b662-4e1ba6e32167
       PROD_DB_ID: 0d12a7cc-12a9-4c71-b55b-61dfd2dac4d4
       BRIDGE_URL: https://football-edge-b05a-staging-bridge.ngophuonghuy.workers.dev
-      FE_APPROVE_REMOTE_SMOKE: YES
+      FE_APPROVE_REMOTE_SMOKE: NO
 
     steps:
       - uses: actions/checkout@v4
@@ -89,100 +89,12 @@ jobs:
           {"bridge_base_url":"$BRIDGE_URL","bridge_token_env":"BATCH05A3_BRIDGE_TOKEN","api_key_env":"APISPORTS_KEY","pilot_id":"FE-B05A-PILOT-FX2","owner_id":"gha-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}","max_ticks":8,"hard_limits":{"fixtures":1,"duration_ms":600000,"provider_attempts":40},"staging_target_confirmed":true,"production_target_forbidden":true}
           EOF
 
-      - name: Redeploy bridge and rotate token
+      - name: Fail-closed remote execution gate
         shell: bash
         run: |
           set -euo pipefail
-          cd "$ROOT"
-          WRANGLER=staging_kit/batch05a-final.toml bash staging_kit/batch05a-final-ops.sh deploy
-          printf '%s' "$BATCH05A3_BRIDGE_TOKEN" | npx wrangler secret put BATCH05A3_BRIDGE_TOKEN --config staging_kit/batch05a-final.toml
-          sleep 5
-
-      - name: Exact runner auth and budget gate
-        shell: bash
-        run: |
-          set -euo pipefail
-          cd "$ROOT"
-          node --input-type=module <<'NODE' | tee "$GITHUB_WORKSPACE/AUTH_GATE.json"
-          import fs from 'node:fs';
-          import {createNodeHttpD1BridgeA3} from './staging_kit/batch05a3-http-d1-bridge.js';
-          const cfg=JSON.parse(fs.readFileSync('./staging_kit/batch05a-final-staging-config.json','utf8'));
-          const token=process.env[cfg.bridge_token_env];
-          if(!token) throw new Error('AUTH_GATE_TOKEN_MISSING');
-          const meta={path:'/__fe_batch05a3/budget/load',method:'POST',authorization_header:'Bearer <redacted>',token_env:cfg.bridge_token_env,token_present:true,token_length:token.length,pilot_id:cfg.pilot_id,owner_id:cfg.owner_id};
-          const client=createNodeHttpD1BridgeA3({baseUrl:cfg.bridge_base_url,token,pilotId:cfg.pilot_id,ownerId:cfg.owner_id});
-          let budget=null, streak=0, attempts=0, lastError=null;
-          while(attempts<30 && streak<5){
-            attempts++;
-            try{budget=await client.budgetStore.load();streak++;lastError=null}
-            catch(e){streak=0;lastError=String(e?.message||e)}
-            if(streak<5) await new Promise(r=>setTimeout(r,2000));
-          }
-          if(streak<5) throw new Error('AUTH_PROPAGATION_NOT_CONVERGED:'+lastError);
-          console.log(JSON.stringify({...meta,exact_runner_client:true,consecutive_passes:streak,auth_probe_attempts:attempts,prior_budget:budget},null,2));
-          NODE
-
-      - name: Patch fixture-2 selector after offline gates
-        shell: bash
-        run: |
-          set -euo pipefail
-          cd "$ROOT"
-          python3 - <<'PY'
-          from pathlib import Path
-          p=Path("staging_kit/batch04-collector-worker.js")
-          s=p.read_text()
-          old="const selected=pinnedFixtureId==null?(ids[0]??null):Number(pinnedFixtureId);"
-          new="const selected=pinnedFixtureId==null?(ids[1]??null):Number(pinnedFixtureId);"
-          assert old in s, "selection patch target missing"
-          p.write_text(s.replace(old,new,1))
-          PY
-
-      - name: Offline fixture eligibility selector regression
-        shell: bash
-        run: |
-          set -euo pipefail
-          cd "$ROOT"
-          cat > /tmp/fixture-selector-test.mjs <<'NODE'
-          import assert from 'node:assert/strict';
-          const usableStats=r=>Array.isArray(r)&&r.some(team=>Array.isArray(team?.statistics)&&team.statistics.some(s=>s?.value!==null&&s?.value!==''&&Number.isFinite(Number(String(s.value).replace('%','')))));
-          const validEvents=r=>Array.isArray(r)&&r.every(e=>e&&e.time&&Number.isFinite(Number(e.time.elapsed))&&e.team&&typeof e.type==='string');
-          const classify=x=>{
-            const stats=usableStats(x.stats);
-            const eventsPresent=Array.isArray(x.events);
-            const eventsValid=eventsPresent&&validEvents(x.events);
-            const market=Array.isArray(x.market)&&x.market.length>0;
-            return {football_eligible:stats&&eventsPresent&&eventsValid,market_eligible:stats&&eventsPresent&&eventsValid&&market,events_state:!eventsPresent?'ENDPOINT_MISSING':eventsValid?(x.events.length?'VALID_EVENTS':'VALID_NO_EVENTS'):'INVALID_EVENTS',stats_state:stats?'USABLE':'NOT_USABLE',market_state:market?'AVAILABLE':'UNAVAILABLE'};
-          };
-          assert.deepEqual(classify({stats:[],events:[],market:[]}),{football_eligible:false,market_eligible:false,events_state:'VALID_NO_EVENTS',stats_state:'NOT_USABLE',market_state:'UNAVAILABLE'});
-          assert.equal(classify({stats:[{statistics:[{type:'Shots on Goal',value:0}]}],events:[],market:[]}).football_eligible,true);
-          assert.equal(classify({stats:[{statistics:[{type:'Shots on Goal',value:0}]}],events:[],market:[]}).market_eligible,false);
-          assert.equal(classify({stats:[{statistics:[{type:'Shots on Goal',value:1}]}],events:null,market:[]}).events_state,'ENDPOINT_MISSING');
-          assert.equal(classify({stats:[{statistics:[{type:'Shots on Goal',value:1}]}],events:[{time:{elapsed:12},team:{id:1},type:'Card'}],market:[{}]}).market_eligible,true);
-          console.log('fixture eligibility selector regression PASS');
-          NODE
-          node /tmp/fixture-selector-test.mjs
-
-      - name: Preflight
-        shell: bash
-        run: |
-          set -euo pipefail
-          cd "$ROOT"
-          CFG=staging_kit/batch05a-final-staging-config.json bash staging_kit/batch05a-final-ops.sh preflight | tee "$GITHUB_WORKSPACE/PREFLIGHT.json"
-
-      - name: Smoke
-        shell: bash
-        run: |
-          set -o pipefail
-          cd "$ROOT"
-          CFG=staging_kit/batch05a-final-staging-config.json bash staging_kit/batch05a-final-ops.sh run | tee "$GITHUB_WORKSPACE/REMOTE_SMOKE.json"
-
-      - name: Smoke evidence gate
-        shell: bash
-        run: |
-          set -euo pipefail
-          jq -e '.failure == null' "$GITHUB_WORKSPACE/REMOTE_SMOKE.json" >/dev/null
-          jq -e '.provider_attempts > 0 and .invocation_provider_attempts > 0' "$GITHUB_WORKSPACE/REMOTE_SMOKE.json" >/dev/null
-          jq -e '.pinned_fixture_id != null and .detailed_fixture_count == 1' "$GITHUB_WORKSPACE/REMOTE_SMOKE.json" >/dev/null
+          echo "REMOTE_DISABLED: entrypoint adapter and durable pre-mutation reservation not yet integrated"
+          exit 1
 
       - name: Stop and export
         if: always()
