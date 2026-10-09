@@ -2,7 +2,7 @@ import json,pathlib,subprocess,os,time,urllib.request,http.server,threading
 ROOT=pathlib.Path(__file__).resolve().parents[1]
 class Handler(http.server.BaseHTTPRequestHandler):
  def do_GET(self):
-  body=(ROOT/'frontend/index.html').read_text().replace('<head>','<head><script>window.__errors=[];window.addEventListener("error",e=>window.__errors.push(e.message));</script>').encode()
+  body=(ROOT/'frontend/index.html').read_text().replace('<head>','<head><script>window.__errors=[];window.addEventListener("error",e=>window.__errors.push(e.message));</script>').replace('  // FE_UI_READ_BRIDGE_START:', 'window.__topTest={rank:feMasterRankRows,select:feSmartSelectRows};\n  // FE_UI_READ_BRIDGE_START:').encode()
   self.send_response(200);self.send_header('Content-Type','text/html');self.send_header('Content-Security-Policy',"default-src 'self' 'unsafe-inline' 'unsafe-eval' data:; connect-src 'self'");self.end_headers();self.wfile.write(body)
  def log_message(self,*args):pass
 httpd=http.server.ThreadingHTTPServer(('127.0.0.1',0),Handler);threading.Thread(target=httpd.serve_forever,daemon=True).start()
@@ -37,6 +37,11 @@ try:
   assert 'test-1' in json.dumps(data),data.keys()
   assert data['watchState']['items'][0]['eval']['score']==r['engines']['FT']['score']
   assert data['handicapWatchState']['pool'][0]['latest']['status']=='2H'
+  result=js('''const seed=window.FEUIReadBridge.read().watchState.items[0];
+    const make=(id,score)=>{const it=JSON.parse(JSON.stringify(seed));delete it.serverRow;delete it.serverGoal;it.id=id;it.state='WATCH';it.cooldownUntil=0;it.eval={...it.eval,score,quality:4,scoreMode:'FULL',hardVeto:false,dataIncomplete:false};it.latest={...it.latest,captured_at:Date.now(),fresh_at:Date.now(),status:'2H',minute:66,stats_presence:{pressure:true,core:true},data_health:{level:'HEALTHY'}};return {id,ft:it,latest:it};};
+    const rows=window.__topTest.rank([make(901,58),make(902,60)]),selected=window.__topTest.select(rows);
+    return {first:rows[0].id,top:rows[0].__rank.top,confirmed:rows[0].__rank.confirmed,state:rows[0].ft.state,selected:selected.length};''')
+  assert result=={'first':902,'top':1,'confirmed':False,'state':'WATCH','selected':2},result
   apply(row(rev=1,offset=-1000));assert 'test-1' in json.dumps(js('return window.FEUIReadBridge.read();'))
   r=row(rev=2,offset=-70000);r['captured_at']=int(time.time()*1000)+10
   # Guard stale snapshot independently of store ordering.

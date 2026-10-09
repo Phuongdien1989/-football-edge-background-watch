@@ -24,6 +24,15 @@ try:
  data=js('return window.FEUIReadBridge.read();')
  assert js('return window.__liveErrors;')==[],js('return window.__liveErrors;')
  print(json.dumps({'real_original_live_scan_button':'PASS','status':status,'engine_counts':{'H1':len(data['h1WatchState']['items']),'FT':len(data['watchState']['items']),'HC':len(data['handicapWatchState']['pool'])}}),flush=True)
+ if os.environ.get('EXPECT_TOP_WATCH')=='1':
+  rows=js('return window.FEAddonBridge.masterRows();');tops=[r for r in rows if r['__rank'].get('top')]
+  assert len(tops)<=5
+  for r in tops:
+   rank=r['__rank'];it=r[rank['primary']['engine'].lower()]
+   assert rank['eligible'] and not rank['hardConflict'] and not rank['adaptiveGuard']
+   assert int(time.time()*1000)-it['latest']['captured_at']<=65000
+   if not rank['confirmed']:assert rank['primary']['stateRank']<3
+  print(json.dumps({'real_top_watch':'PASS','top_count':len(tops),'rows':[{'id':r['id'],'top':r['__rank']['top'],'engine':r['__rank']['primary']['engine'],'confirmed':r['__rank']['confirmed'],'state':r[r['__rank']['primary']['engine'].lower()].get('state'),'score':r[r['__rank']['primary']['engine'].lower()]['eval'].get('score'),'live_gap':r[r['__rank']['primary']['engine'].lower()]['eval'].get('states',{}).get('liveGap')} for r in tops]}),flush=True)
 finally:
  if session:
   try:call('DELETE','/session/'+session)

@@ -17,6 +17,21 @@ replace("    read:()=>feUICopy({\n      state:{selected:state.selected","    rea
 replace("    if(status)status.textContent=active?","    if(status)status.textContent=active?");
 replace("    if(!ctx.fid){empty.classList.remove('hidden');", "    const sync=window.FELegacyNotifySync?.read();if(status&&sync&&sync.state!=='IDLE')status.textContent+=' · '+(sync.state==='OK'?'DA DONG BO':sync.state==='SYNCING'?'DANG DONG BO':'CHUA DONG BO');\n    if(!ctx.fid){empty.classList.remove('hidden');");
 replace('    render();setInterval(render,3000);','    window.addEventListener("fe-notify-sync-updated",()=>{lastSig="";render()});render();setInterval(render,3000);');
+replace('  function feMasterRankMeta(x){',read('frontend/top-watch.js')+'\n  function feMasterRankMeta(x){');
+replace("    ds.sort((a,b)=>feMasterTupleCompare(feMasterDescriptorKey(a),feMasterDescriptorKey(b)));return ds[0]||null;", "    const usable=ds.filter(d=>feTopUsable(d.engine==='H1'?x.h1:d.engine==='FT'?x.ft:x.hc,d.engine));usable.sort((a,b)=>feMasterTupleCompare(feMasterDescriptorKey(a),feMasterDescriptorKey(b)));return usable[0]||null;");
+replace('eligible=!!p&&p.stateRank>=3&&!hardConflict&&!adaptiveGuard;', 'eligible=!!p&&!hardConflict&&!adaptiveGuard,confirmed=eligible&&p.stateRank>=3;');
+replace('return {interaction,primary:p,eligible,hardConflict,adaptiveGuard,group,key,mechs};','return {interaction,primary:p,eligible,confirmed,hardConflict,adaptiveGuard,group,key,mechs};');
+replace('    out.sort((a,b)=>feMasterTupleCompare(a.__rank.key,b.__rank.key)', '    feTopRelativeKeys(out);\n    out.sort((a,b)=>feMasterTupleCompare(a.__rank.key,b.__rank.key)');
+replace("if(r?.top===1)return '<span class=\"master-op-rank top1\">#1 TOP</span>';", "if(r?.top===1)return `<span class=\"master-op-rank top1\">#1 TOP${r.confirmed?'':' · CHO'}</span>`;");
+replace('if(r?.top)return `<span class="master-op-rank top5">#${r.top} TOP</span>`;', 'if(r?.top)return `<span class="master-op-rank top5">#${r.top} TOP${r.confirmed?\'\':\' · CHO\'}</span>`;');
+replace('TOP ĐỦ NGƯỠNG','TOP THEO DOI');
+// Headline retains existing layout but explicitly separates attention from confirmation.
+replace("state=String(it?.state||'WATCH');", "state=String(it?.state||'WATCH');if(r.top&&!r.confirmed)state+=' · CHO';");
+replace("state=String(it?.eval?.state||'WATCH');", "state=String(it?.eval?.state||'WATCH');if(r.top&&!r.confirmed)state+=' · CHO';");
+replace('Chưa có trận đủ điều kiện TOP. Hệ thống sẽ để trống thay vì đẩy một trận yếu lên cho đủ.', 'Chua co tran du du lieu LIVE moi de xep TOP theo doi. TOP khong dong nghia tin hieu xac nhan.');
+replace('Chưa có TOP 2–5 đủ chuẩn.', 'Chua co them tran du du lieu de theo doi.');
+replace('Không ép TOP khi chưa đủ chuẩn', 'Cho du lieu LIVE du dung');
+replace('`${tops.length} TOP • ${suitable} SUITABLE`', '`${tops.length} TOP THEO DOI • ${tops.filter(x=>x.__rank.confirmed).length} READY/STRONG • ${suitable} SUITABLE`');
 fs.writeFileSync(path.join(r,'frontend/index.html'),s);
 let reversed=s;for(const [a,b]of [...changes].reverse())reversed=reversed.replace(b,a);if(reversed!==read('rollback/index.html'))throw Error('REGRESSION: baseline mismatch');
 const crypto=require('node:crypto');fs.writeFileSync(path.join(r,'SOURCE_LOCK.json'),JSON.stringify({baseline_sha256:crypto.createHash('sha256').update(read('rollback/index.html')).digest('hex'),candidate_sha256:crypto.createHash('sha256').update(s).digest('hex'),css_unchanged:true,dom_layout_unchanged:true,r2_included:false},null,2));
