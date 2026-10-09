@@ -37,9 +37,6 @@ try:
   assert 'test-1' in json.dumps(data),data.keys()
   assert data['watchState']['items'][0]['eval']['score']==r['engines']['FT']['score']
   assert data['handicapWatchState']['pool'][0]['latest']['status']=='2H'
-  disclosure=js('const cards=[...document.querySelectorAll(".fmd-card,.mt-intel")];return {count:cards.length,closed:cards.every(c=>{const d=c.closest("details.mt-model-details");return d&&!d.open&&d.querySelector("summary").textContent==="CHI TIET NGHIEN CUU"})};')
-  assert disclosure['count']>=2 and disclosure['closed'],disclosure
-  assert js('const d=document.querySelector(".fmd-card").closest("details");d.open=true;const ok=d.open&&!!d.querySelector(".mt-intel");d.open=false;return ok;')
   apply(row(rev=1,offset=-1000));assert 'test-1' in json.dumps(js('return window.FEUIReadBridge.read();'))
   r=row(rev=2,offset=-70000);r['captured_at']=int(time.time()*1000)+10
   # Guard stale snapshot independently of store ordering.
@@ -49,6 +46,9 @@ try:
   newer=js('return window.FELegacyNotifySync.guard({serverRow:arguments[0],latest:{captured_at:arguments[0].captured_at+1},eval:{score:51}});',[stale]);assert newer['eval']['score']==51 and 'serverRow' not in newer
   js('document.getElementById("backgroundWorkerUrl").value=location.origin;document.getElementById("backgroundWorkerToken").value="test";window.mock=arguments[0];window.fetch=async()=>{window.calls=(window.calls||0)+1;if(window.fail)throw Error("TEST_OFFLINE");return new Response(JSON.stringify(window.mock),{status:200});};',[{'schema':'FE_NOTIFY_UI_STATE_V1','server_at':int(time.time()*1000)+100,'snapshots':[row(rev=3,offset=100)]}])
   assert refresh()['ok'];assert js('return window.FELegacyNotifySync.read().state;')=='OK'
+  disclosure=js('const cards=[...document.querySelectorAll(".fmd-card,.mt-intel")];return {count:cards.length,closed:cards.every(c=>{const d=c.closest("details.mt-model-details");return d&&!d.open&&d.querySelector("summary").textContent==="CHI TIET NGHIEN CUU"})};')
+  assert disclosure['count']>=2 and disclosure['closed'],disclosure
+  assert js('const d=document.querySelector(".fmd-card").closest("details");d.open=true;const ok=d.open&&!!d.querySelector(".mt-intel");d.open=false;return ok;')
   js('window.fail=true;');assert refresh()['error']=='TEST_OFFLINE'
   guarded=js('const d=window.FEUIReadBridge.read();return d;');assert 'CHUA DONG BO' in json.dumps(guarded)
   js('window.fail=false;window.mock={schema:"FE_NOTIFY_UI_STATE_V1",server_at:Date.now()+1000,snapshots:[arguments[0]]};',[row(phase='1H',rev=4,offset=1000)]);assert refresh()['ok']
