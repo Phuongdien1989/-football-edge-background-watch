@@ -1,0 +1,37 @@
+name: Read-only real Football API LIVE diagnosis
+on:
+  push:
+    branches: [fix/production-notification-sync-20261009]
+    paths: ['.github/workflows/diagnose-live.yml']
+permissions:
+  contents: read
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Read provider status and LIVE endpoint without changing production
+        env:
+          APISPORTS_KEY: ${{ secrets.APISPORTS_KEY }}
+          BACKGROUND_TOKEN: ${{ secrets.BACKGROUND_TOKEN }}
+        run: |
+          node --input-type=module <<'JS'
+          const key=process.env.APISPORTS_KEY;
+          if(!key){console.log('DIRECT_API_DIAG_BLOCKED: APISPORTS_KEY not configured in GitHub Actions');}
+          else{
+            const paths=['/status','/fixtures?live=all','/fixtures?live=all&timezone=Asia%2FHo_Chi_Minh'];
+            for(const path of paths){
+              try{
+                const r=await fetch('https://v3.football.api-sports.io'+path,{headers:{'x-apisports-key':key},signal:AbortSignal.timeout(20000)});
+                const d=await r.json();
+                const out={path,http:r.status,errors:d.errors,results:d.results,subscription:path==='/status'?d.response?.subscription:undefined,requests:path==='/status'?d.response?.requests:undefined,quota:{day:r.headers.get('x-ratelimit-requests-remaining'),minute:r.headers.get('x-ratelimit-remaining')},fixtures:Array.isArray(d.response)?d.response.map(f=>({id:f.fixture?.id,status:f.fixture?.status})).slice(0,10):undefined};
+                console.log(JSON.stringify(out).replaceAll(key,'[REDACTED]'));
+              }catch(e){console.log(JSON.stringify({path,error:String(e.message).replaceAll(key,'[REDACTED]')}));}
+            }
+          }
+          const r=await fetch('https://football-edge-background-watch.ngophuonghuy.workers.dev/api/notify/status',{headers:{Authorization:'Bearer '+process.env.BACKGROUND_TOKEN},signal:AbortSignal.timeout(20000)});
+          const d=await r.json();console.log(JSON.stringify({backend_http:r.status,scan:d.scan,quota:d.global_api_quota}));
+          JS
