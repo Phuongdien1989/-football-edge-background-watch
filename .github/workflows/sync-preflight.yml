@@ -1,0 +1,51 @@
+name: Sync fix production read-only preflight
+on:
+  push:
+    branches: [fix/production-notification-sync-20261009]
+    paths: ['.github/workflows/sync-preflight.yml']
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Read deployed source and preserve rollback evidence
+        env:
+          CF_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CF_ACCOUNT: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          node --input-type=module <<'JS'
+          import fs from 'node:fs/promises';
+          import crypto from 'node:crypto';
+          await fs.mkdir('sync-preflight',{recursive:true});
+          const root='https://shiny-silence-d892.ngophuonghuy.workers.dev';
+          const hashes={};
+          for(const path of ['/','/push-sw.js','/manifest.webmanifest']){
+            const r=await fetch(root+path+'?fe_preflight='+Date.now(),{cache:'no-store'});
+            const name=path==='/'?'index.html':path.slice(1);
+            const text=await r.text();
+            hashes[name]={status:r.status,type:r.headers.get('content-type'),sha256:crypto.createHash('sha256').update(text).digest('hex')};
+            if(r.ok)await fs.writeFile('sync-preflight/'+name,text);
+          }
+          for(const service of ['shiny-silence-d892','football-edge-background-watch']){
+            for(const resource of ['deployments','content']){
+              const r=await fetch(`https://api.cloudflare.com/client/v4/accounts/${process.env.CF_ACCOUNT}/workers/scripts/${service}/${resource}`,{headers:{Authorization:'Bearer '+process.env.CF_TOKEN}});
+              if(!r.ok)throw Error(service+' '+resource+' HTTP '+r.status);
+              await fs.writeFile(`sync-preflight/${service}-${resource}.txt`,await r.text());
+              await fs.writeFile(`sync-preflight/${service}-${resource}-type.txt`,r.headers.get('content-type')||'');
+            }
+          }
+          await fs.writeFile('sync-preflight/assets.json',JSON.stringify(hashes,null,2));
+          console.log(JSON.stringify(hashes));
+          JS
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: fe-sync-production-preflight
+          path: sync-preflight/
+          retention-days: 30
