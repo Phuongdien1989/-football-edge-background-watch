@@ -1,0 +1,17 @@
+name: Verify original production LIVE scan with real API in WebKit
+on:
+  push:
+    branches: [fix/production-notification-sync-20261009]
+    paths: ['.github/workflows/verify-original-live.yml']
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update && sudo apt-get install -y xvfb webkit2gtk-driver
+      - run: python3 sync-fix/tests/test-original-live.py
+        env:
+          APISPORTS_KEY: ${{ secrets.APISPORTS_KEY }}
