@@ -1,0 +1,48 @@
+name: Deploy verified original UI notification sync
+on:
+  push:
+    branches: [fix/production-notification-sync-20261009]
+    paths: ['.github/workflows/deploy-sync.yml']
+concurrency:
+  group: football-edge-production
+  cancel-in-progress: false
+permissions:
+  contents: read
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: sudo apt-get update && sudo apt-get install -y xvfb webkit2gtk-driver
+      - run: node sync-fix/build.cjs
+      - run: node --experimental-vm-modules sync-fix/tests/test-worker.mjs
+      - run: python3 sync-fix/tests/test-browser.py
+  deploy:
+    needs: regression
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: npm install --no-save --no-audit --no-fund wrangler@4.119.0
+      - run: node sync-fix/build.cjs
+      - name: Guard, preserve original versions, deploy and verify real endpoints
+        run: node sync-fix/deploy.mjs
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          BACKGROUND_TOKEN: ${{ secrets.BACKGROUND_TOKEN }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: fe-original-ui-sync-production-evidence
+          path: |
+            sync-fix/evidence/
+            sync-fix/SOURCE_LOCK.json
+          retention-days: 90
