@@ -57,10 +57,10 @@ jobs:
           }
           if(!original)throw Error('ORIGINAL_FRONTEND_HASH_FAILED');
           const content=await (await cf('football-edge-background-watch')).text();
-          const source=await fs.readFile('worker_notify_v137_quota50000.js','utf8');
-          if(!content.includes(source))throw Error('ORIGINAL_BACKEND_SOURCE_MISMATCH');
+          // Wrangler bundles the modules; deployed text cannot equal the unbundled root file.
+          if(!content.includes('FE_API_QUOTA_50000_GLOBAL_V1'))throw Error('ORIGINAL_BACKEND_V137_MARKER_MISSING');
           if(content.includes('class SyncWatcher'))throw Error('SYNC_BACKEND_STILL_PRESENT');
-          console.log('ORIGINAL_BACKEND_SOURCE_VERIFIED');
+          console.log('ORIGINAL_BACKEND_BUNDLE_VERIFIED sha256='+hash(content));
           const auth={Authorization:'Bearer '+process.env.BG_TOKEN};
           let routeRestored=false;
           for(let i=0;i<60;i++){
