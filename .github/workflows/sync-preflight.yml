@@ -34,7 +34,9 @@ jobs:
           }
           for(const service of ['shiny-silence-d892','football-edge-background-watch']){
             for(const resource of ['deployments','content']){
-              const r=await fetch(`https://api.cloudflare.com/client/v4/accounts/${process.env.CF_ACCOUNT}/workers/scripts/${service}/${resource}`,{headers:{Authorization:'Bearer '+process.env.CF_TOKEN}});
+              if(service==='shiny-silence-d892'&&resource==='content')continue;
+              const suffix=resource==='content'?'':'/'+resource;
+              const r=await fetch(`https://api.cloudflare.com/client/v4/accounts/${process.env.CF_ACCOUNT}/workers/scripts/${service}${suffix}`,{headers:{Authorization:'Bearer '+process.env.CF_TOKEN}});
               if(!r.ok)throw Error(service+' '+resource+' HTTP '+r.status);
               await fs.writeFile(`sync-preflight/${service}-${resource}.txt`,await r.text());
               await fs.writeFile(`sync-preflight/${service}-${resource}-type.txt`,r.headers.get('content-type')||'');
