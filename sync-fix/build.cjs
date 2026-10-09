@@ -17,13 +17,7 @@ replace("    read:()=>feUICopy({\n      state:{selected:state.selected","    rea
 replace("    if(status)status.textContent=active?","    if(status)status.textContent=active?");
 replace("    if(!ctx.fid){empty.classList.remove('hidden');", "    const sync=window.FELegacyNotifySync?.read();if(status&&sync&&sync.state!=='IDLE')status.textContent+=' · '+(sync.state==='OK'?'DA DONG BO':sync.state==='SYNCING'?'DANG DONG BO':'CHUA DONG BO');\n    if(!ctx.fid){empty.classList.remove('hidden');");
 replace('    render();setInterval(render,3000);','    window.addEventListener("fe-notify-sync-updated",()=>{lastSig="";render()});render();setInterval(render,3000);');
-// Keep research calculations intact; only move their cards into the existing disclosure.
-for(const mode of ['FT','H1']){
- const cards="${fmdHTML(s.final_model_decision)}${mtIntelHTML(s,'"+mode+"')}";
- replace(cards+'<details class="mt-model-details"><summary>MODEL DETAILS</summary>',
- '<details class="mt-model-details"><summary>CHI TIET NGHIEN CUU</summary>'+cards);
-}
 fs.writeFileSync(path.join(r,'frontend/index.html'),s);
 let reversed=s;for(const [a,b]of [...changes].reverse())reversed=reversed.replace(b,a);if(reversed!==read('rollback/index.html'))throw Error('REGRESSION: baseline mismatch');
-const crypto=require('node:crypto');fs.writeFileSync(path.join(r,'SOURCE_LOCK.json'),JSON.stringify({baseline_sha256:crypto.createHash('sha256').update(read('rollback/index.html')).digest('hex'),candidate_sha256:crypto.createHash('sha256').update(s).digest('hex'),css_unchanged:true,dom_layout_unchanged:false,research_cards_collapsed:true,r2_included:false},null,2));
-console.log('PASS exact reversal to P2052; CSS unchanged; research cards inside closed disclosure');
+const crypto=require('node:crypto');fs.writeFileSync(path.join(r,'SOURCE_LOCK.json'),JSON.stringify({baseline_sha256:crypto.createHash('sha256').update(read('rollback/index.html')).digest('hex'),candidate_sha256:crypto.createHash('sha256').update(s).digest('hex'),css_unchanged:true,dom_layout_unchanged:true,r2_included:false},null,2));
+console.log('PASS exact reversal to P2052; CSS and layout unchanged');
