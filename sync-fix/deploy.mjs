@@ -48,17 +48,17 @@ const expected=sha(await fs.readFile(path.join(pub,'index.html')));
 try{
  await deploy('backend',path.join(dir,'backend.toml'));
  let state;
- for(let i=0;i<60;i++){
+ for(let i=0;i<48;i++){
   const r=await read(urls.backend+'/api/notify/ui-state',true);
   await fs.appendFile(path.join(out,'sync-smoke-attempts.ndjson'),JSON.stringify({attempt:i,status:r.status,cache_control:r.headers.get('cache-control')})+'\n');
   if(r.status===200){state=await r.json();if(state.schema==='FE_NOTIFY_UI_STATE_V1'&&r.headers.get('cache-control')==='no-store')break;}
-  state=null;await new Promise(r=>setTimeout(r,2000));
+  state=null;await new Promise(r=>setTimeout(r,10000));
  }
- if(!state)throw Error('BACKEND_SYNC_SMOKE_FAILED_AFTER_120_SECONDS');
+ if(!state)throw Error('BACKEND_SYNC_SMOKE_FAILED_AFTER_8_MINUTES');
  if((await read(urls.backend+'/api/notify/ui-state')).status!==401)throw Error('BACKEND_AUTH_REGRESSION');
  await deploy('frontend',path.join(dir,'frontend.json'));
  let passed=false;
- for(let i=0;i<12;i++){
+ for(let i=0;i<60;i++){
   const r=await read(urls.frontend+'/?fe_sync_smoke='+Date.now());
   if(r.ok&&sha(await r.text())===expected){passed=true;break;}
   await new Promise(r=>setTimeout(r,2000));

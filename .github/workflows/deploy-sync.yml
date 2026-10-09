@@ -47,4 +47,4 @@ jobs:
             sync-fix/SOURCE_LOCK.json
           retention-days: 90
 
-# Retry with verified restored V137 rollback version and propagation allowance.
+# Retry after confirmed baseline rollback; allow global Durable Object propagation.
