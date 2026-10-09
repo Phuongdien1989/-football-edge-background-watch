@@ -5,7 +5,7 @@ try:
  session=call('POST','/session',{'capabilities':{'alwaysMatch':{'browserName':'MiniBrowser'}}})['sessionId']
  cmd('/window/rect',{'width':390,'height':844,'x':0,'y':0})
  cmd('/url',{'url':'https://shiny-silence-d892.ngophuonghuy.workers.dev/?verify_live=original'})
- assert js('return !!window.FEUIReadBridge && !window.FELegacyNotifySync;'),'ORIGINAL_BASELINE_NOT_LOADED'
+ assert js('return !!window.FEUIReadBridge && !!window.FELegacyNotifySync===arguments[0];',[os.environ.get('EXPECT_NOTIFY_SYNC')=='1']),'EXPECTED_RELEASE_NOT_LOADED'
  js('document.getElementById("footballKey").value=arguments[0];document.getElementById("footballProvider").value="direct";document.getElementById("footballBase").value="https://v3.football.api-sports.io";window.__liveErrors=[];window.addEventListener("error",e=>window.__liveErrors.push(e.message));',[os.environ['APISPORTS_KEY']])
  js('document.querySelector("#scanButtons button[data-h=live]").click();')
  for i in range(60):

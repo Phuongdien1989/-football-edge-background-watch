@@ -1,0 +1,75 @@
+name: Restore verified notification sync before hiding research cards
+on:
+  push:
+    branches: [fix/production-notification-sync-20261009]
+    paths: ['.github/workflows/restore-prehide.yml']
+concurrency:
+  group: football-edge-production
+  cancel-in-progress: false
+permissions:
+  contents: read
+jobs:
+  restore:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Restore both exact pre-hide versions
+        env:
+          CF_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CF_ACCOUNT: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          BG_TOKEN: ${{ secrets.BACKGROUND_TOKEN }}
+        run: |
+          node --input-type=module <<'JS'
+          import fs from 'node:fs/promises';
+          import {createHash} from 'node:crypto';
+          const targets=[{name:'football-edge-background-watch',version:'491076a2-78d9-48f0-9050-ffc0f479c531',before:'37c473f4-f2f7-4b77-a441-fc50baf48974'},{name:'shiny-silence-d892',version:'9b5bb5f1-fb53-4a54-9825-b0850ea28074',before:'c1ab7df6-d13d-436c-a656-c42a547b3420'}];
+          const headers={Authorization:'Bearer '+process.env.CF_TOKEN,'Content-Type':'application/json'};
+          await fs.mkdir('prehide-restore-evidence',{recursive:true});
+          const cf=async(t,options={})=>{
+            const r=await fetch(`https://api.cloudflare.com/client/v4/accounts/${process.env.CF_ACCOUNT}/workers/scripts/${t.name}/deployments`,{...options,headers,signal:AbortSignal.timeout(30000)});
+            if(!r.ok)throw Error('CLOUDFLARE_'+t.name+'_HTTP_'+r.status);return await r.json();
+          };
+          for(const t of targets){const d=await cf(t),v=d.result.deployments[0].versions;if(v.length!==1||![t.before,t.version].includes(v[0].version_id))throw Error('PRODUCTION_CHANGED_'+t.name);await fs.writeFile('prehide-restore-evidence/'+t.name+'-before.json',JSON.stringify(d));}
+          for(const t of targets){
+            await cf(t,{method:'POST',body:JSON.stringify({strategy:'percentage',versions:[{version_id:t.version,percentage:100}],annotations:{'workers/message':'Restore user-selected completed notification sync before research-card hide'}})});
+            const d=await cf(t);if(d.result.deployments[0].versions[0].version_id!==t.version)throw Error('RESTORE_VERSION_FAILED_'+t.name);
+            console.log('PREHIDE_VERSION_VERIFIED '+t.name+' '+t.version);
+          }
+          let frontend=false;
+          for(let i=0;i<60;i++){
+            const r=await fetch('https://shiny-silence-d892.ngophuonghuy.workers.dev/?prehide_restore='+Date.now(),{cache:'no-store'}),s=await r.text();
+            if(r.ok&&createHash('sha256').update(s).digest('hex')==='09aaffa8791f64144072dacefa41ec7046ed313063d3c83aa28e68ee6cf3c8e1'){frontend=true;await fs.writeFile('prehide-restore-evidence/index.html',s);break;}
+            await new Promise(r=>setTimeout(r,2000));
+          }
+          if(!frontend)throw Error('PREHIDE_FRONTEND_HASH_FAILED');
+          let state;
+          for(let i=0;i<100;i++){
+            const r=await fetch('https://football-edge-background-watch.ngophuonghuy.workers.dev/api/notify/ui-state',{headers:{Authorization:'Bearer '+process.env.BG_TOKEN},cache:'no-store'}),d=await r.json();
+            if(r.status===200&&d.schema==='FE_NOTIFY_UI_STATE_V1'){state=d;break;}
+            await new Promise(r=>setTimeout(r,3000));
+          }
+          if(!state)throw Error('PREHIDE_BACKEND_RUNTIME_FAILED');
+          console.log(JSON.stringify({prehide_source:'PASS',research_cards_hidden:false,backend_schema:state.schema,snapshots:state.snapshots.length,live_count:state.live_count}));
+          JS
+      - run: sudo apt-get update && sudo apt-get install -y xvfb webkit2gtk-driver
+      - name: Verify actual production notification synchronization
+        run: python3 sync-fix/tests/test-production.py
+        env:
+          BACKGROUND_TOKEN: ${{ secrets.BACKGROUND_TOKEN }}
+      - name: Verify real LIVE list and scan button on restored sync release
+        run: python3 sync-fix/tests/test-original-live.py
+        env:
+          APISPORTS_KEY: ${{ secrets.APISPORTS_KEY }}
+          EXPECT_NOTIFY_SYNC: '1'
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: fe-verified-prehide-restore
+          path: |
+            prehide-restore-evidence/
+            sync-fix/tests/BROWSER.log
+          retention-days: 90
