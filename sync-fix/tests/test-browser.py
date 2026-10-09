@@ -13,7 +13,7 @@ driver=subprocess.Popen(['WebKitWebDriver','--port=9515'],env=env,stdout=log,std
 def call(method,route,body=None):
  req=urllib.request.Request('http://127.0.0.1:9515'+route,data=json.dumps(body).encode() if body is not None else None,headers={'Content-Type':'application/json'},method=method)
  with urllib.request.urlopen(req,timeout=30) as r:data=json.loads(r.read())
- if isinstance(data.get('value'),dict) and data['value'].get('error'):raise RuntimeError(data['value'])
+ if isinstance(data.get('value'),dict) and data['value'].get('error') and 'message' in data['value']:raise RuntimeError(data['value'])
  return data.get('value')
 def cmd(route,body=None,method='POST'):return call(method,'/session/'+session+route,body)
 def js(script,args=[]):return cmd('/execute/sync',{'script':script,'args':args})
@@ -35,6 +35,8 @@ try:
   data=js('return window.FEUIReadBridge.read();');ft=data['watch'][0] if 'watch' in data else None
   # Read the exact old UI bridge rather than a mock/replacement UI.
   assert 'test-1' in json.dumps(data),data.keys()
+  assert data['watchState']['items'][0]['eval']['score']==r['engines']['FT']['score']
+  assert data['handicapWatchState']['pool'][0]['latest']['status']=='2H'
   apply(row(rev=1,offset=-1000));assert 'test-1' in json.dumps(js('return window.FEUIReadBridge.read();'))
   r=row(rev=2,offset=-70000);r['captured_at']=int(time.time()*1000)+10
   # Guard stale snapshot independently of store ordering.
@@ -46,6 +48,11 @@ try:
   assert refresh()['ok'];assert js('return window.FELegacyNotifySync.read().state;')=='OK'
   js('window.fail=true;');assert refresh()['error']=='TEST_OFFLINE'
   guarded=js('const d=window.FEUIReadBridge.read();return d;');assert 'CHUA DONG BO' in json.dumps(guarded)
+  js('window.fail=false;window.mock={schema:"FE_NOTIFY_UI_STATE_V1",server_at:Date.now()+1000,snapshots:[arguments[0]]};',[row(phase='1H',rev=4,offset=1000)]);assert refresh()['ok']
+  data=js('return window.FEUIReadBridge.read();');assert data['h1WatchState']['items'][0]['latest']['status']=='1H'
+  js('window.mock={schema:"FE_NOTIFY_UI_STATE_V1",server_at:Date.now()+2000,snapshots:[arguments[0]]};',[row(phase='FT',rev=5,offset=2000)]);assert refresh()['ok']
+  data=js('return window.FEUIReadBridge.read();');assert data['watchState']['items'][0]['state']=='ENDED' and data['watchState']['items'][0]['eval']['score'] is None
+  js('window.mock={schema:"FE_NOTIFY_UI_STATE_V1",server_at:Date.now()+3000,snapshots:[]};');assert refresh()['error']=='SERVER_SNAPSHOT_PENDING'
   assert js('return window.__errors;')==[],js('return window.__errors;')
   print('PASS full original WebKit app width='+str(width)+': canonical runtime, ordering, stale/newer local guards, authenticated refresh, offline suppression, no JS errors',flush=True)
 finally:

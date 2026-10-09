@@ -3,9 +3,11 @@
   function feSyncGuard(item){
     if(!item)return item;
     const copy=JSON.parse(JSON.stringify(item)),row=copy.serverRow;
-    if(!row)return copy;
+    const pending=['SYNCING','ERROR'].includes(FE_LEGACY_SYNC.state);
+    if(!row&&!pending)return copy;
+    if(!row){copy.state='DATA_WAIT';copy.reason=FE_LEGACY_SYNC.state==='SYNCING'?'DANG DONG BO':'CHUA DONG BO · '+FE_LEGACY_SYNC.error;copy.eval={...copy.eval,score:null,hardVeto:true,dataIncomplete:true};copy.serverGoal={prob:null,source:copy.reason};return copy;}
     if(Number(copy.latest?.captured_at)>row.captured_at){delete copy.serverRow;delete copy.serverGoal;return copy;}
-    const d=window.FEStateCore.disposition(row),pending=['SYNCING','ERROR'].includes(FE_LEGACY_SYNC.state);
+    const d=window.FEStateCore.disposition(row);
     if(d.key==='CURRENT'&&!pending)return copy;
     copy.state=d.key==='ENDED'?'ENDED':d.key==='STALE'?'STALE':'DATA_WAIT';
     copy.reason=pending?(FE_LEGACY_SYNC.state==='SYNCING'?'DANG DONG BO':'CHUA DONG BO · '+FE_LEGACY_SYNC.error):d.label;
@@ -76,6 +78,7 @@
       if(id)q.set('fixture',id);let device=FE_PUSH_P02.deviceId;try{device=device||localStorage.getItem(FE_PUSH_P02.deviceKey)}catch{}
       if(device)q.set('device',device);
       const packet=await bgRequest('/api/notify/ui-state?'+q.toString());feSyncApply(packet);
+      if(id&&!packet.snapshots.some(r=>r.fixture_id===id))throw Error('SERVER_SNAPSHOT_PENDING');
       FE_LEGACY_SYNC.state='OK';FE_LEGACY_SYNC.error='';FE_LEGACY_SYNC.lastAt=Date.now();feSyncRender();
       if(FE_LEGACY_SYNC.link){const target={H1:'h1WatchCard',FT:'liveWatchCard',HC:'handicapWatchCard'}[FE_LEGACY_SYNC.link.mode];document.getElementById(target)?.scrollIntoView({block:'start'});}
       return {ok:true,snapshots:packet.snapshots.length};

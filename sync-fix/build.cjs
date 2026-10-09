@@ -16,6 +16,7 @@ replace("    read:()=>feUICopy({\n      state:{selected:state.selected","    rea
 // No DOM/CSS edits: append sync state to the original status line only.
 replace("    if(status)status.textContent=active?","    if(status)status.textContent=active?");
 replace("    if(!ctx.fid){empty.classList.remove('hidden');", "    const sync=window.FELegacyNotifySync?.read();if(status&&sync&&sync.state!=='IDLE')status.textContent+=' · '+(sync.state==='OK'?'DA DONG BO':sync.state==='SYNCING'?'DANG DONG BO':'CHUA DONG BO');\n    if(!ctx.fid){empty.classList.remove('hidden');");
+replace('    render();setInterval(render,3000);','    window.addEventListener("fe-notify-sync-updated",()=>{lastSig="";render()});render();setInterval(render,3000);');
 fs.writeFileSync(path.join(r,'frontend/index.html'),s);
 let reversed=s;for(const [a,b]of [...changes].reverse())reversed=reversed.replace(b,a);if(reversed!==read('rollback/index.html'))throw Error('REGRESSION: baseline mismatch');
 const crypto=require('node:crypto');fs.writeFileSync(path.join(r,'SOURCE_LOCK.json'),JSON.stringify({baseline_sha256:crypto.createHash('sha256').update(read('rollback/index.html')).digest('hex'),candidate_sha256:crypto.createHash('sha256').update(s).digest('hex'),css_unchanged:true,dom_layout_unchanged:true,r2_included:false},null,2));
