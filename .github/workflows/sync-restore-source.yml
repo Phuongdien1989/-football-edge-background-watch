@@ -1,0 +1,40 @@
+name: Restore exact V137 source baseline
+on:
+  push:
+    branches: [fix/production-notification-sync-20261009]
+    paths: ['.github/workflows/sync-restore-source.yml']
+permissions:
+  contents: read
+jobs:
+  restore:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: npm install --no-save --no-audit --no-fund wrangler@4.119.0
+      - name: Inspect then restore untouched original source
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          BACKGROUND_TOKEN: ${{ secrets.BACKGROUND_TOKEN }}
+        run: |
+          node --input-type=module <<'JS'
+          import {spawnSync} from 'node:child_process';
+          const headers={Authorization:'Bearer '+process.env.BACKGROUND_TOKEN};
+          const root='https://football-edge-background-watch.ngophuonghuy.workers.dev';
+          let r=await fetch(root+'/api/notify/ui-state',{headers});let d=await r.json().catch(()=>({}));
+          console.log(JSON.stringify({before_status:r.status,schema:d.schema,cache_control:r.headers.get('cache-control'),live_count:d.live_count,snapshots:d.snapshots?.length}));
+          const cmd=spawnSync(process.execPath,['node_modules/wrangler/bin/wrangler.js','deploy','--config','wrangler.toml'],{stdio:'inherit',env:process.env});
+          if(cmd.status!==0)throw Error('RESTORE_ORIGINAL_SOURCE_FAILED');
+          for(let i=0;i<30;i++){
+            r=await fetch(root+'/api/notify/ui-state',{headers,cache:'no-store'});d=await r.json().catch(()=>({}));
+            if(r.status===404){console.log('Original V137 route restored: ui-state HTTP 404');break;}
+            if(i===29)throw Error('RESTORE_SOURCE_SMOKE_FAILED');
+            await new Promise(r=>setTimeout(r,2000));
+          }
+          r=await fetch(root+'/api/notify/status',{headers});if(r.status!==200)throw Error('ORIGINAL_STATUS_FAILED');
+          console.log('Original notification status HTTP 200');
+          JS
