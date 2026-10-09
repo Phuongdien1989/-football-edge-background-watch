@@ -1,0 +1,28 @@
+name: Original UI notification sync regression
+on:
+  push:
+    branches: [fix/production-notification-sync-20261009]
+    paths: ['sync-fix/**', '.github/workflows/test-sync.yml']
+permissions:
+  contents: read
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: sudo apt-get update && sudo apt-get install -y xvfb webkit2gtk-driver
+      - run: node sync-fix/build.cjs
+      - run: node --experimental-vm-modules sync-fix/tests/test-worker.mjs
+      - run: python3 sync-fix/tests/test-browser.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: fe-sync-regression
+          path: |
+            sync-fix/tests/BROWSER.log
+            sync-fix/SOURCE_LOCK.json
+          retention-days: 30
