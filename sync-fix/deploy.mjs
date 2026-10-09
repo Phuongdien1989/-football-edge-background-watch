@@ -6,14 +6,14 @@ import {spawnSync} from 'node:child_process';
 const root=path.dirname(fileURLToPath(import.meta.url)),out=path.join(root,'evidence');
 await fs.mkdir(out,{recursive:true});
 const services={backend:'football-edge-background-watch',frontend:'shiny-silence-d892'};
-const previous={backend:'6c1b74e6-4327-4ce2-b5d7-5dc42803cf13',frontend:'c1ab7df6-d13d-436c-a656-c42a547b3420'};
+const previous={backend:'37c473f4-f2f7-4b77-a441-fc50baf48974',frontend:'c1ab7df6-d13d-436c-a656-c42a547b3420'};
 const urls={backend:'https://football-edge-background-watch.ngophuonghuy.workers.dev',frontend:'https://shiny-silence-d892.ngophuonghuy.workers.dev'};
 const sha=s=>createHash('sha256').update(s).digest('hex');
 const token=process.env.CLOUDFLARE_API_TOKEN,account=process.env.CLOUDFLARE_ACCOUNT_ID,bg=process.env.BACKGROUND_TOKEN;
 if(!token||!account||!bg)throw Error('MISSING_CONFIGURED_GITHUB_SECRET');
 async function cf(service,suffix='',options={}){
  const r=await fetch(`https://api.cloudflare.com/client/v4/accounts/${account}/workers/scripts/${service}${suffix}`,{...options,headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},signal:AbortSignal.timeout(30000)});
- if(!r.ok)throw Error('CLOUDFLARE_HTTP_'+r.status+'_'+service);
+ if(!r.ok){const d=await r.json().catch(()=>({}));throw Error('CLOUDFLARE_HTTP_'+r.status+'_'+service+' '+JSON.stringify(d.errors||[]));}
  return r;
 }
 async function versions(key){return (await (await cf(services[key],'/deployments')).json()).result.deployments;}
@@ -27,6 +27,8 @@ if(sha(baseline)!=='a82bf87e1db875fb975b94ac9b6df9e785818de37b7bb55fec6f290efca9
 await fs.writeFile(path.join(out,'frontend-original.html'),baseline);
 await fs.writeFile(path.join(out,'backend-original.multipart'),await (await cf(services.backend)).text());
 if((await read(urls.backend+'/api/notify/status',true)).status!==200)throw Error('BACKGROUND_TOKEN_AUTH_FAILED_BEFORE_DEPLOY');
+const oldRoute=await read(urls.backend+'/api/notify/ui-state',true);
+if(oldRoute.status!==405||(await oldRoute.json()).error!=='METHOD_NOT_ALLOWED')throw Error('V137_BASELINE_ROUTE_CHANGED');
 const dir=path.join(root,'deploy'),pub=path.join(dir,'public');await fs.mkdir(pub,{recursive:true});
 for(const name of ['index.html','push-sw.js','manifest.webmanifest'])await fs.copyFile(path.join(root,'frontend',name),path.join(pub,name));
 let workerConfig=await fs.readFile(path.join(root,'..','wrangler.toml'),'utf8');
@@ -46,12 +48,13 @@ const expected=sha(await fs.readFile(path.join(pub,'index.html')));
 try{
  await deploy('backend',path.join(dir,'backend.toml'));
  let state;
- for(let i=0;i<12;i++){
+ for(let i=0;i<60;i++){
   const r=await read(urls.backend+'/api/notify/ui-state',true);
+  await fs.appendFile(path.join(out,'sync-smoke-attempts.ndjson'),JSON.stringify({attempt:i,status:r.status,cache_control:r.headers.get('cache-control')})+'\n');
   if(r.status===200){state=await r.json();if(state.schema==='FE_NOTIFY_UI_STATE_V1'&&r.headers.get('cache-control')==='no-store')break;}
   state=null;await new Promise(r=>setTimeout(r,2000));
  }
- if(!state)throw Error('BACKEND_SYNC_SMOKE_FAILED');
+ if(!state)throw Error('BACKEND_SYNC_SMOKE_FAILED_AFTER_120_SECONDS');
  if((await read(urls.backend+'/api/notify/ui-state')).status!==401)throw Error('BACKEND_AUTH_REGRESSION');
  await deploy('frontend',path.join(dir,'frontend.json'));
  let passed=false;
