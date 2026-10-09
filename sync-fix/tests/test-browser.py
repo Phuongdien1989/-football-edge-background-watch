@@ -7,8 +7,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
  def log_message(self,*args):pass
 httpd=http.server.ThreadingHTTPServer(('127.0.0.1',0),Handler);threading.Thread(target=httpd.serve_forever,daemon=True).start()
 display=':'+str(200+os.getpid()%500);log=open(ROOT/'tests/BROWSER.log','w')
-x=subprocess.Popen(['Xvfb',display,'-nolisten','unix','-nolisten','local','-listen','tcp','-screen','0','1600x1400x24','-ac'],stdout=log,stderr=log)
-env={**os.environ,'DISPLAY':'localhost'+display,'WEBKIT_DISABLE_SANDBOX_THIS_IS_DANGEROUS':'1','WEBKIT_DISABLE_DMABUF_RENDERER':'1'}
+x=subprocess.Popen(['Xvfb',display,'-screen','0','1600x1400x24','-ac'],stdout=log,stderr=log)
+env={**os.environ,'DISPLAY':display,'NO_AT_BRIDGE':'1','WEBKIT_DISABLE_SANDBOX_THIS_IS_DANGEROUS':'1','WEBKIT_DISABLE_DMABUF_RENDERER':'1'}
 driver=subprocess.Popen(['WebKitWebDriver','--port=9515'],env=env,stdout=log,stderr=log);session=None
 def call(method,route,body=None):
  req=urllib.request.Request('http://127.0.0.1:9515'+route,data=json.dumps(body).encode() if body is not None else None,headers={'Content-Type':'application/json'},method=method)
