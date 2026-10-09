@@ -37,6 +37,9 @@ try:
   assert 'test-1' in json.dumps(data),data.keys()
   assert data['watchState']['items'][0]['eval']['score']==r['engines']['FT']['score']
   assert data['handicapWatchState']['pool'][0]['latest']['status']=='2H'
+  disclosure=js('const cards=[...document.querySelectorAll(".fmd-card,.mt-intel")];return {count:cards.length,closed:cards.every(c=>{const d=c.closest("details.mt-model-details");return d&&!d.open&&d.querySelector("summary").textContent==="CHI TIET NGHIEN CUU"})};')
+  assert disclosure['count']>=2 and disclosure['closed'],disclosure
+  assert js('const d=document.querySelector(".fmd-card").closest("details");d.open=true;const ok=d.open&&!!d.querySelector(".mt-intel");d.open=false;return ok;')
   apply(row(rev=1,offset=-1000));assert 'test-1' in json.dumps(js('return window.FEUIReadBridge.read();'))
   r=row(rev=2,offset=-70000);r['captured_at']=int(time.time()*1000)+10
   # Guard stale snapshot independently of store ordering.
