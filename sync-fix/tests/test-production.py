@@ -8,7 +8,12 @@ try:
  assert js('return !!window.FELegacyNotifySync && !!window.FEUIReadBridge;'),'PRODUCTION_SYNC_SCRIPT_MISSING'
  js('document.getElementById("backgroundWorkerUrl").value=arguments[0];document.getElementById("backgroundWorkerToken").value=arguments[1];',['https://football-edge-background-watch.ngophuonghuy.workers.dev',os.environ['BACKGROUND_TOKEN']])
  result=refresh();assert result.get('ok'),result
- status=js('return window.FELegacyNotifySync.read();');assert status['state']=='OK',status
+ # A pageshow/focus resume may start another refresh immediately after explicit refresh.
+ for i in range(15):
+  status=js('return window.FELegacyNotifySync.read();')
+  if status['state']!='SYNCING':break
+  time.sleep(1)
+ assert status['state']=='OK',status
  data=js('return window.FEUIReadBridge.read();')
  counts={};rows={}
  for name,key in [('watchState','items'),('h1WatchState','items'),('handicapWatchState','pool')]:

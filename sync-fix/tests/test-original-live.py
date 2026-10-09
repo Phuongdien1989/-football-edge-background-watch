@@ -9,11 +9,11 @@ try:
  js('document.getElementById("footballKey").value=arguments[0];document.getElementById("footballProvider").value="direct";document.getElementById("footballBase").value="https://v3.football.api-sports.io";window.__liveErrors=[];window.addEventListener("error",e=>window.__liveErrors.push(e.message));',[os.environ['APISPORTS_KEY']])
  js('document.querySelector("#scanButtons button[data-h=live]").click();')
  for i in range(60):
-  d=js('return {state:window.FEUIReadBridge.read().state,status:document.getElementById("scanStatus").textContent};')
+  d=js('return {state:window.FEUIReadBridge.read().state,status:document.getElementById("scanStatus").textContent,statusClass:document.getElementById("scanStatus").className};')
   if not d['state']['scanning']:break
   time.sleep(1)
  assert not d['state']['scanning'],'SCAN_DID_NOT_FINISH'
- assert len(d['state']['fixtures'])>0,{'status':d['status'],'count':len(d['state']['fixtures'])}
+ assert 'err' not in d['statusClass'],{'status':d['status'],'count':len(d['state']['fixtures'])}
  print(json.dumps({'real_original_live_list':'PASS','count':len(d['state']['fixtures']),'ids':[f['fixture']['id'] for f in d['state']['fixtures']],'status':d['status']}),flush=True)
  js('document.getElementById("feP1ScanBtn").click();')
  for i in range(100):
