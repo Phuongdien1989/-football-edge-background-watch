@@ -1,0 +1,54 @@
+name: Restore pre-collapse UI and inspect LIVE health
+on:
+  push:
+    branches: [fix/production-notification-sync-20261009]
+    paths: ['.github/workflows/rollback-research.yml']
+concurrency:
+  group: football-edge-production
+  cancel-in-progress: false
+permissions:
+  contents: read
+jobs:
+  restore:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Restore verified pre-collapse version and read API health
+        env:
+          CF_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CF_ACCOUNT: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          BG_TOKEN: ${{ secrets.BACKGROUND_TOKEN }}
+        run: |
+          node --input-type=module <<'JS'
+          import fs from 'node:fs/promises';
+          import {createHash} from 'node:crypto';
+          const version='9b5bb5f1-fb53-4a54-9825-b0850ea28074';
+          const root='https://shiny-silence-d892.ngophuonghuy.workers.dev';
+          const endpoint=`https://api.cloudflare.com/client/v4/accounts/${process.env.CF_ACCOUNT}/workers/scripts/shiny-silence-d892/deployments`;
+          const headers={Authorization:'Bearer '+process.env.CF_TOKEN,'Content-Type':'application/json'};
+          const before=await (await fetch(endpoint,{headers})).json();
+          const active=before.result.deployments[0].versions;
+          if(active.length!==1||!['8ccef0ff-21eb-4ab1-abfc-247390f6ac42',version].includes(active[0].version_id))throw Error('FRONTEND_CHANGED_STOP');
+          if(active[0].version_id!==version){
+            const r=await fetch(endpoint,{method:'POST',headers,body:JSON.stringify({strategy:'percentage',versions:[{version_id:version,percentage:100}],annotations:{'workers/message':'User requested restoring pre-collapse UI after LIVE scan issue'}})});
+            if(!r.ok)throw Error('ROLLBACK_HTTP_'+r.status);
+          }
+          let verified=false;
+          for(let i=0;i<45;i++){
+            const r=await fetch(root+'/?rollback_check='+Date.now(),{cache:'no-store'});
+            if(r.ok&&createHash('sha256').update(await r.text()).digest('hex')==='09aaffa8791f64144072dacefa41ec7046ed313063d3c83aa28e68ee6cf3c8e1'){verified=true;break;}
+            await new Promise(r=>setTimeout(r,2000));
+          }
+          if(!verified)throw Error('ROLLBACK_SOURCE_CHECK_FAILED');
+          console.log('ROLLBACK_SOURCE_VERIFIED '+version);
+          for(const route of ['/api/notify/status','/api/notify/quota-status','/api/notify/ui-state']){
+            const r=await fetch('https://football-edge-background-watch.ngophuonghuy.workers.dev'+route,{headers:{Authorization:'Bearer '+process.env.BG_TOKEN},cache:'no-store'});
+            const d=await r.json();
+            if(route.endsWith('ui-state'))console.log(JSON.stringify({route,http:r.status,server_at:d.server_at,live_count:d.live_count,snapshots:(d.snapshots||[]).map(x=>({id:x.fixture_id,captured_at:x.captured_at,active_live:x.active_live,phase:x.fixture?.fixture?.status,health:x.source_health,publication_error:x.publication_error}))}));
+            else console.log(JSON.stringify({route,http:r.status,fields:Object.keys(d),scan:d.scan,last_scan:d.last_scan,global_api_quota:d.global_api_quota,quota:route.endsWith('quota-status')?d:undefined}));
+          }
+          JS
