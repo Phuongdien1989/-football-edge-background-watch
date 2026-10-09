@@ -1,0 +1,18 @@
+name: Verify real production app synchronization
+on:
+  push:
+    branches: [fix/production-notification-sync-20261009]
+    paths: ['.github/workflows/verify-sync-production.yml']
+permissions:
+  contents: read
+jobs:
+  real-app:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update && sudo apt-get install -y xvfb webkit2gtk-driver
+      - name: Open actual production app and read actual backend snapshots
+        run: python3 sync-fix/tests/test-production.py
+        env:
+          BACKGROUND_TOKEN: ${{ secrets.BACKGROUND_TOKEN }}
