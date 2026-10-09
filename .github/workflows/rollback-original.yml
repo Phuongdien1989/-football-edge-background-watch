@@ -1,0 +1,84 @@
+name: Restore frozen original P2052 and V137 production
+on:
+  push:
+    branches: [fix/production-notification-sync-20261009]
+    paths: ['.github/workflows/rollback-original.yml']
+concurrency:
+  group: football-edge-production
+  cancel-in-progress: false
+permissions:
+  contents: read
+jobs:
+  restore:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Restore both frozen versions and verify deployed source
+        env:
+          CF_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CF_ACCOUNT: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          BG_TOKEN: ${{ secrets.BACKGROUND_TOKEN }}
+        run: |
+          node --input-type=module <<'JS'
+          import fs from 'node:fs/promises';
+          import {createHash} from 'node:crypto';
+          const hash=s=>createHash('sha256').update(s).digest('hex');
+          const targets=[{name:'shiny-silence-d892',version:'c1ab7df6-d13d-436c-a656-c42a547b3420',allowed:['9b5bb5f1-fb53-4a54-9825-b0850ea28074','8ccef0ff-21eb-4ab1-abfc-247390f6ac42']},{name:'football-edge-background-watch',version:'37c473f4-f2f7-4b77-a441-fc50baf48974',allowed:['491076a2-78d9-48f0-9050-ffc0f479c531']}];
+          const headers={Authorization:'Bearer '+process.env.CF_TOKEN,'Content-Type':'application/json'};
+          await fs.mkdir('original-rollback-evidence',{recursive:true});
+          const cf=async(name,suffix='',options={})=>{
+            const r=await fetch(`https://api.cloudflare.com/client/v4/accounts/${process.env.CF_ACCOUNT}/workers/scripts/${name}${suffix}`,{...options,headers,signal:AbortSignal.timeout(30000)});
+            if(!r.ok)throw Error('CLOUDFLARE_'+name+'_HTTP_'+r.status);return r;
+          };
+          for(const t of targets){
+            const d=await (await cf(t.name,'/deployments')).json();
+            const active=d.result.deployments[0].versions;
+            await fs.writeFile('original-rollback-evidence/'+t.name+'-before.json',JSON.stringify(d));
+            if(active.length!==1||![t.version,...t.allowed].includes(active[0].version_id))throw Error('UNEXPECTED_DEPLOYMENT_'+t.name);
+          }
+          for(const t of targets){
+            await cf(t.name,'/deployments',{method:'POST',body:JSON.stringify({strategy:'percentage',versions:[{version_id:t.version,percentage:100}],annotations:{'workers/message':'User requested full frozen P2052/V137 rollback after LIVE scan failure'}})});
+            const d=await (await cf(t.name,'/deployments')).json();
+            if(d.result.deployments[0].versions[0].version_id!==t.version)throw Error('ROLLBACK_VERSION_MISMATCH_'+t.name);
+            console.log('ORIGINAL_VERSION_VERIFIED '+t.name+' '+t.version);
+          }
+          let original=false;
+          for(let i=0;i<60;i++){
+            const r=await fetch('https://shiny-silence-d892.ngophuonghuy.workers.dev/?full_original='+Date.now(),{cache:'no-store'});
+            const s=await r.text();
+            if(r.ok&&hash(s)==='a82bf87e1db875fb975b94ac9b6df9e785818de37b7bb55fec6f290efca9c844'){
+              await fs.writeFile('original-rollback-evidence/index.html',s);original=true;console.log('ORIGINAL_FRONTEND_HASH_VERIFIED '+hash(s)+' sync_script_present='+s.includes('FE_NOTIFY_SYNC_CORE'));break;
+            }
+            await new Promise(r=>setTimeout(r,2000));
+          }
+          if(!original)throw Error('ORIGINAL_FRONTEND_HASH_FAILED');
+          const content=await (await cf('football-edge-background-watch')).text();
+          const source=await fs.readFile('worker_notify_v137_quota50000.js','utf8');
+          if(!content.includes(source))throw Error('ORIGINAL_BACKEND_SOURCE_MISMATCH');
+          if(content.includes('class SyncWatcher'))throw Error('SYNC_BACKEND_STILL_PRESENT');
+          console.log('ORIGINAL_BACKEND_SOURCE_VERIFIED');
+          const auth={Authorization:'Bearer '+process.env.BG_TOKEN};
+          let routeRestored=false;
+          for(let i=0;i<60;i++){
+            const r=await fetch('https://football-edge-background-watch.ngophuonghuy.workers.dev/api/notify/ui-state',{headers:auth,cache:'no-store'});
+            const d=await r.json();
+            if(r.status===405&&d.error==='METHOD_NOT_ALLOWED'){routeRestored=true;break;}
+            await new Promise(r=>setTimeout(r,3000));
+          }
+          if(!routeRestored)throw Error('ORIGINAL_BACKEND_RUNTIME_NOT_CONFIRMED');
+          console.log('ORIGINAL_BACKEND_RUNTIME_VERIFIED');
+          const r=await fetch('https://football-edge-background-watch.ngophuonghuy.workers.dev/api/notify/status',{headers:auth,cache:'no-store'});
+          const d=await r.json();console.log(JSON.stringify({http:r.status,scan:d.scan,quota:d.global_api_quota,scan_control:d.scan_control}));
+          if(r.status!==200)throw Error('ORIGINAL_STATUS_HTTP_'+r.status);
+          await fs.writeFile('original-rollback-evidence/RESULT.json',JSON.stringify({original_frontend:true,original_backend:true,versions:targets.map(t=>({name:t.name,version:t.version})),scan:d.scan,quota:d.global_api_quota},null,2));
+          JS
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: fe-full-original-rollback-evidence
+          path: original-rollback-evidence/
+          retention-days: 90
