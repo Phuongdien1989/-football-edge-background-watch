@@ -5,6 +5,9 @@ on:
       - 'worker_notify_v136_hot_priority.js'
       - 'tests/test-do-free-write-throttle.mjs'
       - 'tests/test-do-free-runtime.mjs'
+      - 'tests/test-do-free-entrypoint.mjs'
+      - 'wrangler.toml'
+      - 'worker_notify_v137_quota50000.js'
       - '.github/workflows/test-do-free-isolated.yml'
   workflow_dispatch:
 jobs:
@@ -21,3 +24,5 @@ jobs:
         run: node tests/test-do-free-write-throttle.mjs
       - name: Simulate scheduler runtime writes
         run: node tests/test-do-free-runtime.mjs
+      - name: Verify deployed entrypoint inheritance
+        run: node tests/test-do-free-entrypoint.mjs
