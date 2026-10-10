@@ -176,7 +176,11 @@ export class BackgroundWatcher extends DeepLinkWatcher{
       status.rotationEstimateSeconds=Math.ceil(live.length/12)*cycleSec;
     }catch(e){status.errors.push({error:errText(e)})}
     status.apiToday=budget.used;status.durationMs=Date.now()-now;status.targetCadenceMs=SCAN_TARGET_MS;status.startedAt=now;status.at=Date.now();
-    await this.ctx.storage.put({'notify:status':status,'notify:budget':budget});
+    // Budget only changes when an API attempt is reserved; skip redundant writes on idle cycles.
+    const previousBudget=await this.ctx.storage.get('notify:budget');
+    const budgetChanged=previousBudget?.day!==budget.day||Number(previousBudget?.used)!==Number(budget.used);
+    if(budgetChanged)await this.ctx.storage.put('notify:budget',budget);
+    await this.ctx.storage.put('notify:status',status);
   }
 
   async alarm(){
