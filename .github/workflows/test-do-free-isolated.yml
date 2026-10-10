@@ -4,6 +4,8 @@ on:
     paths:
       - 'worker_notify_v136_hot_priority.js'
       - 'worker_notify_v135_full_pause.js'
+      - 'worker_notify_v130.js'
+      - 'tests/test-do-free-budget-no-rewrite.mjs'
       - 'tests/test-do-free-pause-no-rewrite.mjs'
       - 'tests/test-do-free-write-throttle.mjs'
       - 'tests/test-do-free-runtime.mjs'
@@ -33,3 +35,5 @@ jobs:
         run: node tests/test-do-free-quota-runtime.mjs
       - name: Verify paused alarms do not rewrite status
         run: node tests/test-do-free-pause-no-rewrite.mjs
+      - name: Verify budget change-only persistence
+        run: node tests/test-do-free-budget-no-rewrite.mjs
