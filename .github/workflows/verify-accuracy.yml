@@ -1,0 +1,29 @@
+name: Independent read-only accuracy production checkpoint
+on:
+  push:
+    branches: [fix/production-notification-sync-20261009]
+    paths: ['.github/workflows/verify-accuracy.yml']
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Read-only official period settlement and frozen UI verification
+        run: node accuracy-verify.mjs
+        env:
+          BACKGROUND_TOKEN: ${{ secrets.BACKGROUND_TOKEN }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          APISPORTS_KEY: ${{ secrets.APISPORTS_KEY }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: fe-independent-accuracy-production-checkpoint
+          path: accuracy-independent-check/
+          retention-days: 90
