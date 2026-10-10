@@ -1,0 +1,27 @@
+name: Read-only Ultra75k production checkpoint
+on:
+  push:
+    branches: [fix/ultra75k-budget-isolated-20261010]
+    paths: ['.github/workflows/inspect-ultra75k.yml']
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Read current quota, scanner and accuracy only
+        run: |
+          node --input-type=module <<'JS'
+          const base='https://football-edge-background-watch.ngophuonghuy.workers.dev',report={at:new Date().toISOString(),read_only:true};
+          for(const p of ['/api/notify/status','/api/notify/accuracy','/api/notify/validation/summary']){
+            const r=await fetch(base+p,{headers:{Authorization:'Bearer '+process.env.BACKGROUND_TOKEN},signal:AbortSignal.timeout(30000)});if(!r.ok)throw Error('READ_HTTP_'+r.status);const d=await r.json();
+            report[p]=p.endsWith('/status')?{quota:d.global_api_quota,scan:{at:d.scan?.at,apiToday:d.scan?.apiToday,apiLimit:d.scan?.apiLimit,live:d.scan?.live,scanned:d.scan?.scanned,errors:d.scan?.errors},paused:d.full_background_paused}:p.endsWith('/summary')?{validation_api_today:d.validation_api_today}:d;
+          }
+          console.log('ULTRA_RUNTIME '+JSON.stringify(report));
+          JS
+        env:
+          BACKGROUND_TOKEN: ${{ secrets.BACKGROUND_TOKEN }}
