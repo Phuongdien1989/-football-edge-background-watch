@@ -6,6 +6,7 @@ on:
       - 'tests/test-do-free-write-throttle.mjs'
       - 'tests/test-do-free-runtime.mjs'
       - 'tests/test-do-free-entrypoint.mjs'
+      - 'tests/test-do-free-quota-runtime.mjs'
       - 'wrangler.toml'
       - 'worker_notify_v137_quota50000.js'
       - '.github/workflows/test-do-free-isolated.yml'
@@ -26,3 +27,5 @@ jobs:
         run: node tests/test-do-free-runtime.mjs
       - name: Verify deployed entrypoint inheritance
         run: node tests/test-do-free-entrypoint.mjs
+      - name: Verify quota exhaustion runtime behavior
+        run: node tests/test-do-free-quota-runtime.mjs
