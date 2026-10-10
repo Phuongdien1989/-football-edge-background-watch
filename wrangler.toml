@@ -4,12 +4,12 @@ compatibility_flags = ["nodejs_compat"]
 compatibility_date = "2026-09-11"
 
 [vars]
-# API-Football current plan: 50,000 calls/day TOTAL.
-# P1.3 adds a global hard cap across Notification + Smart Follow + Evidence + Validation.
+# API-Football Ultra subscription: 75,000 calls/day; reserve 3,000 for untracked callers and headroom.
+# Global hard cap for this Worker is 72,000/day; other clients must respect the provider's shared account limit.
 # It does NOT pace or slow requests while quota remains available.
-API_TOTAL_DAILY_BUDGET = "50000"
-NOTIFY_DAILY_BUDGET = "43000"
-VALIDATION_DAILY_BUDGET = "3000"
+API_TOTAL_DAILY_BUDGET = "72000"
+NOTIFY_DAILY_BUDGET = "62000"
+VALIDATION_DAILY_BUDGET = "4000"
 APISPORTS_BASE = "https://v3.football.api-sports.io"
 TZ = "Asia/Ho_Chi_Minh"
 
