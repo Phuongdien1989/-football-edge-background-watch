@@ -16,6 +16,7 @@ jobs:
           node-version: '24'
       - run: node tests/test-ultra-budget-config.mjs
       - run: node --experimental-vm-modules tests/test-ultra-budget-runtime.mjs
+      - run: node --experimental-vm-modules tests/test-validation-lanes.mjs
       - run: node sync-fix/build.cjs
       - run: node sync-fix/tests/test-top.cjs
       - run: node --experimental-vm-modules sync-fix/tests/test-worker.mjs

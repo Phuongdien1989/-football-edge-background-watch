@@ -6,7 +6,7 @@ import {webcrypto} from 'node:crypto';
 import {createRequire} from 'node:module';
 const repo=new URL('../',import.meta.url).pathname;
 let checks=0;
-for(const entry of ['worker_notify_v137_quota50000.js','sync-fix/worker/worker_notify_v139_accuracy.js']){
+for(const entry of ['worker_notify_v137_quota50000.js','sync-fix/worker/worker_notify_v139_accuracy.js','sync-fix/worker/worker_notify_v140_validation_lanes.js']){
   let calls=0;
   const ctx=vm.createContext({console,Request,Response,Headers,URL,URLSearchParams,TextEncoder,TextDecoder,AbortController,AbortSignal,crypto:webcrypto,setTimeout,clearTimeout,btoa,atob,Buffer,process:{env:{}},fetch:async()=>{calls++;return new Response(JSON.stringify({response:[],errors:[]}))}});
   const cache=new Map(),cf=new vm.SyntheticModule(['DurableObject'],function(){this.setExport('DurableObject',class{constructor(ctx,env){this.ctx=ctx;this.env=env}})},{context:ctx}),nm=new vm.SyntheticModule(['createRequire'],function(){this.setExport('createRequire',createRequire)},{context:ctx});
@@ -31,7 +31,7 @@ for(const entry of ['worker_notify_v137_quota50000.js','sync-fix/worker/worker_n
   assert.ok(map.get('notify:status').errors.some(e=>e.error==='NOTIFY_DAILY_BUDGET_REACHED'));checks++;
   // LIVE/Smart Follow still shares the global cap after Notification is exhausted.
   await w.api('/fixtures',{live:'all'},true);equal(map.get(key).used,3);
-  if(entry.includes('v139')){
+  if(entry.includes('v139')||entry.includes('v140')){
     map.set('notify:validation-budget',{day,used:3998});
     const validation=await Promise.allSettled(Array.from({length:12},()=>w.validationApi('/fixtures',{id:1})));
     equal(validation.filter(r=>r.status==='fulfilled').length,2);equal(map.get('notify:validation-budget').used,4000);equal(map.get(key).used,5);
