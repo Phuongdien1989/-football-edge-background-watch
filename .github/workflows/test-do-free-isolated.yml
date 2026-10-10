@@ -1,0 +1,20 @@
+name: DO Free isolated regression
+on:
+  pull_request:
+    paths:
+      - 'worker_notify_v136_hot_priority.js'
+      - 'tests/test-do-free-write-throttle.mjs'
+      - '.github/workflows/test-do-free-isolated.yml'
+  workflow_dispatch:
+jobs:
+  source-regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify syntax
+        run: node --check worker_notify_v136_hot_priority.js
+      - name: Verify DO throttle and push scan invariants
+        run: node tests/test-do-free-write-throttle.mjs
