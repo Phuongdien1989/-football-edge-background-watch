@@ -27,3 +27,11 @@ Actual worker chain and SQLite: 58 assertions; missing GAP vs real zero, stale/f
 TOP ranking: 25 existing cases and frozen inline-engine comparison. Original sync/scanner import tests retained. GitHub deployment requires full WebKit regression and real production LIVE/sync readback; frontend version/hash must stay unchanged. Real background alarm/backfill must be observed. On any failed verification, exact prior backend version restored; additive measurements remain, no data deleted.
 
 Local unit tests are not production evidence. Deployment outcome is reported separately only after the workflow and real endpoints pass. Physical iPhone notification clicks are not independently verified.
+
+## Batch D — evidence-driven follow-up
+
+Batch B deployed backend 60781a4e-70cb-4c02-a036-2528c3048ed5 successfully (run 38046091773, regression job 114195806419, deploy job 114195988010). Real WebKit sync PASS, live list 61 and scan button PASS; TOP empty at that instant, not evidence of successful non-empty TOP promotion. Frontend version/hash unchanged. Actual alarm and backfill observed. Independent run 38046414750 job 114196748736 matched 31 settled CAUTION paper snapshots, one fixture, to official result; 60 paper rows remained OPEN at 17:55. No executable betting ROI claimed.
+
+Actual archived period records exposed first-attempt UNKNOWN with FIXTURE_UNAVAILABLE/FINAL_LEDGER_MISMATCH. Source review found the inherited non-strict provider parser can return [] on HTTP-200 provider errors. Follow-up uses strict validation-only parsing (not scanner/engine behavior), serial budget reservation, transient backoff, and a review-time 48h allowance rather than expiring old signal dates on first backfill attempt. Original UNKNOWN rows remain; appended RECHECK rows supersede only in canonical report totals.
+
+Fair settlement reserves two of three fixture slots on entry-due ticks. Separate tests cover strict provider error versus genuine empty response, budget cap, settlement starvation, retry retention and immutable rechecks. Production gate now checks repair_revision=2 and historical eligible paper entries actually settled; rollback for this follow-up is exact Batch B backend 60781a4e. Original pre-repair backend 491076a2 and all prior source backups remain available.

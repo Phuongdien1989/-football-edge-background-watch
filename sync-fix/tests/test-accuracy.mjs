@@ -71,5 +71,28 @@ eq(sqlite.prepare('SELECT COUNT(*) n FROM entry_outcomes').get().n,1);eq(calls.l
 await liveWatcher.accuracyTick();eq(calls.length,2);
 const summary=await liveWatcher.accuracySummary();eq(summary.engine_changed,false);eq(summary.paper[0].policy_status,'CAUTION');
 const stale=sandbox.entry({FOOTBALL_DB:d1},p,now);await stale.run();eq(sqlite.prepare("SELECT resolution FROM entry_decisions WHERE id='e1'").get().resolution,'RESOLVED');
+// Real provider parser must throw on HTTP-200 rate-limit errors, not return [].
+const strictWatcher=new W({storage},{APISPORTS_KEY:'fake-test-key',VALIDATION_DAILY_BUDGET:100,API_TOTAL_DAILY_BUDGET:10000});
+ctx.fetch=async()=>new Response(JSON.stringify({errors:{requests:'RATE_LIMIT'},response:[]}),{status:200});
+await assert.rejects(()=>strictWatcher.validationApi('/fixtures',{id:1}),/EVIDENCE_PROVIDER_ERROR/);n++;
+ctx.fetch=async()=>new Response(JSON.stringify({errors:[],response:[]}),{status:200});eq(await strictWatcher.validationApi('/fixtures',{id:1}),[]);
+const limited=new W({storage},{APISPORTS_KEY:'fake-test-key',VALIDATION_DAILY_BUDGET:1});await assert.rejects(()=>limited.validationApi('/fixtures',{id:1}),/VALIDATION_DAILY_BUDGET_REACHED/);n++;
+ctx.fetch=()=>{throw Error('NETWORK_FORBIDDEN')};
+// Live period queues cannot monopolize all fixture slots when paper settlement is due.
+for(const id of [2,3,4])sqlite.prepare('INSERT INTO fixtures(fixture_id,first_seen_at,last_seen_at) VALUES(?,?,?)').run(id,1,1);
+const e4={...p,id:'e4',fixture_id:4};await sandbox.entry({FOOTBALL_DB:d1},e4,now).run();
+for(const id of [1,2,3])await liveWatcher.captureMeasurement({fixture_id:id,created_at:now,body:"H-A | 70' | 0-0",signals:{goal:{value:73}}});
+map.delete('accuracy:last-tick');map.delete('accuracy:entries-at');calls.length=0;
+await liveWatcher.accuracyTick();eq(calls.some(x=>x.params.id===4),true);eq(sqlite.prepare("SELECT resolution FROM entry_decisions WHERE id='e4'").get().resolution,'RESOLVED');
+// Transient provider failure preserves PENDING and advances retry instead of losing history.
+await liveWatcher.captureMeasurement({fixture_id:2,created_at:now-3*86400000,body:"H-A | 70' | 0-0",signals:{goal:{value:74}}});
+map.delete('accuracy:last-tick');liveWatcher.validationApi=async()=>{throw Error('EVIDENCE_PROVIDER_ERROR')};await liveWatcher.accuracyTick();
+const retry=sqlite.prepare("SELECT result_key,payload_json FROM validation_results WHERE id=?").get(`AC-2-${now-3*86400000}-goal-74-na`);
+eq(retry.result_key,'PENDING');eq(JSON.parse(retry.payload_json).last_provider_error,'EVIDENCE_PROVIDER_ERROR');eq(JSON.parse(retry.payload_json).due_at>now,true);
+await liveWatcher.measurementWrite({id:'old-unknown',fixture_id:1,validation_type:'ACCURACY_FT_PERIOD',engine:'FT',signal_at:now-3*86400000,minute:70,score_home:0,score_away:0,result_key:'UNKNOWN',reason:'FIXTURE_UNAVAILABLE'});
+map.delete('accuracy:strict-recheck-done');map.delete('accuracy:last-tick');liveWatcher.validationApi=async(endpoint)=>endpoint==='/fixtures'?[f]:events;await liveWatcher.accuracyTick();
+eq(sqlite.prepare("SELECT result_key FROM validation_results WHERE id='old-unknown'").get().result_key,'UNKNOWN');
+eq(sqlite.prepare("SELECT result_key FROM validation_results WHERE id='old-unknown-RECHECK'").get().result_key,'HIT');
+eq((await liveWatcher.accuracySummary()).periods.some(x=>x.result_key==='UNKNOWN'),false);
 sqlite.close();
 console.log('PASS accuracy '+n+' assertions; real worker chain and SQL; no external network');

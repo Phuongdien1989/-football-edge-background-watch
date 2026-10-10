@@ -1,4 +1,5 @@
 name: Frozen-engine accuracy repair with guarded backend rollback
+# Batch D: strict provider evidence, retry-safe historical review and fair paper settlement.
 on:
   push:
     branches: [fix/production-notification-sync-20261009]
