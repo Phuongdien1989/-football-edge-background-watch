@@ -29,7 +29,9 @@ export class BackgroundWatcher extends HotPriorityWatcher{
       let q=await this.ctx.storage.get(key);
       if(!q||q.day!==day)q={day,used:0,limit:cfg.total,updated:Date.now()};
       if(n(q.used)>=cfg.total){
-        q.limit=cfg.total;q.updated=Date.now();await this.ctx.storage.put(key,q);
+        // A rejected reservation does not change usage. Do not persist the
+        // unchanged counter on every denied request: this can exhaust DO Free
+        // writes precisely when the API budget has already been reached.
         const e=new Error('API_TOTAL_DAILY_BUDGET_REACHED');e.code='API_TOTAL_DAILY_BUDGET_REACHED';throw e;
       }
       q.used=n(q.used)+1;q.limit=cfg.total;q.updated=Date.now();
