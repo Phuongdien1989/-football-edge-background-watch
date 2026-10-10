@@ -1,0 +1,26 @@
+name: Independent read-only official outcome audit
+on:
+  push:
+    branches: [fix/production-notification-sync-20261009]
+    paths: ['.github/workflows/audit-outcomes.yml']
+permissions:
+  contents: read
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: node sync-fix/audit-outcomes.mjs
+        env:
+          BACKGROUND_TOKEN: ${{ secrets.BACKGROUND_TOKEN }}
+          APISPORTS_KEY: ${{ secrets.APISPORTS_KEY }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: fe-independent-official-outcome-audit-20261010
+          path: accuracy-outcomes-20261010/
+          retention-days: 90
