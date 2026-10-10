@@ -54,25 +54,29 @@ function dbFixtureStmt(env,p,now){
     .bind(fid,cleanStr(p?.league),cleanStr(p?.home),cleanStr(p?.away),n(p?.kickoff,null),cleanStr(p?.status,20),now,now);
 }
 function dbEntryStmt(env,p,now){
+  const n=(v,d=null)=>v!==null&&v!==undefined&&v!==''&&typeof v!=='boolean'&&Number.isFinite(Number(v))?Number(v):d;
   const score=p?.entry_score||{},final=p?.final_score||{};
   return env.FOOTBALL_DB.prepare(`INSERT INTO entry_decisions
     (id,fixture_id,engine,policy_status,policy_reason,captured_at,minute,score_home,score_away,market_type,selection,line,price,odds_format,price_zone,behavior_state,signal_state,data_level,market_level,edge_level,model_prob,break_even,market_prob,edge,model_ev,candidate_supported,auto_settle_supported,resolution,outcome,unit_pl,resolved_at,payload_json,updated_at)
     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
     ON CONFLICT(id) DO UPDATE SET
-      policy_status=excluded.policy_status,policy_reason=excluded.policy_reason,minute=excluded.minute,score_home=excluded.score_home,score_away=excluded.score_away,
-      market_type=excluded.market_type,selection=excluded.selection,line=excluded.line,price=excluded.price,price_zone=excluded.price_zone,behavior_state=excluded.behavior_state,
-      signal_state=excluded.signal_state,data_level=excluded.data_level,market_level=excluded.market_level,edge_level=excluded.edge_level,model_prob=excluded.model_prob,
-      break_even=excluded.break_even,market_prob=excluded.market_prob,edge=excluded.edge,model_ev=excluded.model_ev,candidate_supported=excluded.candidate_supported,
-      auto_settle_supported=excluded.auto_settle_supported,resolution=excluded.resolution,outcome=excluded.outcome,unit_pl=excluded.unit_pl,resolved_at=excluded.resolved_at,
-      payload_json=excluded.payload_json,updated_at=excluded.updated_at`)
+      resolution=excluded.resolution,outcome=excluded.outcome,unit_pl=excluded.unit_pl,resolved_at=excluded.resolved_at,
+      updated_at=excluded.updated_at
+      WHERE entry_decisions.resolution='OPEN' AND excluded.resolution='RESOLVED'
+        AND entry_decisions.fixture_id=excluded.fixture_id AND entry_decisions.engine=excluded.engine
+        AND entry_decisions.market_type=excluded.market_type AND entry_decisions.selection=excluded.selection
+        AND entry_decisions.line=excluded.line AND entry_decisions.price=excluded.price`)
     .bind(cleanStr(p?.id,160),n(p?.fixture_id),cleanStr(p?.engine,20),cleanStr(p?.policy_status,40),cleanStr(p?.policy_reason,500),n(p?.captured_at,now),n(p?.minute,null),n(score?.home,null),n(score?.away,null),cleanStr(p?.market_type,40),cleanStr(p?.selection,40),n(p?.line,null),n(p?.price,null),cleanStr(p?.odds_format,20),cleanStr(p?.price_zone,40),cleanStr(p?.behavior_state,50),cleanStr(p?.signal_state,80),cleanStr(p?.data_level,80),cleanStr(p?.market_level,80),cleanStr(p?.edge_level,80),n(p?.model_prob,null),n(p?.break_even,null),n(p?.market_prob,null),n(p?.edge,null),n(p?.model_ev,null),p?.candidate_supported?1:0,p?.auto_settle_supported?1:0,cleanStr(p?.resolution,40),cleanStr(p?.outcome,40),n(p?.unit_pl,null),n(p?.resolved_at,null),dbJson(p),now);
 }
 function dbEntryOutcomeStmt(env,p,now){
+  const n=(v,d=null)=>v!==null&&v!==undefined&&v!==''&&typeof v!=='boolean'&&Number.isFinite(Number(v))?Number(v):d;
   if(String(p?.resolution||'')!=='RESOLVED'||!p?.id)return null;const final=p?.final_score||{};
   return env.FOOTBALL_DB.prepare(`INSERT INTO entry_outcomes (decision_id,fixture_id,engine,outcome,unit_pl,final_score_home,final_score_away,resolved_at,payload_json,updated_at)
-    VALUES (?,?,?,?,?,?,?,?,?,?)
-    ON CONFLICT(decision_id) DO UPDATE SET outcome=excluded.outcome,unit_pl=excluded.unit_pl,final_score_home=excluded.final_score_home,final_score_away=excluded.final_score_away,resolved_at=excluded.resolved_at,payload_json=excluded.payload_json,updated_at=excluded.updated_at`)
-    .bind(cleanStr(p.id,160),n(p.fixture_id),cleanStr(p.engine,20),cleanStr(p.outcome,40),n(p.unit_pl,null),n(final?.home,null),n(final?.away,null),n(p.resolved_at,now),dbJson(p),now);
+    SELECT ?,?,?,?,?,?,?,?,?,? FROM entry_decisions
+    WHERE id=? AND fixture_id=? AND engine=? AND line=? AND price=? AND selection=?
+      AND resolution='RESOLVED' AND outcome=? AND unit_pl=?
+    ON CONFLICT(decision_id) DO NOTHING`)
+    .bind(cleanStr(p.id,160),n(p.fixture_id),cleanStr(p.engine,20),cleanStr(p.outcome,40),n(p.unit_pl,null),n(final?.home,null),n(final?.away,null),n(p.resolved_at,now),dbJson(p),now,cleanStr(p.id,160),n(p.fixture_id),cleanStr(p.engine,20),n(p.line,null),n(p.price,null),cleanStr(p.selection,40),cleanStr(p.outcome,40),n(p.unit_pl,null));
 }
 function dbLiveStmt(env,p,now){
   return env.FOOTBALL_DB.prepare(`INSERT INTO live_snapshots
@@ -86,7 +90,9 @@ async function dbWriteEvents(env,events){
   const rows=(Array.isArray(events)?events:[]).slice(0,80),now=Date.now();let accepted=0,ignored=0;
   for(let i=0;i<rows.length;i+=20){
     const stmts=[],chunk=rows.slice(i,i+20);
-    for(const evt of chunk){const p=evt?.payload||{},type=String(evt?.type||'');const fs=dbFixtureStmt(env,p,now);if(fs)stmts.push(fs);
+    for(const evt of chunk){const original=evt?.payload||{},type=String(evt?.type||'');
+      const p=type==='ENTRY_DECISION'?{...original,server_capture_contract:{schema:'FE_ENTRY_CAPTURE_V1_20261010',received_at:now,engine_version:'P2052_FROZEN',source_version:original.schema||null,sample_type:'ENTRY_POLICY_PAPER',execution_verified:false,settlement_basis:original.engine==='H1'?'H1_SEGMENT':original.engine==='FT'?'FULL_MATCH':'UNVERIFIED_HC',value_type:'MODEL_PROBABILITY_WHEN_AVAILABLE'}}:original;
+      const fs=dbFixtureStmt(env,p,now);if(fs)stmts.push(fs);
       if(type==='ENTRY_DECISION'){if(p?.id&&Number.isFinite(n(p?.fixture_id))){stmts.push(dbEntryStmt(env,p,now));const os=dbEntryOutcomeStmt(env,p,now);if(os)stmts.push(os);accepted++}else ignored++}
       else if(type==='LIVE_SNAPSHOT'){if(p?.id&&Number.isFinite(n(p?.fixture_id))){stmts.push(dbLiveStmt(env,p,now));accepted++}else ignored++}
       else ignored++;
