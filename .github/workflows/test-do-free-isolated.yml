@@ -4,6 +4,7 @@ on:
     paths:
       - 'worker_notify_v136_hot_priority.js'
       - 'tests/test-do-free-write-throttle.mjs'
+      - 'tests/test-do-free-runtime.mjs'
       - '.github/workflows/test-do-free-isolated.yml'
   workflow_dispatch:
 jobs:
@@ -18,3 +19,5 @@ jobs:
         run: node --check worker_notify_v136_hot_priority.js
       - name: Verify DO throttle and push scan invariants
         run: node tests/test-do-free-write-throttle.mjs
+      - name: Simulate scheduler runtime writes
+        run: node tests/test-do-free-runtime.mjs
