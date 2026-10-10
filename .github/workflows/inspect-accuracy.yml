@@ -1,0 +1,28 @@
+name: Read-only current accuracy runtime diagnostics
+on:
+  push:
+    branches: [fix/production-notification-sync-20261009]
+    paths: ['.github/workflows/inspect-accuracy.yml']
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Read current report and scan errors only, do not trigger scans or writes
+        run: |
+          node --input-type=module <<'JS'
+          const base='https://football-edge-background-watch.ngophuonghuy.workers.dev';
+          const report={at:new Date().toISOString(),read_only:true};
+          for(const p of ['/api/notify/accuracy','/api/notify/status']){
+            const r=await fetch(base+p,{headers:{Authorization:'Bearer '+process.env.BACKGROUND_TOKEN},signal:AbortSignal.timeout(45000)});const d=await r.json();
+            report[p]=p.endsWith('/accuracy')?d:{http:r.status,scan:d.scan,scan_control:d.scan_control,full_background_paused:d.full_background_paused,global_api_quota:d.global_api_quota};
+          }
+          console.log('CURRENT_ACCURACY_RUNTIME '+JSON.stringify(report));
+          JS
+        env:
+          BACKGROUND_TOKEN: ${{ secrets.BACKGROUND_TOKEN }}
