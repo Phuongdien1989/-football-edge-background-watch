@@ -1,4 +1,5 @@
 name: Guarded Ultra75k Worker and Batch D production verification
+# Batch E: separate Validation invocation; preserve inherited scan due time.
 on:
   push:
     branches: [fix/ultra75k-budget-isolated-20261010]
@@ -20,6 +21,7 @@ jobs:
       - run: sudo apt-get update && sudo apt-get install -y xvfb webkit2gtk-driver
       - run: node tests/test-ultra-budget-config.mjs
       - run: node --experimental-vm-modules tests/test-ultra-budget-runtime.mjs
+      - run: node --experimental-vm-modules tests/test-validation-lanes.mjs
       - run: node sync-fix/build.cjs
       - run: node sync-fix/tests/test-top.cjs
       - run: node --experimental-vm-modules sync-fix/tests/test-worker.mjs

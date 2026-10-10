@@ -6,7 +6,7 @@ import base,{BackgroundWatcher as AccuracyWatcher} from './worker_notify_v139_ac
 export class BackgroundWatcher extends AccuracyWatcher{
   async resolveDueValidations(){if(this._scanAlarmLane)return;return super.resolveDueValidations()}
   async accuracyTick(){if(this._scanAlarmLane)return;return super.accuracyTick()}
-  async accuracySummary(){return {...await super.accuracySummary(),validation_execution:'SEPARATE_ALARM_V1'}}
+  async accuracySummary(){return {...await super.accuracySummary(),validation_execution:'SEPARATE_ALARM_V1',validation_lane:await this.ctx.storage.get('accuracy:lane-status')||null}}
   async alarm(){
     const control=await this.scanControl();
     if(control?.enabled===false){await this.ctx.storage.delete('accuracy:alarm-lane');return super.alarm()}
