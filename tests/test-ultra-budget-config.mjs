@@ -1,0 +1,15 @@
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+const cfg=readFileSync(new URL('../wrangler.toml',import.meta.url),'utf8');
+const worker=readFileSync(new URL('../worker_notify_v137_quota50000.js',import.meta.url),'utf8');
+const get=k=>Number(cfg.match(new RegExp('^'+k+' = "(\\d+)"','m'))?.[1]);
+assert.equal(get('API_TOTAL_DAILY_BUDGET'),72000);
+assert.equal(get('NOTIFY_DAILY_BUDGET'),62000);
+assert.equal(get('VALIDATION_DAILY_BUDGET'),4000);
+assert.ok(get('API_TOTAL_DAILY_BUDGET')<=75000-3000);
+assert.ok(get('NOTIFY_DAILY_BUDGET')+get('VALIDATION_DAILY_BUDGET')<=get('API_TOTAL_DAILY_BUDGET'));
+assert.match(worker,/key='api:q50000:global:v1'/);
+assert.match(worker,/this\.quotaWork\(async\(\)=>/);
+assert.match(worker,/await this\.reserveApiCall\(\)/);
+assert.match(worker,/API_TOTAL_DAILY_BUDGET_REACHED/);
+console.log('PASS: Ultra budget configuration and global counter invariants (static checks)');
