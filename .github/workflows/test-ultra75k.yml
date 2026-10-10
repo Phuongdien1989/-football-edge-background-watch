@@ -1,0 +1,31 @@
+name: Ultra75k quota and Batch D preflight
+on:
+  push:
+    branches: [fix/ultra75k-budget-isolated-20261010]
+    paths: ['.github/workflows/test-ultra75k.yml']
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: node tests/test-ultra-budget-config.mjs
+      - run: node --experimental-vm-modules tests/test-ultra-budget-runtime.mjs
+      - run: node sync-fix/build.cjs
+      - run: node sync-fix/tests/test-top.cjs
+      - run: node --experimental-vm-modules sync-fix/tests/test-worker.mjs
+      - run: node --experimental-vm-modules sync-fix/tests/test-accuracy.mjs
+      - run: node tests/preflight-ultra.mjs
+        env:
+          BACKGROUND_TOKEN: ${{ secrets.BACKGROUND_TOKEN }}
+          APISPORTS_KEY: ${{ secrets.APISPORTS_KEY }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ultra75k-preflight-evidence
+          path: ultra-preflight/
