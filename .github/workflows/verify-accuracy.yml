@@ -1,4 +1,5 @@
 name: Independent read-only accuracy production checkpoint
+# Batch D revision 2: require actual historical settlement, not only a readable endpoint.
 on:
   push:
     branches: [fix/production-notification-sync-20261009]
@@ -8,7 +9,7 @@ permissions:
 jobs:
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 18
+    timeout-minutes: 22
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
