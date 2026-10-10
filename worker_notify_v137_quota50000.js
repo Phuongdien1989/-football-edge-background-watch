@@ -1,11 +1,11 @@
 import base,{BackgroundWatcher as HotPriorityWatcher} from './worker_notify_v136_hot_priority.js';
 
-// P1.3 GLOBAL 50K HARD CAP
+// P1.3 GLOBAL CONFIGURABLE HARD CAP
 // Quota safety only. No pacing and no H1/FT/HC engine, threshold, HOT scheduler,
 // Push, validation semantics or D1 schema changes.
 // Every API-Football request made through the BackgroundWatcher shares one
 // Durable Object counter so notification + Smart Follow + Evidence + Validation
-// cannot collectively exceed the actual 50,000 calls/day plan.
+// cannot collectively exceed the configured Worker daily budget.
 const reply=(data,status=200)=>new Response(JSON.stringify(data),{status,headers:{
   'content-type':'application/json','cache-control':'no-store','access-control-allow-origin':'*',
   'access-control-allow-headers':'authorization,content-type','access-control-allow-methods':'GET,POST,OPTIONS'
@@ -18,8 +18,8 @@ export class BackgroundWatcher extends HotPriorityWatcher{
   }
 
   quotaWork(fn){
-    const p=(this._q50000Chain||Promise.resolve()).then(fn);
-    this._q50000Chain=p.catch(()=>{});
+    const p=(this._quotaChain||Promise.resolve()).then(fn);
+    this._quotaChain=p.catch(()=>{});
     return p;
   }
 
