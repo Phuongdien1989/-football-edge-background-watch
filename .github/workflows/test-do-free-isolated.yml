@@ -6,6 +6,7 @@ on:
       - 'worker_notify_v135_full_pause.js'
       - 'worker_notify_v130.js'
       - 'tests/test-do-free-budget-no-rewrite.mjs'
+      - 'tests/test-do-free-write-floor.mjs'
       - 'tests/test-do-free-pause-no-rewrite.mjs'
       - 'tests/test-do-free-write-throttle.mjs'
       - 'tests/test-do-free-runtime.mjs'
@@ -37,3 +38,5 @@ jobs:
         run: node tests/test-do-free-pause-no-rewrite.mjs
       - name: Verify budget change-only persistence
         run: node tests/test-do-free-budget-no-rewrite.mjs
+      - name: Quantify DO write lower bound (diagnostic, not a release approval)
+        run: node tests/test-do-free-write-floor.mjs
