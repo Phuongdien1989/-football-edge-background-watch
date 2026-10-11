@@ -51,6 +51,8 @@ jobs:
         run: node tests/test-do-free-scan-control-runtime.mjs
       - name: Verify empty fixture write guard
         run: node tests/test-do-free-empty-fixture.mjs
+      - name: Verify status write throttle
+        run: node tests/test-do-free-status-throttle.mjs
       - name: Enforce conservative DO write budget release gate
         env:
           REQUIRE_DO_FREE_SAFE: '1'
@@ -59,5 +61,3 @@ jobs:
           FIXTURES_PER_TICK: '12'
           DO_FREE_DAILY_WRITE_BUDGET: '1000'
         run: node tests/test-do-free-write-floor.mjs
-      - name: Verify status write throttle
-        run: node tests/test-do-free-status-throttle.mjs
