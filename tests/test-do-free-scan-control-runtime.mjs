@@ -26,4 +26,9 @@ assert.equal(alarms,1,'resume schedules exactly once');
 for(let i=0;i<12;i++){const result=await call(true);assert.equal(result.unchanged,true)}
 assert.equal(writes,2,'repeated resume should not write');
 assert.equal(alarms,1,'repeated resume should not schedule alarms');
-console.log('PASS: runtime pause/resume transitions are idempotent');
+obj.scanControl=async()=>({enabled:false,manualEnabled:true,scheduledPaused:true,updated:123});
+const priorWrites=writes,priorAlarms=alarms;
+assert.equal((await call(true)).unchanged,true,'repeated resume during closed hours is idempotent against manual state');
+assert.equal(writes,priorWrites);assert.equal(alarms,priorAlarms);
+await call(false);assert.equal(state.get('notify:scan-control').enabled,false,'manual pause works during scheduled closure');
+console.log('PASS: runtime pause/resume transitions, including scheduled closure, are idempotent');

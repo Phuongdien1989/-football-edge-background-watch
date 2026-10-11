@@ -13,19 +13,19 @@ const block=Number(process.env.API_RESERVATION_BLOCK_SIZE||64);
 const officialDO=100000,officialD1=100000; // Cloudflare Workers Free SQLite row writes/day
 // Upper-bound *model* for a single watcher; account-wide usage requires Cloudflare metrics.
 // Include DO alarm, API counter, budget, status, scheduler and HOT state refresh.
-// Two setAlarm calls per tick (base + HOT) are modeled conservatively.
+// Base, notify, cadence and HOT can each set one alarm per tick.
 const doBreakdown={
   apiReservation:Math.ceil(calls/block),
-  alarm:2*ticks,
+  alarm:4*ticks,
   notificationBudget:ticks,
   diagnosticStatus:Math.ceil(ticks/4),
   schedulerStatus:Math.ceil(ticks/4),
-  hotBoost:6*Math.ceil(ticks/4),
   reserveOther:10000
 };
 const d1Breakdown={
   fixtureSnapshots:ticks*fixtures,
   staleTombstones:ticks*fixtures,
+  hotBoost:6*ticks, // Reason can change every tick; 120s throttle is not an unconditional bound.
   reserveOther:10000
 };
 const sum=x=>Object.values(x).reduce((a,b)=>a+b,0);

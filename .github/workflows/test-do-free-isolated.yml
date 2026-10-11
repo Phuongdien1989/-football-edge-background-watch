@@ -20,6 +20,8 @@ on:
       - 'tests/test-do-free-d1-live-state.mjs'
       - 'wrangler.toml'
       - 'worker_notify_v137_quota50000.js'
+      - 'worker_notify_v138_peak_window.js'
+      - 'tests/test-do-free-peak-window.mjs'
       - '.github/workflows/test-do-free-isolated.yml'
       - '.github/workflows/deploy-d1-candidate.yml'
       - '.github/scripts/cloudflare-readonly-preflight.mjs'
@@ -36,6 +38,7 @@ jobs:
         run: |
           node --check worker_notify_v136_hot_priority.js
           node --check worker_notify_v137_quota50000.js
+          node --check worker_notify_v138_peak_window.js
           node --check worker_notify_v130.js
           node --check tests/test-do-free-write-floor.mjs
           node --check tests/test-do-free-d1-live-state.mjs
@@ -43,6 +46,8 @@ jobs:
         run: |
           npm install --no-save wrangler@4
           npx wrangler deploy --dry-run --outdir /tmp/fe-d1-bundle
+      - name: Verify peak-hour full pause and wake-up runtime
+        run: node tests/test-do-free-peak-window.mjs
       - name: Verify DO throttle and push scan invariants
         run: node tests/test-do-free-write-throttle.mjs
       - name: Simulate scheduler runtime writes
@@ -71,7 +76,7 @@ jobs:
         env:
           REQUIRE_DO_FREE_SAFE: '1'
           API_DAILY_CALLS: '50000'
-          SCAN_TICKS_PER_DAY: '2880'
+          SCAN_TICKS_PER_DAY: '720'
           FIXTURES_PER_TICK: '12'
           API_RESERVATION_BLOCK_SIZE: '64'
         run: node tests/test-do-free-write-floor.mjs

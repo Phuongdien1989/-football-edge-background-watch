@@ -62,7 +62,7 @@ if(token&&account){
   const af=await fields(unwrap(accountsField.type));
   report.analytics={};
   const today=new Date().toISOString().slice(0,10),yesterday=new Date(Date.now()-86400000).toISOString().slice(0,10);
-  const datasets=af.map(x=>x.name).filter(x=>/^durableObjects.*(Storage|Invocations)|^d1AnalyticsAdaptiveGroups$/.test(x));
+  const datasets=af.map(x=>x.name).filter(x=>/^durableObjects|^d1AnalyticsAdaptiveGroups$/.test(x));
   report.analyticsDatasetNames=datasets;
   for(const dataset of datasets){
    const f=af.find(x=>x.name===dataset);if(!f)throw Error('ANALYTICS_DATASET_NOT_AVAILABLE:'+dataset);
@@ -92,6 +92,15 @@ if(token&&account){
  }catch(e){block('CLOUDFLARE_ANALYTICS_READ:'+e.message)}
 }
 
+if(token&&account){
+ const today=new Date().toISOString().slice(0,10),yesterday=new Date(Date.now()-86400000).toISOString().slice(0,10);
+ try{
+  const result=await api('/accounts/'+encodeURIComponent(account)+'/billable/usage?from='+yesterday+'&to='+today);
+  if(!Array.isArray(result))throw Error('BILLABLE_USAGE_UNEXPECTED_SHAPE');
+  report.billableUsage=result.map(x=>({metric:x.x_BillableMetricId,description:x.ChargeDescription,unit:x.ConsumedUnit,quantity:x.ConsumedQuantity,start:x.ChargePeriodStart,end:x.ChargePeriodEnd}));
+  report.checks.billable_usage_read='PASS';
+ }catch(e){report.checks.billable_usage_read=e.message;}
+}
 report.checks.production_deploy='NOT_ATTEMPTED';
 writeFileSync('cloudflare-readonly-preflight.json',JSON.stringify(report,null,2));
 console.log(JSON.stringify(report,null,2));
