@@ -5,7 +5,7 @@ const source=readFileSync(new URL('../worker_notify_v137_quota50000.js',import.m
 const begin=source.indexOf('  d1LiveEnabled(){');
 const end=source.indexOf('  async reserveApiCall(){',begin);
 assert.ok(begin>0&&end>begin);
-const methods=source.slice(begin,end);
+const methods=source.slice(begin,end).replace(/\}\n  async /g,'},\n  async ').replace(/\}\n  d1LiveEnabled/g,'},\n  d1LiveEnabled');
 const rows=new Map(),legacy=new Map();
 let creates=0,reads=0,writes=0;
 const db={prepare(sql){return {bind(...args){return {...this,args}},async run(){if(sql.startsWith('CREATE')){creates++;return};if(sql.startsWith('INSERT')){writes++;rows.set(this.args[0],{fixture_id:this.args[0],payload:this.args[1]});return};if(sql.startsWith('DELETE')){rows.delete(this.args[0]);return}},async first(){reads++;return rows.get(this.args[0])||null},async all(){return {results:[...rows.values()]}}}}};
