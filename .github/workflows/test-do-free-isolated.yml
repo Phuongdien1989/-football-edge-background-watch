@@ -17,6 +17,7 @@ on:
       - 'tests/test-do-free-runtime.mjs'
       - 'tests/test-do-free-entrypoint.mjs'
       - 'tests/test-do-free-quota-runtime.mjs'
+      - 'tests/test-do-free-d1-live-state.mjs'
       - 'wrangler.toml'
       - 'worker_notify_v137_quota50000.js'
       - '.github/workflows/test-do-free-isolated.yml'
@@ -30,7 +31,12 @@ jobs:
         with:
           node-version: '22'
       - name: Verify syntax
-        run: node --check worker_notify_v136_hot_priority.js
+        run: |
+          node --check worker_notify_v136_hot_priority.js
+          node --check worker_notify_v137_quota50000.js
+          node --check worker_notify_v130.js
+          node --check tests/test-do-free-write-floor.mjs
+          node --check tests/test-do-free-d1-live-state.mjs
       - name: Verify DO throttle and push scan invariants
         run: node tests/test-do-free-write-throttle.mjs
       - name: Simulate scheduler runtime writes
@@ -55,11 +61,11 @@ jobs:
         run: node tests/test-do-free-status-throttle.mjs
       - name: Verify D1 LIVE state migration and dedup regression
         run: node tests/test-do-free-d1-live-state.mjs
-      - name: Enforce conservative DO write budget release gate
+      - name: Enforce official DO and D1 Workers Free write limits
         env:
           REQUIRE_DO_FREE_SAFE: '1'
           API_DAILY_CALLS: '50000'
           SCAN_TICKS_PER_DAY: '2880'
           FIXTURES_PER_TICK: '12'
-          DO_FREE_DAILY_WRITE_BUDGET: '1000'
+          API_RESERVATION_BLOCK_SIZE: '64'
         run: node tests/test-do-free-write-floor.mjs
