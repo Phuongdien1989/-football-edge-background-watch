@@ -97,7 +97,7 @@ if(token&&account){
    report.analytics[dataset].daily=(data.viewer?.accounts||[]).flatMap(x=>x[dataset]||[]);
    const group=dimensionNames.find(x=>x==='scriptName')||dimensionNames.find(x=>x==='namespaceId')||(dataset==='d1AnalyticsAdaptiveGroups'?dimensionNames.find(x=>x==='databaseId'):null);
    if(group){
-    const grouped=await gql(`query($accountTag:string!,$start:Date,$end:Date){viewer{accounts(filter:{accountTag:$accountTag}){${dataset}(limit:10000,filter:{date_geq:$start,date_leq:$end}){sum{${names.join(' ')}} dimensions{date ${group}}}}}`,{accountTag:account,start:yesterday,end:today});
+    const grouped=await gql(`query($accountTag:string!,$start:Date,$end:Date){viewer{accounts(filter:{accountTag:$accountTag}){${dataset}(limit:10000,filter:{date_geq:$start,date_leq:$end}){sum{${names.join(' ')}} dimensions{date ${group}}}}}}`,{accountTag:account,start:yesterday,end:today});
     report.analytics[dataset].byResource=(grouped.viewer?.accounts||[]).flatMap(x=>x[dataset]||[]);
    }
   }

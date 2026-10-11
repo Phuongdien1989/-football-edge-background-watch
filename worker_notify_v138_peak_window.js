@@ -65,7 +65,7 @@ export class BackgroundWatcher extends QuotaWatcher{
       }else await this.armPeakWake(control.peak_window);
       return reply({ok:true,scan_control:control});
     }
-    if(path==='/api/notify/peak-window'&&request.method==='GET')return reply({ok:true,scan_control:await this.scanControl()});
+    if(path==='/api/notify/peak-window'&&request.method==='GET')return reply({ok:true,scan_control:await this.scanControl(),next_alarm:await this.ctx.storage.getAlarm()});
     return super.fetch(request);
   }
 }
@@ -73,7 +73,12 @@ export class BackgroundWatcher extends QuotaWatcher{
 export default {...base,async fetch(request,env,ctx){
   const response=await base.fetch(request,env,ctx);
   if(new URL(request.url).pathname==='/health'&&response.ok){
-    const health=await response.json();return reply({...health,peak_window:peakWindow(env)});
+    const health=await response.json();
+    const id=env.BACKGROUND_WATCHER.idFromName('football-edge-global');
+    const status=await env.BACKGROUND_WATCHER.get(id).fetch(new Request('https://internal/api/notify/peak-window'));
+    if(!status.ok)return reply({...health,peak_window:peakWindow(env),peak_status_error:'HTTP_'+status.status},503);
+    const peak=await status.json();
+    return reply({...health,peak_window:peakWindow(env),peak_status:peak.scan_control,next_alarm:peak.next_alarm});
   }
   return response;
 },async scheduled(controller,env){
