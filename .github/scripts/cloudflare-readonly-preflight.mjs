@@ -46,6 +46,33 @@ if(token&&account&&worker&&database){
  }catch(e){block('D1_READ:'+e.message)}
 }
 report.checks.account_wide_usage='NOT_VERIFIED_REQUIRES_CLOUDFLARE_ANALYTICS';
+if(token&&account){
+ async function gql(query,variables={}){
+  const r=await fetch('https://api.cloudflare.com/client/v4/graphql',{method:'POST',headers:{authorization:'Bearer '+token,'content-type':'application/json'},body:JSON.stringify({query,variables}),signal:AbortSignal.timeout(20000)});
+  const b=await r.json();if(!r.ok||b.errors?.length)throw Error('HTTP_'+r.status+':'+JSON.stringify(b.errors||[]));return b.data;
+ }
+ try{
+  const unwrap=t=>t?.name||unwrap(t?.ofType);
+  const fields=async name=>(await gql('query($name:String!){__type(name:$name){fields{name type{kind name ofType{kind name ofType{kind name}}}}}}',{name})).__type?.fields||[];
+  const af=await fields('Account');
+  report.analytics={};
+  const today=new Date().toISOString().slice(0,10),yesterday=new Date(Date.now()-86400000).toISOString().slice(0,10);
+  for(const dataset of ['durableObjectsStorageGroups','d1AnalyticsAdaptiveGroups']){
+   const f=af.find(x=>x.name===dataset);if(!f)throw Error('ANALYTICS_DATASET_NOT_AVAILABLE:'+dataset);
+   const df=await fields(unwrap(f.type)),sf=df.find(x=>x.name==='sum');
+   if(!sf)throw Error('ANALYTICS_SUM_NOT_AVAILABLE:'+dataset);
+   const sums=await fields(unwrap(sf.type));
+   const names=sums.map(x=>x.name).filter(x=>/row|write|read/i.test(x));
+   report.analytics[dataset]={availableSumFields:sums.map(x=>x.name)};
+   if(!names.length)throw Error('ANALYTICS_ROW_METRICS_NOT_AVAILABLE:'+dataset);
+   const query=`query($accountTag:string!,$start:Date,$end:Date){viewer{accounts(filter:{accountTag:$accountTag}){${dataset}(limit:10000,filter:{date_geq:$start,date_leq:$end}){sum{${names.join(' ')}} dimensions{date}}}}}`;
+   const data=await gql(query,{accountTag:account,start:yesterday,end:today});
+   report.analytics[dataset].daily=(data.viewer?.accounts||[]).flatMap(x=>x[dataset]||[]);
+  }
+  report.checks.analytics_read='PASS';report.checks.account_wide_usage='METRICS_RETRIEVED_REQUIRES_UNIT_AND_HEADROOM_REVIEW';
+ }catch(e){block('CLOUDFLARE_ANALYTICS_READ:'+e.message)}
+}
+
 report.checks.production_deploy='NOT_ATTEMPTED';
 writeFileSync('cloudflare-readonly-preflight.json',JSON.stringify(report,null,2));
 console.log(JSON.stringify(report,null,2));
