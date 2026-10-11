@@ -1,0 +1,51 @@
+name: Football Edge D1 candidate deploy (manual guarded)
+on:
+  workflow_dispatch:
+    inputs:
+      deploy:
+        description: 'Deploy only after reviewing dry-run, Cloudflare usage, and rollback version'
+        type: boolean
+        required: true
+        default: false
+jobs:
+  candidate:
+    runs-on: ubuntu-latest
+    environment: football-edge-production
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify credentials and rollback checkpoint
+        env:
+          CF_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CF_ACCOUNT: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          ROLLBACK: ${{ vars.FE_ROLLBACK_VERSION_ID }}
+        run: |
+          test -n "$CF_TOKEN" || { echo 'BLOCKER: CLOUDFLARE_API_TOKEN secret missing'; exit 1; }
+          test -n "$CF_ACCOUNT" || { echo 'BLOCKER: CLOUDFLARE_ACCOUNT_ID secret missing'; exit 1; }
+          test -n "$ROLLBACK" || { echo 'BLOCKER: FE_ROLLBACK_VERSION_ID repository/environment variable missing'; exit 1; }
+          echo "Rollback version is configured (value withheld)"
+      - name: Verify D1 configuration and full regression
+        run: |
+          node --check worker_notify_v137_quota50000.js
+          node tests/test-do-free-d1-live-state.mjs
+          node tests/test-do-free-quota-runtime.mjs
+          REQUIRE_DO_FREE_SAFE=1 API_DAILY_CALLS=50000 SCAN_TICKS_PER_DAY=2880 FIXTURES_PER_TICK=12 node tests/test-do-free-write-floor.mjs
+      - name: Install Wrangler
+        run: npm install --no-save wrangler@4
+      - name: Validate Cloudflare authentication and candidate bundle
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          npx wrangler whoami
+          npx wrangler deploy --dry-run --outdir /tmp/fe-d1-candidate
+      - name: Deploy only on explicit production approval
+        if: ${{ inputs.deploy == true }}
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          npx wrangler deploy
+          npx wrangler deployments list
