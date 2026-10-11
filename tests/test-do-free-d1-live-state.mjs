@@ -9,7 +9,7 @@ const methods=source.slice(begin,end);
 const rows=new Map(),legacy=new Map();
 let creates=0,reads=0,writes=0;
 const db={prepare(sql){return {bind(...args){return {...this,args}},async run(){if(sql.startsWith('CREATE')){creates++;return};if(sql.startsWith('INSERT')){writes++;rows.set(this.args[0],{fixture_id:this.args[0],payload:this.args[1]});return};if(sql.startsWith('DELETE')){rows.delete(this.args[0]);return}},async first(){reads++;return rows.get(this.args[0])||null},async all(){return {results:[...rows.values()]}}}}};
-const storage={async list(){return new Map([...legacy].map(([id,row])=>['notify:match:'+id,row]))},async get(key){return legacy.get(Number(key.split(':').at(-1)))||null},async put(key,value){legacy.set(Number(key.split(':').at(-1)),structuredClone(value))},async delete(key){legacy.delete(Number(key.split(':').at(-1))}};
+const storage={async list(){return new Map([...legacy].map(([id,row])=>['notify:match:'+id,row]))},async get(key){return legacy.get(Number(key.split(':').at(-1)))||null},async put(key,value){legacy.set(Number(key.split(':').at(-1)),structuredClone(value))},async delete(key){legacy.delete(Number(key.split(':').at(-1)))} };
 const make=(enabled=true)=>{const o=vm.runInNewContext('({'+methods+'})',{String,Number,Date,JSON,Map,Error});o.env={LIVE_STATE_D1_ENABLED:String(enabled),FOOTBALL_DB:db};o.ctx={storage};return o};
 const old={id:10,history:[{minute:33}],alerts:{'device:H1':{armed:false,lastSent:123}},lastAt:10};
 legacy.set(10,structuredClone(old));
