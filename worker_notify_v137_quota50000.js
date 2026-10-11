@@ -45,14 +45,15 @@ export class BackgroundWatcher extends HotPriorityWatcher{
     await this.ensureLiveTable();
     const result=await this.env.FOOTBALL_DB.prepare('SELECT fixture_id,payload FROM fe_notify_live_state').all();
     const map=new Map(legacy.map(row=>[Number(row.id),row]));
-    for(const row of result.results||[])map.set(Number(row.fixture_id),JSON.parse(row.payload));
+    for(const row of result.results||[]){const state=JSON.parse(row.payload);if(state?.__fe_deleted===true)map.delete(Number(row.fixture_id));else map.set(Number(row.fixture_id),state);}
     return [...map.values()];
   }
   async getNotifyMatch(id){
     if(!this.d1LiveEnabled())return this.ctx.storage.get('notify:match:'+id);
     await this.ensureLiveTable();
     const row=await this.env.FOOTBALL_DB.prepare('SELECT payload FROM fe_notify_live_state WHERE fixture_id=?').bind(Number(id)).first();
-    return row?JSON.parse(row.payload):this.ctx.storage.get('notify:match:'+id);
+    if(row){const state=JSON.parse(row.payload);return state?.__fe_deleted===true?null:state;}
+    return this.ctx.storage.get('notify:match:'+id);
   }
   async putNotifyMatch(id,item){
     if(!this.d1LiveEnabled())return this.ctx.storage.put('notify:match:'+id,item);
@@ -64,9 +65,11 @@ export class BackgroundWatcher extends HotPriorityWatcher{
   async deleteNotifyMatch(id){
     if(!this.d1LiveEnabled())return this.ctx.storage.delete('notify:match:'+id);
     await this.ensureLiveTable();
-    // Remove from both stores so legacy fallback cannot resurrect stale fixtures.
-    await this.env.FOOTBALL_DB.prepare('DELETE FROM fe_notify_live_state WHERE fixture_id=?').bind(Number(id)).run();
-    await this.ctx.storage.delete('notify:match:'+id);
+    // Tombstone in D1 instead of deleting the legacy DO row. This prevents
+    // resurrection on restart while keeping original data for rollback.
+    await this.env.FOOTBALL_DB.prepare(
+      'INSERT INTO fe_notify_live_state(fixture_id,payload,updated_at) VALUES(?,?,?) ON CONFLICT(fixture_id) DO UPDATE SET payload=excluded.payload,updated_at=excluded.updated_at'
+    ).bind(Number(id),JSON.stringify({__fe_deleted:true}),Date.now()).run();
   }
   async reserveApiCall(){
     return this.quotaWork(async()=>{
