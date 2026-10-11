@@ -1,4 +1,5 @@
 import { DurableObject } from "cloudflare:workers";
+import {providerObservation} from './provider_errors.mjs';
 
 const WORKER_VERSION = "1.2.1";
 const DB_SCHEMA_VERSION = "V1.23.1";
@@ -345,10 +346,19 @@ export class BackgroundWatcher extends DurableObject {
     const base=String(this.env.APISPORTS_BASE||"https://v3.football.api-sports.io").replace(/\/$/,"");
     const u=new URL(base+path);
     for(const [k,v] of Object.entries(params))if(v!==undefined&&v!==null&&v!=="")u.searchParams.set(k,String(v));
+    if(typeof this.beforeProviderRequest==='function')await this.beforeProviderRequest();
     const ctl=new AbortController(),timer=setTimeout(()=>ctl.abort(),12000);
     try{
       const r=await fetch(u,{headers:{"x-apisports-key":this.env.APISPORTS_KEY,"accept":"application/json"},signal:ctl.signal});
       const txt=await r.text();let data={};try{data=JSON.parse(txt)}catch{}
+      const observation=providerObservation(r,data,this.env.APISPORTS_KEY);
+      if(typeof this.recordProviderObservation==='function')await this.recordProviderObservation(observation);
+      if(observation.code!=='OK'&&(strict||!r.ok)){
+        const error=new Error(observation.code);
+        error.retryable=observation.code==='API_PROVIDER_SERVER_ERROR';
+        error.retryAfterMs=observation.retry_after_ms;
+        throw error;
+      }
       if(!r.ok)throw new Error(`API HTTP ${r.status}`);
       if(strict&&!Array.isArray(data?.response))throw new Error('EVIDENCE_PROVIDER_INVALID_RESPONSE');
       if(data?.errors&&Object.keys(data.errors).length){if(strict)throw new Error('EVIDENCE_PROVIDER_ERROR');console.log("api warning",JSON.stringify(data.errors).slice(0,500))}

@@ -2,6 +2,10 @@ name: DO Free isolated regression
 on:
   pull_request:
     paths:
+      - 'worker.js'
+      - 'provider_errors.mjs'
+      - 'worker_notify_v126.js'
+      - 'tests/test-provider-errors.mjs'
       - 'worker_notify_v136_hot_priority.js'
       - 'worker_notify_v135_full_pause.js'
       - 'worker_notify_v130.js'
@@ -43,6 +47,8 @@ jobs:
           node --check worker_notify_v130.js
           node --check tests/test-do-free-write-floor.mjs
           node --check tests/test-do-free-d1-live-state.mjs
+      - name: Verify provider error classification and per-attempt quota
+        run: node tests/test-provider-errors.mjs
       - name: Validate Cloudflare Worker deploy bundle (no credentials)
         run: |
           npm install --no-save wrangler@4
@@ -110,5 +116,47 @@ jobs:
         with:
           name: cloudflare-readonly-preflight
           path: cloudflare-readonly-preflight.json
+          if-no-files-found: ignore
+
+  deploy-provider-production:
+    needs: [source-regression, cloudflare-readonly-preflight]
+    if: github.event_name == 'pull_request' && github.event.pull_request.number == 5 && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref == 'fix/do-free-isolated-20261010'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    environment: football-edge-production
+    concurrency:
+      group: football-edge-production
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --no-save wrangler@4
+      - name: Refresh quota and rollback evidence
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          FE_ROLLBACK_VERSION_ID: ${{ vars.FE_ROLLBACK_VERSION_ID || '60781a4e-70cb-4c02-a036-2528c3048ed5' }}
+          CANDIDATE_SHA: ${{ github.event.pull_request.head.sha }}
+        run: node .github/scripts/cloudflare-readonly-preflight.mjs
+      - name: Deploy provider error and request accounting correction
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CANDIDATE_SHA: ${{ github.event.pull_request.head.sha }}
+        run: node .github/scripts/deploy-peak-candidate.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: provider-production-result
+          path: |
+            peak-production-result.json
+            cloudflare-readonly-preflight.json
           if-no-files-found: ignore
 

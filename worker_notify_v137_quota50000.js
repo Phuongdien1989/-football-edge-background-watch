@@ -107,9 +107,29 @@ export class BackgroundWatcher extends HotPriorityWatcher{
     return {ok:true,schema:'FE_API_QUOTA_50000_GLOBAL_V1',day,used,limit:cfg.total,remaining,utilization_pct:Math.round((used/cfg.total)*10000)/100,hard_cap:true,pacing:false,accounting:'PREPAID_BLOCK_UPPER_BOUND',usage_note:'used includes prepaid reservations that may not have been sent; unused reservations are forfeited on restart',block_size:Math.max(1,Math.min(256,Math.floor(n(this.env.API_RESERVATION_BLOCK_SIZE,64))))};
   }
 
-  async api(path,params={},strict=false){
-    await this.reserveApiCall();
-    return super.api(path,params,strict);
+  async beforeProviderRequest(){
+    const run=async()=>{
+      const wait=Math.max(0,Number(this._providerNextStart||0)-Date.now(),Number(this._providerRetryAt||0)-Date.now());
+      if(wait>0)await new Promise(resolve=>setTimeout(resolve,wait));
+      await this.reserveApiCall();
+      const rpm=Number(this._providerMinuteLimit||0);
+      // Respect provider-advertised speed, including its operational per-second layer.
+      const gap=rpm>=60?Math.ceil(1000/Math.floor(rpm/60)):rpm>0?Math.ceil(60000/rpm):0;
+      this._providerNextStart=Date.now()+gap;
+    };
+    const promise=(this._providerStartWork||Promise.resolve()).then(run);
+    this._providerStartWork=promise.catch(()=>{});
+    return promise;
+  }
+  async recordProviderObservation(observation){
+    this._providerObservation=observation;
+    const rpm=observation.limits.minute_limit;
+    if(Number.isFinite(rpm)&&rpm>0)this._providerMinuteLimit=rpm;
+    if(observation.code==='API_PROVIDER_RATE_LIMIT')this._providerRetryAt=Math.max(this._providerRetryAt||0,Date.now()+(observation.retry_after_ms||1000));
+    if(observation.code!=='OK'){
+      const previous=await this.ctx.storage.get('api:last-provider-error:v1');
+      if(!previous||previous.code!==observation.code||Date.now()-previous.at>=120000)await this.ctx.storage.put('api:last-provider-error:v1',observation);
+    }
   }
 
   async fetch(request){

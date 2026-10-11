@@ -4,7 +4,7 @@ import base,{BackgroundWatcher as ResilientWatcher} from './worker_notify_v125.j
 // Stable scoring, thresholds, calibration and push logic remain inherited unchanged.
 const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 const message=e=>String(e?.message||e||'UNKNOWN').slice(0,120);
-const retryable=e=>/EVIDENCE_PROVIDER_ERROR|API HTTP 429|API HTTP 5\d\d|AbortError|aborted|timeout|network|fetch failed/i.test(message(e));
+const retryable=e=>typeof e?.retryable==='boolean'?e.retryable:/EVIDENCE_PROVIDER_ERROR|API HTTP 429|API HTTP 5\d\d|AbortError|aborted|timeout|network|fetch failed/i.test(message(e));
 
 export class BackgroundWatcher extends ResilientWatcher{
   async api(path,params={},strict=false){
