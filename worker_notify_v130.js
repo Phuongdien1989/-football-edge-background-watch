@@ -170,7 +170,11 @@ export class BackgroundWatcher extends DeepLinkWatcher{
         }catch(e){status.errors.push({fixture:id,error:errText(e)})}
         item.lastAt=Date.now();const bytes=()=>new TextEncoder().encode(JSON.stringify(item)).byteLength;
         while(item.oddsHistory.length>2&&bytes()>100000)item.oddsHistory.shift();while(item.history.length>2&&bytes()>100000){item.history.shift();if(item.h1History.length>2)item.h1History.shift();if(item.hcHistory.length>2)item.hcHistory.shift()}
-        await this.ctx.storage.put('notify:match:'+id,item);
+        // Do not persist a brand-new empty fixture shell when all provider reads
+        // failed before any useful snapshot was captured. Existing fixture state
+        // still persists, preserving alert crossings and retry order.
+        const hasSnapshot=Boolean(item.last)||item.history.length>0||item.h1History.length>0||item.hcHistory.length>0||item.oddsHistory.length>0;
+        if(byId.has(id)||hasSnapshot)await this.ctx.storage.put('notify:match:'+id,item);
       }
       const cycleSec=Math.max(30,Math.ceil((Date.now()-now)/1000));
       status.rotationEstimateSeconds=Math.ceil(live.length/12)*cycleSec;
