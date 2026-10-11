@@ -24,9 +24,29 @@ export function peakWindow(env,now=Date.now()){
 }
 
 export class BackgroundWatcher extends QuotaWatcher{
+  constructor(ctx,env){
+    super(ctx,env);
+    if(String(env?.MANUAL_SCAN_MODE_ENABLED)==='true')ctx.blockConcurrencyWhile(async()=>{
+      const key='notify:manual-mode:v1';
+      if(await ctx.storage.get(key))return;
+      const previous=await ctx.storage.get('notify:scan-control');
+      // One-time migration only: subsequent restarts preserve the user's choice.
+      await ctx.storage.put({[key]:true,'notify:manual-mode:previous-control:v1':previous||null,'notify:scan-control':{enabled:false,updated:Date.now()}});
+      await ctx.storage.deleteAlarm();
+    });
+  }
+  manualMode(){return String(this.env.MANUAL_SCAN_MODE_ENABLED)==='true';}
+  async manualBudget(){
+    const day=Math.floor(Date.now()/DAY),stored=await this.ctx.storage.get('notify:manual-ticks:v1');
+    const limit=Number(this.env.MANUAL_SCAN_TICKS_PER_DAY);
+    if(!Number.isInteger(limit)||limit<1||limit>720)throw Error('MANUAL_SCAN_BUDGET_INVALID');
+    return {day,used:stored?.day===day?Number(stored.used||0):0,limit};
+  }
   async scanControl(){
     const manual=await super.scanControl(),window=peakWindow(this.env);
-    return {...manual,manualEnabled:manual.enabled!==false,enabled:manual.enabled!==false&&window.allowed,scheduledPaused:manual.enabled!==false&&!window.allowed,peak_window:window};
+    const budget=this.manualMode()?await this.manualBudget():null;
+    const quotaPaused=Boolean(budget&&budget.used>=budget.limit&&!this._manualCycleActive);
+    return {...manual,manualEnabled:manual.enabled!==false,enabled:manual.enabled!==false&&window.allowed&&!quotaPaused,scheduledPaused:manual.enabled!==false&&!window.allowed,manualMode:this.manualMode(),quotaPaused,scan_budget:budget,peak_window:window};
   }
   async armPeakWake(window){
     // A single wake-up at the opening boundary, never a 20-second idle loop.
@@ -34,6 +54,27 @@ export class BackgroundWatcher extends QuotaWatcher{
     if(previous!==window.nextStart)await this.ctx.storage.setAlarm(window.nextStart);
   }
   async alarm(){
+    if(this.manualMode()){
+      // Prepay each whole scan cycle durably, including failed attempts.
+      // ON/OFF and restarts cannot reset the daily Free-tier allowance.
+      const run=async()=>{
+        const control=await this.scanControl();
+        if(!control.enabled){await this.ctx.storage.deleteAlarm();return super.alarm();}
+        const budget=control.scan_budget;
+        await this.ctx.storage.put('notify:manual-ticks:v1',{day:budget.day,used:budget.used+1});
+        this._manualCycleActive=true;
+        try{return await super.alarm();}
+        finally{
+          this._manualCycleActive=false;
+          const after=await this.scanControl();
+          if(after.quotaPaused&&after.manualEnabled)await this.ctx.storage.put('notify:scan-control',{enabled:false,updated:Date.now()});
+          if(!after.enabled)await this.ctx.storage.deleteAlarm();
+        }
+      };
+      const result=(this._manualAlarmWork||Promise.resolve()).then(run);
+      this._manualAlarmWork=result.catch(()=>{});
+      return result;
+    }
     const control=await this.scanControl();
     if(!control.manualEnabled)return super.alarm();
     if(!control.peak_window.allowed){
@@ -56,7 +97,12 @@ export class BackgroundWatcher extends QuotaWatcher{
   }
   async fetch(request){
     const path=new URL(request.url).pathname;
+    if(this.manualMode()&&path==='/api/notify/scan-control'&&request.method==='POST'){
+      const input=await request.clone().json().catch(()=>null),control=await this.scanControl();
+      if(input?.enabled===true&&control.quotaPaused)return reply({ok:false,error:'FREE_SCAN_DAILY_BUDGET_EXHAUSTED',scan_control:control},409);
+    }
     if(path==='/api/notify/peak-wake'&&request.method==='POST'){
+      if(this.manualMode())return reply({ok:true,manualMode:true,automaticWake:false});
       const control=await this.scanControl();
       if(!control.manualEnabled)return reply({ok:true,paused:true,peak_window:control.peak_window});
       if(control.peak_window.allowed){
@@ -66,7 +112,14 @@ export class BackgroundWatcher extends QuotaWatcher{
       return reply({ok:true,scan_control:control});
     }
     if(path==='/api/notify/peak-window'&&request.method==='GET')return reply({ok:true,scan_control:await this.scanControl(),next_alarm:await this.ctx.storage.getAlarm()});
-    return super.fetch(request);
+    const response=await super.fetch(request);
+    if(this.manualMode()&&path==='/api/notify/scan-control'&&request.method==='POST'&&response.ok){
+      const control=await this.scanControl();
+      if(!control.enabled)await this.ctx.storage.deleteAlarm();
+      const data=await response.json();
+      return reply({...data,scan_control:control});
+    }
+    return response;
   }
 }
 
@@ -82,6 +135,7 @@ export default {...base,async fetch(request,env,ctx){
   }
   return response;
 },async scheduled(controller,env){
+  if(String(env.MANUAL_SCAN_MODE_ENABLED)==='true')return;
   // Daily start also recovers a worker with no existing alarm after deployment.
   const id=env.BACKGROUND_WATCHER.idFromName('football-edge-global');
   const response=await env.BACKGROUND_WATCHER.get(id).fetch(new Request('https://internal/api/notify/peak-wake',{method:'POST'}));

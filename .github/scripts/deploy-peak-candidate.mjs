@@ -6,6 +6,7 @@ const candidate=process.env.CANDIDATE_SHA;
 const repository=process.env.GITHUB_REPOSITORY;
 const token=process.env.CLOUDFLARE_API_TOKEN,account=process.env.CLOUDFLARE_ACCOUNT_ID;
 const rollback='60781a4e-70cb-4c02-a036-2528c3048ed5';
+const expectedProduction='160f5f93-e6a2-4bc4-ad3d-84aba6b74e96';
 const worker=evidence.worker,database=evidence.database?.uuid;
 const prefix='/accounts/'+encodeURIComponent(account);
 const report={commit:candidate,rollback,checks:{},productionDeploy:'NOT_ATTEMPTED'};
@@ -21,7 +22,7 @@ try{
  if(!candidate||!token||!account||!database||!worker)throw Error('DEPLOY_INPUT_MISSING');
  if(evidence.commit!==candidate||evidence.blockers?.length)throw Error('PREFLIGHT_CHECKPOINT_MISMATCH_OR_BLOCKED');
  if(evidence.rollbackVersion?.id!==rollback)throw Error('ROLLBACK_NOT_VERIFIED');
- if(!/PEAK_SCAN_ENABLED\s*=\s*"true"/.test(cfg)||!/PEAK_SCAN_START\s*=\s*"20:00"/.test(cfg)||!/PEAK_SCAN_END\s*=\s*"00:00"/.test(cfg)||!/LIVE_STATE_D1_ENABLED\s*=\s*"true"/.test(cfg))throw Error('RELEASE_WINDOW_OR_D1_CONFIGURATION_CHANGED');
+ if(!/PEAK_SCAN_ENABLED\s*=\s*"false"/.test(cfg)||!/MANUAL_SCAN_MODE_ENABLED\s*=\s*"true"/.test(cfg)||!/MANUAL_SCAN_TICKS_PER_DAY\s*=\s*"720"/.test(cfg)||!/crons\s*=\s*\[\s*\]/.test(cfg)||!/LIVE_STATE_D1_ENABLED\s*=\s*"true"/.test(cfg))throw Error('RELEASE_MANUAL_OR_D1_CONFIGURATION_CHANGED');
  const pr=await fetch('https://api.github.com/repos/'+repository+'/pulls/5',{headers:{accept:'application/vnd.github+json'},signal:AbortSignal.timeout(20000)}).then(r=>r.json());
  if(pr.head?.sha!==candidate||pr.head?.ref!=='fix/do-free-isolated-20261010'||pr.state!=='open')throw Error('PR_HEAD_CHANGED_OR_CLOSED');
  report.checks.checkpoint='PASS';
@@ -35,7 +36,7 @@ try{
  const otherDO=objects.byResource.filter(x=>x.dimensions.namespaceId!==namespace);
  const otherBaseline=total(otherDO,yesterday,'rowsWritten');
  const doToday=total(objects.daily,today,'rowsWritten');
- const plannedDO=782+4*720+720+720+180+50000+10;
+ const plannedDO=782+4*720+720+720+720+180+50000+10;
  report.quota={baselineD1:baseline,candidateD1,combinedD1:baseline+candidateD1,otherDO:otherBaseline,doToday,plannedDO,limit:100000,modelOnly:true};
  if(baseline+candidateD1>100000)throw Error('D1_ACCOUNT_HEADROOM_INSUFFICIENT');
  if(otherBaseline+doToday+plannedDO>100000)throw Error('DO_ACCOUNT_HEADROOM_INSUFFICIENT');
@@ -46,15 +47,10 @@ try{
  if(!bindings.some(x=>x.name==='FOOTBALL_DB'&&x.id===database))throw Error('PRODUCTION_D1_BINDING_MISMATCH');
  const path=prefix+'/workers/scripts/'+encodeURIComponent(worker);
  const active=await api(path+'/deployments');
- if(active.deployments?.[0]?.versions?.length!==1||active.deployments[0].versions[0].version_id!==rollback||active.deployments[0].versions[0].percentage!==100)throw Error('PRODUCTION_CHANGED_SINCE_ROLLBACK_CHECKPOINT');
+ if(active.deployments?.[0]?.versions?.length!==1||active.deployments[0].versions[0].version_id!==expectedProduction||active.deployments[0].versions[0].percentage!==100)throw Error('PRODUCTION_CHANGED_SINCE_MANUAL_CHECKPOINT');
  const scheduleResponse=await api(path+'/schedules');
  previousSchedules=Array.isArray(scheduleResponse)?scheduleResponse:scheduleResponse.schedules;
  if(!Array.isArray(previousSchedules))throw Error('SCHEDULE_API_SHAPE_NOT_SUPPORTED');
- // The first attempt restored the old version but left this newly added cron.
- // Its recorded pre-deployment schedule was empty; repair only that exact case.
- if(previousSchedules.length===1&&previousSchedules[0].cron==='0 13 * * *'){
-  await api(path+'/schedules',{method:'PUT',body:'[]'});previousSchedules=[];
- }
  report.previousSchedules=previousSchedules;
  await api(prefix+'/d1/database/'+database+'/query',{method:'POST',body:JSON.stringify({sql:'CREATE TABLE IF NOT EXISTS fe_notify_live_state (fixture_id INTEGER PRIMARY KEY, payload TEXT NOT NULL, updated_at INTEGER NOT NULL)'})});
  const columns=await api(prefix+'/d1/database/'+database+'/query',{method:'POST',body:JSON.stringify({sql:"PRAGMA table_info('fe_notify_live_state')"})});
@@ -82,16 +78,19 @@ try{
   const response=await fetch(healthURL,{signal:AbortSignal.timeout(10000)});
   health=await response.json();
   report.healthAttempts.push({attempt:attempt+1,http:response.status,commit:health.deploy_commit,doStatus:health.peak_status_error||'OK'});
-  healthy=response.ok&&health.deploy_commit===candidate&&health.peak_window?.start==='20:00'&&health.peak_window?.end==='00:00'&&Boolean(health.peak_status);
+  healthy=response.ok&&health.deploy_commit===candidate&&health.peak_window?.enabled===false&&health.peak_status?.manualMode===true&&health.peak_status?.scan_budget?.limit===720;
   if(healthy)break;
   await new Promise(resolve=>setTimeout(resolve,2000));
  }
  report.health=health;
- if(!healthy)throw Error('PRODUCTION_PEAK_HEALTH_FAILED');
- if(!health.peak_window.allowed&&health.peak_status.enabled!==false)throw Error('PRODUCTION_SCAN_NOT_PAUSED_OUTSIDE_WINDOW');
- report.checks.productionSchedule='PASS';
- report.checks.manualScanControl=health.peak_status.manualEnabled?'ENABLED_SCHEDULE_CONTROLS_SCANNING':'MANUALLY_PAUSED_REQUIRES_RESUME';
- report.checks.livePush=health.peak_window.allowed?'REQUIRES_RUNTIME_SIGNAL_AND_DEVICE_VERIFICATION':'NOT_TESTED_OUTSIDE_AUTHORIZED_PEAK_WINDOW';
+ if(!healthy)throw Error('PRODUCTION_MANUAL_HEALTH_FAILED');
+ if(health.peak_status.enabled!==false||health.peak_status.manualEnabled!==false||health.next_alarm!==null)throw Error('PRODUCTION_MANUAL_SCAN_NOT_OFF');
+ const finalSchedulesResponse=await api(path+'/schedules');
+ const finalSchedules=Array.isArray(finalSchedulesResponse)?finalSchedulesResponse:finalSchedulesResponse.schedules;
+ if(!Array.isArray(finalSchedules)||finalSchedules.length!==0)throw Error('PRODUCTION_AUTOMATIC_CRON_NOT_REMOVED');
+ report.checks.productionSchedule='PASS_NO_AUTOMATIC_CRON';
+ report.checks.manualScanControl='PASS_OFF_NO_ALARM';
+ report.checks.livePush='NOT_TESTED_USER_HAS_NOT_ENABLED_SCAN';
  report.checks.rollbackPreserved='PASS_OLD_VERSION_EXISTS_LEGACY_DO_UNTOUCHED';
  save();console.log(JSON.stringify(report,null,2));
 }catch(error){
@@ -100,7 +99,8 @@ try{
   try{
    await api(prefix+'/workers/scripts/'+encodeURIComponent(worker)+'/deployments',{method:'POST',body:JSON.stringify({strategy:'percentage',versions:[{version_id:rollback,percentage:100}],annotations:{'workers/message':'Automatic rollback: peak-window deployment verification failed'}})});
    report.productionDeploy='ROLLED_BACK';
-   if(previousSchedules)await api(prefix+'/workers/scripts/'+encodeURIComponent(worker)+'/schedules',{method:'PUT',body:JSON.stringify(previousSchedules.map(x=>({cron:x.cron})))});
+   // Original 60781a4e production had no cron. Keep manual mode paused on rollback.
+   await api(prefix+'/workers/scripts/'+encodeURIComponent(worker)+'/schedules',{method:'PUT',body:'[]'});
    report.productionDeploy='ROLLED_BACK';
   }catch(rollbackError){report.rollbackError=String(rollbackError.message||rollbackError);}
  }

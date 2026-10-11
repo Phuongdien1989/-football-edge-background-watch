@@ -5,7 +5,8 @@ const source=readFileSync(new URL('../worker_notify_v138_peak_window.js',import.
 let now=Date.parse('2026-10-11T11:59:59Z'),manual=true,superAlarms=0,providerCalls=0,quotaReservations=0;
 let alarmAt=null,alarmWrites=0;
 class QuotaWatcher {
- async scanControl(){return {enabled:manual,updated:123};}
+ constructor(ctx,env){this.ctx=ctx;this.env=env;}
+ async scanControl(){const saved=await this.ctx?.storage.get?.('notify:scan-control');return saved||{enabled:manual,updated:123};}
  async alarm(){if((await this.scanControl()).enabled){superAlarms++;await this.api('/fixtures');}}
  async api(){quotaReservations++;providerCalls++;return [];}
  async fetch(){return new Response('{}');}
@@ -50,3 +51,35 @@ assert.equal(alarmAt,now+1000,'cron can bootstrap a worker without an alarm');
 const n=alarmWrites;await w.fetch(new Request('https://test/api/notify/peak-wake',{method:'POST'}));
 assert.equal(alarmWrites,n,'cron never postpones an already scheduled scan');
 console.log('PASS: Vietnam overnight/daytime boundaries, no polling/quota outside window, single wake, restart, manual pause, cron bootstrap');
+
+const data=new Map([['notify:scan-control',{enabled:true,updated:123}]]);
+const manualEnv={PEAK_SCAN_ENABLED:'false',MANUAL_SCAN_MODE_ENABLED:'true',MANUAL_SCAN_TICKS_PER_DAY:'3'};
+let initialization;
+const ctx={blockConcurrencyWhile:fn=>{initialization=fn();},storage:{
+ get:async key=>data.get(key),
+ put:async(key,value)=>{if(typeof key==='object'){for(const [k,v]of Object.entries(key))data.set(k,v);}else data.set(key,value);},
+ getAlarm:async()=>alarmAt,setAlarm:async t=>{alarmAt=t;alarmWrites++;},deleteAlarm:async()=>{alarmAt=null;}
+}};
+const restart=async()=>{const watcher=new result.BackgroundWatcher(ctx,manualEnv);await initialization;return watcher;};
+w=await restart();
+assert.equal((await w.scanControl()).enabled,false,'manual migration starts paused');
+assert.equal(alarmAt,null,'old daily wake removed');
+assert.equal(data.get('notify:manual-mode:previous-control:v1').enabled,true,'previous control archived');
+const before=providerCalls;
+await w.alarm();assert.equal(providerCalls,before,'manual mode does not poll while OFF');
+data.set('notify:scan-control',{enabled:true,updated:now});
+w=await restart();assert.equal((await w.scanControl()).enabled,true,'restart preserves explicit ON');
+await w.fetch(new Request('https://test/api/notify/peak-wake',{method:'POST'}));
+assert.equal(alarmAt,null,'obsolete cron never auto starts manual mode');
+await Promise.all([w.alarm(),w.alarm(),w.alarm(),w.alarm()]);
+assert.equal(providerCalls-before,3,'concurrent alarms admit exactly the daily allowance, including final cycle');
+assert.equal((await w.scanControl()).manualEnabled,false,'Free budget exhaustion switches scanner OFF');
+w=await restart();data.set('notify:scan-control',{enabled:true,updated:now});
+await w.alarm();assert.equal(providerCalls-before,3,'restart or ON cannot reset daily ledger');
+now+=86400000;
+assert.equal((await w.scanControl()).scan_budget.used,0,'UTC reset matches provider daily rows budget');
+data.set('notify:scan-control',{enabled:false,updated:now});
+await w.alarm();assert.equal(providerCalls-before,3,'daily reset never automatically enables scanner');
+data.set('notify:scan-control',{enabled:true,updated:now});await w.alarm();
+assert.equal(providerCalls-before,4,'explicit ON works at any hour on a new day');
+console.log('PASS: default OFF, no automatic wake, persisted manual choice, serialized prepaid Free budget, restart/toggle guard, next-day manual resume');

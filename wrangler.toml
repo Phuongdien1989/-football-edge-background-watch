@@ -15,7 +15,9 @@ NOTIFY_DAILY_BUDGET = "43000"
 VALIDATION_DAILY_BUDGET = "3000"
 APISPORTS_BASE = "https://v3.football.api-sports.io"
 TZ = "Asia/Ho_Chi_Minh"
-PEAK_SCAN_ENABLED = "true"
+PEAK_SCAN_ENABLED = "false"
+MANUAL_SCAN_MODE_ENABLED = "true"
+MANUAL_SCAN_TICKS_PER_DAY = "720"
 PEAK_SCAN_START = "20:00"
 PEAK_SCAN_END = "00:00"
 
@@ -61,5 +63,5 @@ enabled = true
 head_sampling_rate = 1
 
 [triggers]
-# 20:00 Vietnam. Alarm handles the overnight window and exact next opening.
-crons = ["0 13 * * *"]
+# Only the app's authenticated ON control starts scanning.
+crons = []

@@ -20,6 +20,7 @@ const doBreakdown={
   notificationBudget:ticks,
   diagnosticStatus:ticks,
   schedulerStatus:Math.ceil(ticks/4),
+  manualCycleLedger:/MANUAL_SCAN_MODE_ENABLED\s*=\s*"true"/.test(config)?ticks:0,
   reserveOther:50000 // Conservative allowance for inherited follow/evidence/device/push writes.
 };
 const d1Breakdown={
