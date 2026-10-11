@@ -26,6 +26,48 @@ export class BackgroundWatcher extends HotPriorityWatcher{
   // Durable Object serializes reservations. Persist a *prepaid* block before
   // consuming any request. Unused tokens are forfeited on restart: this can
   // underuse the provider quota, but cannot overspend it.
+  // D1 migration is opt-in. Legacy DO rows are retained and used as fallback.
+  // No D1 schema changes occur while LIVE_STATE_D1_ENABLED is disabled.
+  d1LiveEnabled(){return String(this.env.LIVE_STATE_D1_ENABLED||'false')==='true';}
+  async ensureLiveTable(){
+    if(!this.d1LiveEnabled())return;
+    if(!this.env.FOOTBALL_DB)throw Error('LIVE_D1_BINDING_MISSING');
+    if(!this._liveTableReady){
+      this._liveTableReady=this.env.FOOTBALL_DB.prepare(
+        'CREATE TABLE IF NOT EXISTS fe_notify_live_state (fixture_id INTEGER PRIMARY KEY, payload TEXT NOT NULL, updated_at INTEGER NOT NULL)'
+      ).run().catch(e=>{this._liveTableReady=null;throw e});
+    }
+    await this._liveTableReady;
+  }
+  async listNotifyMatches(){
+    const legacy=[...(await this.ctx.storage.list({prefix:'notify:match:'})).values()];
+    if(!this.d1LiveEnabled())return legacy;
+    await this.ensureLiveTable();
+    const result=await this.env.FOOTBALL_DB.prepare('SELECT fixture_id,payload FROM fe_notify_live_state').all();
+    const map=new Map(legacy.map(row=>[Number(row.id),row]));
+    for(const row of result.results||[])map.set(Number(row.fixture_id),JSON.parse(row.payload));
+    return [...map.values()];
+  }
+  async getNotifyMatch(id){
+    if(!this.d1LiveEnabled())return this.ctx.storage.get('notify:match:'+id);
+    await this.ensureLiveTable();
+    const row=await this.env.FOOTBALL_DB.prepare('SELECT payload FROM fe_notify_live_state WHERE fixture_id=?').bind(Number(id)).first();
+    return row?JSON.parse(row.payload):this.ctx.storage.get('notify:match:'+id);
+  }
+  async putNotifyMatch(id,item){
+    if(!this.d1LiveEnabled())return this.ctx.storage.put('notify:match:'+id,item);
+    await this.ensureLiveTable();
+    await this.env.FOOTBALL_DB.prepare(
+      'INSERT INTO fe_notify_live_state(fixture_id,payload,updated_at) VALUES(?,?,?) ON CONFLICT(fixture_id) DO UPDATE SET payload=excluded.payload,updated_at=excluded.updated_at'
+    ).bind(Number(id),JSON.stringify(item),Date.now()).run();
+  }
+  async deleteNotifyMatch(id){
+    if(!this.d1LiveEnabled())return this.ctx.storage.delete('notify:match:'+id);
+    await this.ensureLiveTable();
+    // Remove from both stores so legacy fallback cannot resurrect stale fixtures.
+    await this.env.FOOTBALL_DB.prepare('DELETE FROM fe_notify_live_state WHERE fixture_id=?').bind(Number(id)).run();
+    await this.ctx.storage.delete('notify:match:'+id);
+  }
   async reserveApiCall(){
     return this.quotaWork(async()=>{
       const cfg=this.quotaCfg(),day=new Date().toISOString().slice(0,10),key='api:q50000:global:v1';
