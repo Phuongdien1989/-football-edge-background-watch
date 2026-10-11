@@ -12,7 +12,8 @@ const fixtures=Number(process.env.FIXTURES_PER_TICK||12);
 // can now skip writes, and actual fixture count varies by scan.
 const block=Number(process.env.API_RESERVATION_BLOCK_SIZE||64);
 const apiReservationWrites=Math.ceil(calls/block);
-const projectedWrites=apiReservationWrites+ticks*fixtures;\nconst d1ProjectedDoWrites=apiReservationWrites+ticks; // setAlarm() alone costs one DO write per scan tick
+const projectedWrites=apiReservationWrites+ticks*fixtures;
+const d1ProjectedDoWrites=apiReservationWrites+ticks; // setAlarm() alone costs one DO write per scan tick
 const budget=Number(process.env.DO_FREE_DAILY_WRITE_BUDGET||1000);
 const result={schema:'DO_WRITE_PROJECTION_V2',calls,ticks,fixtures,block,apiReservationWrites,projectedWrites,d1ProjectedDoWrites,configuredWriteBudget:budget,withinBudget:projectedWrites<=budget,excluded:['notify:status','scheduler','setAlarm','push latency','subscriptions','other inherited writes']};
 console.log(JSON.stringify(result));
