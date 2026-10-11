@@ -52,8 +52,8 @@ if(token&&account){
   const b=await r.json();if(!r.ok||b.errors?.length)throw Error('HTTP_'+r.status+':'+JSON.stringify(b.errors||[]));return b.data;
  }
  try{
-  const unwrap=t=>t?.name||unwrap(t?.ofType);
-  const fields=async name=>(await gql('query($name:String!){__type(name:$name){fields{name type{kind name ofType{kind name ofType{kind name}}}}}}',{name})).__type?.fields||[];
+  const unwrap=t=>{if(!t)throw Error('GRAPHQL_TYPE_WRAPPER_DEPTH_EXCEEDED');return t.name||unwrap(t.ofType)};
+  const fields=async name=>(await gql('query($name:String!){__type(name:$name){fields{name type{kind name ofType{kind name ofType{kind name ofType{kind name ofType{kind name ofType{kind name}}}}}}}}}',{name})).__type?.fields||[];
   const root=(await gql('{__schema{queryType{name}}}')).__schema.queryType.name;
   const rootFields=await fields(root),viewerField=rootFields.find(x=>x.name==='viewer');
   if(!viewerField)throw Error('GRAPHQL_VIEWER_SCHEMA_MISSING');
