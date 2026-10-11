@@ -23,7 +23,8 @@ assert.equal((await o.getNotifyMatch(10)).alerts['device:H1'].lastSent,123,'dedu
 assert.equal((await o.listNotifyMatches()).length,1,'merge must not duplicate legacy+D1');
 await o.deleteNotifyMatch(10);
 assert.equal((await o.getNotifyMatch(10)),null,'delete cannot resurrect old state');
-assert.equal(writes,1);
+assert.equal(writes,2,'D1 insert and tombstone are durable writes');
+assert.ok(legacy.has(10),'original DO row must remain available for rollback');
 const noD1=make(false);await noD1.putNotifyMatch(11,{id:11,history:[],alerts:{}});
 assert.ok(legacy.has(11),'disabled mode keeps original storage');
 assert.equal(rows.has(11),false,'disabled mode never writes D1');
