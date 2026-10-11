@@ -355,8 +355,9 @@ export class BackgroundWatcher extends DurableObject {
       if(typeof this.recordProviderObservation==='function')await this.recordProviderObservation(observation);
       if(observation.code!=='OK'&&(strict||!r.ok)){
         const error=new Error(observation.code);
-        error.retryable=observation.code==='API_PROVIDER_SERVER_ERROR';
-        error.retryAfterMs=observation.retry_after_ms;
+        const softRate=observation.code==='API_PROVIDER_RATE_LIMIT'&&r.status===200&&observation.limits.minute_remaining!==0;
+        error.retryAfterMs=observation.retry_after_ms||(softRate?Math.max(1000,Number(this._providerRetryAt||0)-Date.now()):0);
+        error.retryable=observation.code==='API_PROVIDER_SERVER_ERROR'||softRate&&error.retryAfterMs<=10000;
         throw error;
       }
       if(!r.ok)throw new Error(`API HTTP ${r.status}`);

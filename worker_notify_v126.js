@@ -16,7 +16,11 @@ export class BackgroundWatcher extends ResilientWatcher{
       catch(e){
         lastError=e;
         if(attempt>=attempts||!retryable(e))break;
-        await sleep(attempt===1?450:1100);
+        const delay=Math.max(attempt===1?450:1100,Number(e?.retryAfterMs||0));
+        // Preserve bounded LIVE recovery without holding an entire snapshot
+        // across a long provider cooldown or retrying an exhausted minute.
+        if(delay>10000)break;
+        await sleep(delay);
       }
     }
     if(liveDiscovery){

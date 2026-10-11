@@ -46,14 +46,15 @@ console.log('PASS: shared cooldown blocks all physical calls and reservations, s
 const observerMethod=source.slice(source.indexOf('  async recordProviderObservation('),source.indexOf('  async fetch(request)',source.indexOf('  async recordProviderObservation(')));
 const saved=new Map();let cooldownWrites=0;
 const observer=vm.runInNewContext('({'+observerMethod+'})',{Date:{now:()=>now},Number,Math});
-observer.ctx={storage:{get:async k=>saved.get(k),put:async(k,v)=>{saved.set(k,v);if(k==='api:provider-cooldown:v1')cooldownWrites++;}}};
-const rate=()=>({at:now,code:'API_PROVIDER_RATE_LIMIT',limits:{minute_limit:null},retry_after_ms:0});
+observer.ctx={storage:{get:async k=>saved.get(k),put:async(k,v)=>{saved.set(k,v);if(k==='api:provider-cooldown:v2')cooldownWrites++;}}};
+const rate=()=>({http:200,at:now,code:'API_PROVIDER_RATE_LIMIT',limits:{minute_limit:null},retry_after_ms:0});
 await observer.recordProviderObservation(rate());const firstUntil=observer._providerRetryAt;
 for(let i=0;i<18;i++)await observer.recordProviderObservation(rate());
 assert.equal(observer._providerRateFailures,1);assert.equal(cooldownWrites,1,'one batch shares one durable cooldown episode');
 await observer.recordProviderObservation({at:now,code:'OK',limits:{minute_limit:450}});
 assert.equal(observer._providerRetryAt,firstUntil,'old in-flight success cannot cancel active cooldown');
-now=firstUntil;await observer.recordProviderObservation(rate());assert.equal(observer._providerRetryAt-now,120000,'repeat failure increases backoff');
+now=firstUntil;await observer.recordProviderObservation(rate());assert.equal(observer._providerRetryAt-now,2000,'second soft rate failure permits bounded retry');
+now=observer._providerRetryAt;await observer.recordProviderObservation(rate());assert.equal(observer._providerRetryAt-now,60000,'third failure stops rapid retry for a full minute');
 now=observer._providerRetryAt;await observer.recordProviderObservation({at:now,code:'OK',limits:{minute_limit:450}});
 assert.equal(observer._providerRateFailures,0);assert.equal(observer._providerRetryAt,0,'successful recovery resets cooldown');
 console.log('PASS: bounded progressive cooldown, in-flight race guard and successful recovery');
@@ -65,13 +66,28 @@ console.log('PASS: structured API error codes, rate headers, Retry-After, secret
 const start=base.indexOf('  async api(path,params={},strict=false){');
 const apiMethod=base.slice(start,base.indexOf('  async listWatches(){',start));
 let physical=0;
-const baseApi=vm.runInNewContext('({'+apiMethod+'})',{URL,AbortController,Error,Object,JSON,providerObservation,
+const baseApi=vm.runInNewContext('({'+apiMethod+'})',{URL,AbortController,Error,Object,JSON,Date,Number,Math,providerObservation,
  setTimeout:()=>0,clearTimeout:()=>{},fetch:async()=>{physical++;return new Response(JSON.stringify({errors:[],response:[]}),{status:physical===1?503:200});}});
 class ResilientWatcher{async api(...args){return baseApi.api.call(this,...args);}}
 const retrySource=readFileSync('worker_notify_v126.js','utf8').replace(/^import .*;\n/,'').replace('export class BackgroundWatcher','class BackgroundWatcher').split('export default')[0];
-const Retry=vm.runInNewContext(retrySource+';BackgroundWatcher',{ResilientWatcher,Error,String,Promise,setTimeout:fn=>fn()});
+const Retry=vm.runInNewContext(retrySource+';BackgroundWatcher',{ResilientWatcher,Error,String,Number,Math,Promise,setTimeout:fn=>fn()});
 const retryWatcher=new Retry();retryWatcher.env={APISPORTS_KEY:'TEST_ONLY',APISPORTS_BASE:'https://provider.test'};
 let physicalReservations=0;retryWatcher.beforeProviderRequest=async()=>{physicalReservations++;};
 await retryWatcher.api('/fixtures',{live:'all'},true);
 assert.equal(physical,2);assert.equal(physicalReservations,2,'each actual retry must prepay a separate global token');
 console.log('PASS: real retry inheritance counts each outbound HTTP attempt before sending');
+
+// Regression: preserve strict LIVE recovery that the original generic error
+// retried, rather than stopping after one HTTP 200 rate error.
+let rateAttempts=0;const delays=[];
+const rateApi=vm.runInNewContext('({'+apiMethod+'})',{URL,AbortController,Error,Object,JSON,Date,Math,Number,providerObservation,
+ setTimeout:()=>0,clearTimeout:()=>{},fetch:async()=>{rateAttempts++;return new Response(JSON.stringify(rateAttempts===1?{errors:{rateLimit:'per-minute request limit'},response:[]}:{errors:[],response:[{fixture:{id:1}}]}),{status:200});}});
+class RateResilientWatcher{async api(...args){return rateApi.api.call(this,...args);}}
+const RateRetry=vm.runInNewContext(retrySource+';BackgroundWatcher',{ResilientWatcher:RateResilientWatcher,Error,String,Number,Math,Promise,setTimeout:(fn,ms)=>{delays.push(ms);fn();}});
+const rateWatcher=new RateRetry();rateWatcher.env={APISPORTS_KEY:'TEST_ONLY'};let paidAttempts=0;rateWatcher.beforeProviderRequest=async()=>paidAttempts++;
+const rows=await rateWatcher.api('/fixtures',{live:'all'},true);
+assert.equal(rows.length,1);assert.equal(rateAttempts,2);assert.equal(paidAttempts,2);assert.ok(delays[0]>=1000);
+rateAttempts=0;rateApi.api=vm.runInNewContext('({'+apiMethod+'})',{URL,AbortController,Error,Object,JSON,Date,Math,Number,providerObservation,
+ setTimeout:()=>0,clearTimeout:()=>{},fetch:async()=>{rateAttempts++;return new Response(JSON.stringify({errors:{rateLimit:'rate limit'},response:[]}),{status:429,headers:{'retry-after':'60','x-ratelimit-remaining':'0'}});}}).api;
+await assert.rejects(rateWatcher.api('/fixtures',{live:'all'},true),/API_PROVIDER_RATE_LIMIT/);assert.equal(rateAttempts,1,'hard 429/minute exhaustion never rapidly retries');
+console.log('PASS: HTTP 200 LIVE rate recovery, per-attempt accounting, advertised cooldown and hard limit stop');

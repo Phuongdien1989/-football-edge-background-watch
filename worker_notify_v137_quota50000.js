@@ -119,7 +119,7 @@ export class BackgroundWatcher extends HotPriorityWatcher{
   async beforeProviderRequest(){
     const run=async()=>{
       if(!this._providerCooldownLoaded){
-        const saved=await this.ctx.storage.get('api:provider-cooldown:v1');
+        const saved=await this.ctx.storage.get('api:provider-cooldown:v2');
         this._providerRetryAt=Math.max(this._providerRetryAt||0,Number(saved?.until||0));
         this._providerRateFailures=Number(saved?.failures||0);
         this._providerCooldownLoaded=true;
@@ -152,14 +152,20 @@ export class BackgroundWatcher extends HotPriorityWatcher{
     if(observation.code==='API_PROVIDER_RATE_LIMIT'){
       const active=Number(this._providerRetryAt||0)>Date.now();
       if(!active)this._providerRateFailures=(this._providerRateFailures||0)+1;
-      const delay=observation.retry_after_ms||Math.min(300000,60000*2**Math.min(3,this._providerRateFailures-1));
+      // HTTP 200 rate errors with no exhausted-minute header may be brief
+      // proxy protection. Give original strict LIVE retries 1s/2s recovery,
+      // then stop all branches for a full minute if all three attempts fail.
+      const soft=observation.http===200&&observation.limits.minute_remaining!==0;
+      const failures=this._providerRateFailures||1;
+      const fallback=soft&&failures<3?1000*failures:Math.min(300000,60000*2**Math.min(3,Math.max(0,failures-(soft?3:1))));
+      const delay=observation.retry_after_ms||fallback;
       const previousUntil=Number(this._providerRetryAt||0);
       // Responses from one in-flight batch share a single cooldown episode.
       if(!active||observation.retry_after_ms)this._providerRetryAt=Math.max(previousUntil,Date.now()+delay);
-      if(this._providerRetryAt!==previousUntil)await this.ctx.storage.put('api:provider-cooldown:v1',{until:this._providerRetryAt,failures:this._providerRateFailures});
+      if(this._providerRetryAt!==previousUntil)await this.ctx.storage.put('api:provider-cooldown:v2',{until:this._providerRetryAt,failures:this._providerRateFailures});
     }else if(observation.code==='OK'&&this._providerRateFailures&&Date.now()>=Number(this._providerRetryAt||0)){
       this._providerRateFailures=0;this._providerRetryAt=0;
-      await this.ctx.storage.put('api:provider-cooldown:v1',{until:0,failures:0});
+      await this.ctx.storage.put('api:provider-cooldown:v2',{until:0,failures:0});
     }
     if(observation.code!=='OK'){
       const previous=await this.ctx.storage.get('api:last-provider-error:v1');
