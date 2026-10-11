@@ -7,6 +7,7 @@ on:
       - 'worker_notify_v130.js'
       - 'worker_notify_v127.js'
       - 'tests/test-do-free-scan-control-idempotent.mjs'
+      - 'tests/test-do-free-scan-control-runtime.mjs'
       - 'tests/test-do-free-budget-no-rewrite.mjs'
       - 'tests/test-do-free-write-floor.mjs'
       - 'tests/test-do-free-pause-no-rewrite.mjs'
@@ -44,3 +45,5 @@ jobs:
         run: node tests/test-do-free-write-floor.mjs
       - name: Verify idempotent scan pause/resume
         run: node tests/test-do-free-scan-control-idempotent.mjs
+      - name: Execute scan-control runtime regression
+        run: node tests/test-do-free-scan-control-runtime.mjs
