@@ -103,9 +103,9 @@ export class BackgroundWatcher extends DeepLinkWatcher{
     try{
       const live=(await api('/fixtures',{live:'all'},true)).filter(f=>['1H','2H','LIVE'].includes(f.fixture?.status?.short)&&Number(f.fixture?.status?.elapsed)>=1&&Number(f.fixture?.status?.elapsed)<=90);
       status.live=live.length;
-      const all=[...(await this.ctx.storage.list({prefix:'notify:match:'})).values()],byId=new Map(all.map(x=>[x.id,x]));
+      const all=await this.listNotifyMatches(),byId=new Map(all.map(x=>[x.id,x]));
       const batch=live.sort((a,b)=>(byId.get(a.fixture.id)?.lastAt||0)-(byId.get(b.fixture.id)?.lastAt||0)).slice(0,12);
-      const activeIds=new Set(live.map(f=>f.fixture.id));for(const old of all)if(!activeIds.has(old.id)&&now-old.lastAt>3600000)await this.ctx.storage.delete('notify:match:'+old.id);
+      const activeIds=new Set(live.map(f=>f.fixture.id));for(const old of all)if(!activeIds.has(old.id)&&now-old.lastAt>3600000)await this.deleteNotifyMatch(old.id);
       const calibrations={};for(const d of devices){const cal={FT:[],legacyFT:[]};for(const key of Object.keys(cal))for(let i=0;i<5;i++)cal[key].push(...(await this.ctx.storage.get(`notify:cal:${d.id}:${key}:${i}`)||[]));calibrations[d.id]=createEngine(cal)}
       const engine=createEngine();
       for(const f of batch){
@@ -174,7 +174,7 @@ export class BackgroundWatcher extends DeepLinkWatcher{
         // failed before any useful snapshot was captured. Existing fixture state
         // still persists, preserving alert crossings and retry order.
         const hasSnapshot=Boolean(item.last)||item.history.length>0||item.h1History.length>0||item.hcHistory.length>0||item.oddsHistory.length>0;
-        if(byId.has(id)||hasSnapshot)await this.ctx.storage.put('notify:match:'+id,item);
+        if(byId.has(id)||hasSnapshot)await this.putNotifyMatch(id,item);
       }
       const cycleSec=Math.max(30,Math.ceil((Date.now()-now)/1000));
       status.rotationEstimateSeconds=Math.ceil(live.length/12)*cycleSec;
