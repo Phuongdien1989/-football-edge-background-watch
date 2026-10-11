@@ -54,7 +54,7 @@ export class BackgroundWatcher extends HotPriorityWatcher{
     let q=await this.ctx.storage.get(key);
     if(!q||q.day!==day)q={day,used:0,limit:cfg.total,updated:0};
     const used=n(q.used),remaining=Math.max(0,cfg.total-used);
-    return {ok:true,schema:'FE_API_QUOTA_50000_GLOBAL_V1',day,used,limit:cfg.total,remaining,utilization_pct:Math.round((used/cfg.total)*10000)/100,hard_cap:true,pacing:false,accounting:'PREPAID_BLOCK_UPPER_BOUND',block_size:Math.max(1,Math.min(256,Math.floor(n(this.env.API_RESERVATION_BLOCK_SIZE,64))))};
+    return {ok:true,schema:'FE_API_QUOTA_50000_GLOBAL_V1',day,used,limit:cfg.total,remaining,utilization_pct:Math.round((used/cfg.total)*10000)/100,hard_cap:true,pacing:false,accounting:'PREPAID_BLOCK_UPPER_BOUND',usage_note:'used includes prepaid reservations that may not have been sent; unused reservations are forfeited on restart',block_size:Math.max(1,Math.min(256,Math.floor(n(this.env.API_RESERVATION_BLOCK_SIZE,64))))};
   }
 
   async api(path,params={},strict=false){
