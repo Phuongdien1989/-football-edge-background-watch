@@ -62,14 +62,16 @@ if(token&&account){
   const af=await fields(unwrap(accountsField.type));
   report.analytics={};
   const today=new Date().toISOString().slice(0,10),yesterday=new Date(Date.now()-86400000).toISOString().slice(0,10);
-  for(const dataset of ['durableObjectsStorageGroups','d1AnalyticsAdaptiveGroups']){
+  const datasets=af.map(x=>x.name).filter(x=>/^durableObjects.*(Storage|Invocations)|^d1AnalyticsAdaptiveGroups$/.test(x));
+  report.analyticsDatasetNames=datasets;
+  for(const dataset of datasets){
    const f=af.find(x=>x.name===dataset);if(!f)throw Error('ANALYTICS_DATASET_NOT_AVAILABLE:'+dataset);
    const df=await fields(unwrap(f.type)),sf=df.find(x=>x.name==='sum');
-   if(!sf)throw Error('ANALYTICS_SUM_NOT_AVAILABLE:'+dataset);
+   if(!sf){report.analytics[dataset]={datasetFields:df.map(x=>x.name)};continue;}
    const sums=await fields(unwrap(sf.type));
    const names=sums.map(x=>x.name).filter(x=>/row|write|read/i.test(x));
    report.analytics[dataset]={availableSumFields:sums.map(x=>x.name)};
-   if(!names.length)throw Error('ANALYTICS_ROW_METRICS_NOT_AVAILABLE:'+dataset);
+   if(!names.length)continue;
    const query=`query($accountTag:string!,$start:Date,$end:Date){viewer{accounts(filter:{accountTag:$accountTag}){${dataset}(limit:10000,filter:{date_geq:$start,date_leq:$end}){sum{${names.join(' ')}} dimensions{date}}}}}`;
    const data=await gql(query,{accountTag:account,start:yesterday,end:today});
    report.analytics[dataset].daily=(data.viewer?.accounts||[]).flatMap(x=>x[dataset]||[]);
