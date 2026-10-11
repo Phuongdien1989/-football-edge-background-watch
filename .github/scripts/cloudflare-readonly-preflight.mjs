@@ -74,6 +74,13 @@ if(token&&account&&worker&&database){
   if(!Array.isArray(schema)||schema.some(x=>x.success===false))throw Error('D1_SCHEMA_QUERY_FAILED');
   report.liveTableSchema=schema.flatMap(x=>x.results||[]);report.checks.d1_schema_read='PASS';
   report.checks.live_table=report.liveTableSchema.length?'EXISTS_REVIEW_COLUMNS':'ABSENT_CANDIDATE_CREATES_ON_FIRST_USE';
+  if(report.liveTableSchema.length){
+   const cutoff=Date.now()-300000;
+   const state=await api(prefix+'/d1/database/'+encodeURIComponent(database)+'/query',{method:'POST',body:JSON.stringify({sql:"SELECT COUNT(*) AS retained_fixtures, COALESCE(SUM(CASE WHEN updated_at>=? THEN 1 ELSE 0 END),0) AS recent_5m, COALESCE(SUM(CASE WHEN updated_at>=? AND json_extract(payload,'$.last.sourceHealth.stats')='OK' THEN 1 ELSE 0 END),0) AS recent_stats_ok, COALESCE(SUM(CASE WHEN updated_at>=? AND json_extract(payload,'$.last.reason')='STATS_UNAVAILABLE' THEN 1 ELSE 0 END),0) AS recent_stats_unavailable, MAX(updated_at) AS last_fixture_state_at FROM fe_notify_live_state WHERE COALESCE(json_extract(payload,'$.__fe_deleted'),0)=0",params:[cutoff,cutoff,cutoff]})});
+   const push=await api(prefix+'/d1/database/'+encodeURIComponent(database)+'/query',{method:'POST',body:JSON.stringify({sql:"SELECT COUNT(*) AS accepted_alert_states_5m FROM fe_notify_live_state t, json_each(t.payload,'$.alerts') a WHERE CAST(json_extract(a.value,'$.lastSent') AS INTEGER)>=?",params:[cutoff]})});
+   report.liveStateEvidence={measuredAt:Date.now(),cutoff,fixtures:state.flatMap(x=>x.results||[]),pushAccepted:push.flatMap(x=>x.results||[]),deviceDelivery:'NOT_VERIFIED'};
+   report.checks.d1_fixture_state_read='PASS_AGGREGATES_ONLY';
+  }
  }catch(e){block('D1_READ:'+e.message)}
 }
 report.checks.account_wide_usage='NOT_VERIFIED_REQUIRES_CLOUDFLARE_ANALYTICS';

@@ -352,6 +352,7 @@ export class BackgroundWatcher extends DurableObject {
       const r=await fetch(u,{headers:{"x-apisports-key":this.env.APISPORTS_KEY,"accept":"application/json"},signal:ctl.signal});
       const txt=await r.text();let data={};try{data=JSON.parse(txt)}catch{}
       const observation=providerObservation(r,data,this.env.APISPORTS_KEY);
+      observation.request_kind=path==='/fixtures'&&String(params?.live||'').toLowerCase()==='all'?(params.timezone?'LIVE_WITH_TIMEZONE':'LIVE_WITHOUT_TIMEZONE'):path==='/fixtures/statistics'?'STATISTICS':path==='/fixtures/events'?'EVENTS':path==='/odds/live'?'ODDS':'OTHER_ENDPOINT';
       if(typeof this.recordProviderObservation==='function')await this.recordProviderObservation(observation);
       if(observation.code!=='OK'&&(strict||!r.ok)){
         const error=new Error(observation.code);

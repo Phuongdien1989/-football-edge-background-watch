@@ -4,12 +4,12 @@ import vm from 'node:vm';
 import {providerRateScope} from '../provider_errors.mjs';
 const source=readFileSync(new URL('../worker_notify_v138_peak_window.js',import.meta.url),'utf8');
 let now=Date.parse('2026-10-11T11:59:59Z'),manual=true,superAlarms=0,providerCalls=0,quotaReservations=0;
-let alarmAt=null,alarmWrites=0;
+let alarmAt=null,alarmWrites=0,lastApiParams=null;
 class QuotaWatcher {
  constructor(ctx,env){this.ctx=ctx;this.env=env;}
  async scanControl(){const saved=await this.ctx?.storage.get?.('notify:scan-control');return saved||{enabled:manual,updated:123};}
  async alarm(){if((await this.scanControl()).enabled){superAlarms++;await this.api('/fixtures');}}
- async api(){quotaReservations++;providerCalls++;return [];}
+ async api(path,params){lastApiParams=params;quotaReservations++;providerCalls++;return [];}
  async fetch(request){return new Response(new URL(request.url).pathname==='/api/notify/status'?JSON.stringify({scan:data.get('notify:status')}):'{}');}
  async quotaStatus(){return {used:123,remaining:49877};}
  providerPacingCfg(){return {configured_minute_limit:450,effective_minute_limit:450,start_gap_ms:143,bootstrap:true};}
@@ -122,3 +122,8 @@ w=await restart();await w.maybeStartProviderProbe();
 assert.equal(providerCalls-beforeProbe,3,'persisted pilot cannot repeat on restart or health polls');
 assert.equal(data.get('notify:scan-control').enabled,false,'diagnostic does not resume user-paused scanner');
 console.log('PASS: approved three-call provider pilot, concurrency/restart idempotence, manual OFF preserved');
+
+const normalized=new result.BackgroundWatcher(ctx,{MANUAL_SCAN_MODE_ENABLED:'false',TZ:'Asia/Ho_Chi_Minh'});
+await normalized.api('/fixtures',{live:'all'},true);assert.equal(lastApiParams.timezone,'Asia/Ho_Chi_Minh');
+await normalized.api('/fixtures',{live:'all',timezone:'Europe/London'},true);assert.equal(lastApiParams.timezone,'Europe/London','explicit timezone is preserved');
+console.log('PASS: strict LIVE discovery uses Smart Follow catalog parameters without changing explicit timezones');

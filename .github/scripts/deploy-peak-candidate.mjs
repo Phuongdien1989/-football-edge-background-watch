@@ -6,7 +6,7 @@ const candidate=process.env.CANDIDATE_SHA;
 const repository=process.env.GITHUB_REPOSITORY;
 const token=process.env.CLOUDFLARE_API_TOKEN,account=process.env.CLOUDFLARE_ACCOUNT_ID;
 const rollback='60781a4e-70cb-4c02-a036-2528c3048ed5';
-const expectedProduction='61eaa8c5-14b1-492d-b6ef-8208f5e65a89';
+const expectedProduction='278c4131-83bc-44a4-b8a0-4966fcb7451b';
 const worker=evidence.worker,database=evidence.database?.uuid;
 const prefix='/accounts/'+encodeURIComponent(account);
 const report={commit:candidate,rollback,checks:{},productionDeploy:'NOT_ATTEMPTED'};
@@ -78,7 +78,7 @@ try{
   const response=await fetch(healthURL,{signal:AbortSignal.timeout(10000)});
   health=await response.json();
   report.healthAttempts.push({attempt:attempt+1,http:response.status,commit:health.deploy_commit,doStatus:health.peak_status_error||'OK',manualMode:health.peak_status?.manualMode||false});
-  healthy=response.ok&&health.deploy_commit===candidate&&health.peak_window?.enabled===false&&health.peak_status?.manualMode===true&&health.peak_status?.scan_budget?.limit===720&&health.notify_status?.diagnostics_version==='PACING_COOLDOWN_QUOTA_V2'&&health.notify_status?.provider?.classification==='V2'&&health.notify_status?.provider?.pacing?.bootstrap===true&&health.notify_status?.provider?.pacing?.configured_minute_limit===450&&health.notify_status?.provider?.pacing?.start_gap_ms>=143&&typeof health.notify_status?.provider?.pacing?.cooldown_until==='number'&&typeof health.notify_status?.provider?.pacing?.consecutive_rate_failures==='number';
+  healthy=response.ok&&health.deploy_commit===candidate&&health.peak_window?.enabled===false&&health.peak_status?.manualMode===true&&health.peak_status?.scan_budget?.limit===720&&health.notify_status?.diagnostics_version==='PACING_COOLDOWN_QUOTA_V3'&&health.notify_status?.provider?.classification==='V2'&&health.notify_status?.provider?.pacing?.bootstrap===true&&health.notify_status?.provider?.pacing?.configured_minute_limit===450&&health.notify_status?.provider?.pacing?.start_gap_ms>=143&&typeof health.notify_status?.provider?.pacing?.cooldown_until==='number'&&typeof health.notify_status?.provider?.pacing?.consecutive_rate_failures==='number';
   if(healthy)break;
   // Permit old idle DO instances to evict before polling the new generation.
   await new Promise(resolve=>setTimeout(resolve,attempt===0?150000:5000));

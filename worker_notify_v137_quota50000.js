@@ -127,8 +127,11 @@ export class BackgroundWatcher extends HotPriorityWatcher{
       // Recheck after waiting: an in-flight response may extend Retry-After.
       for(;;){
         if(Number(this._providerRetryAt||0)>Date.now()){
-          const error=new Error('API_PROVIDER_COOLDOWN');error.retryable=false;
-          error.retryAfterMs=this._providerRetryAt-Date.now();throw error;
+          const error=new Error('API_PROVIDER_COOLDOWN');
+          error.retryAfterMs=this._providerRetryAt-Date.now();
+          // Strict discovery can wait out a brief cooldown started by another
+          // branch. Long cooldowns remain terminal for this scan cycle.
+          error.retryable=error.retryAfterMs<=10000;throw error;
         }
         const wait=Math.max(0,Number(this._providerNextStart||0)-Date.now());
         if(wait<=0)break;

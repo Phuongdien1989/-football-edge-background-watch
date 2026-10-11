@@ -42,6 +42,7 @@ const blocked=await Promise.allSettled(Array.from({length:18},()=>watcher.before
 assert.ok(blocked.every(x=>x.status==='rejected'&&x.reason.message==='API_PROVIDER_COOLDOWN'&&x.reason.retryable===false));assert.equal(duringCooldown,0);
 watcher._providerCooldownLoaded=false;watcher._providerRetryAt=0;watcher.ctx.storage.get=async()=>({until:now+60000,failures:2});
 await assert.rejects(watcher.beforeProviderRequest(),/API_PROVIDER_COOLDOWN/);assert.equal(duringCooldown,0,'restart cannot bypass provider cooldown');
+watcher._providerRetryAt=now+1000;watcher._providerCooldownLoaded=true;await assert.rejects(watcher.beforeProviderRequest(),e=>e.message==='API_PROVIDER_COOLDOWN'&&e.retryable===true&&e.retryAfterMs===1000);assert.equal(duringCooldown,0,'brief sibling cooldown does not send or reserve a request');
 console.log('PASS: shared cooldown blocks all physical calls and reservations, survives restart');
 const observerMethod=source.slice(source.indexOf('  async recordProviderObservation('),source.indexOf('  async fetch(request)',source.indexOf('  async recordProviderObservation(')));
 const saved=new Map();let cooldownWrites=0;
@@ -91,3 +92,9 @@ rateAttempts=0;rateApi.api=vm.runInNewContext('({'+apiMethod+'})',{URL,AbortCont
  setTimeout:()=>0,clearTimeout:()=>{},fetch:async()=>{rateAttempts++;return new Response(JSON.stringify({errors:{rateLimit:'rate limit'},response:[]}),{status:429,headers:{'retry-after':'60','x-ratelimit-remaining':'0'}});}}).api;
 await assert.rejects(rateWatcher.api('/fixtures',{live:'all'},true),/API_PROVIDER_RATE_LIMIT/);assert.equal(rateAttempts,1,'hard 429/minute exhaustion never rapidly retries');
 console.log('PASS: HTTP 200 LIVE rate recovery, per-attempt accounting, advertised cooldown and hard limit stop');
+
+let starts=0,actualRecoveryCalls=0;
+rateApi.api=vm.runInNewContext('({'+apiMethod+'})',{URL,AbortController,Error,Object,JSON,Date,Math,Number,providerObservation,setTimeout:()=>0,clearTimeout:()=>{},fetch:async()=>{actualRecoveryCalls++;return new Response(JSON.stringify({errors:[],response:[{fixture:{id:1}}]}));}}).api;
+rateWatcher.beforeProviderRequest=async()=>{if(starts++===0){const e=new Error('API_PROVIDER_COOLDOWN');e.retryable=true;e.retryAfterMs=1000;throw e;}};
+const recovered=await rateWatcher.api('/fixtures',{live:'all'},true);assert.equal(recovered.length,1);assert.equal(actualRecoveryCalls,1,'sibling cooldown is waited out without wasting a physical request');
+console.log('PASS: strict discovery survives a short cooldown from another scan branch');
