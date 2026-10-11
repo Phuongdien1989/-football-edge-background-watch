@@ -8,9 +8,9 @@ assert.match(v130,/await this\.ctx\.storage\.put\('notify:match:'\+id,item\)/,'f
 const calls=Number(process.env.API_DAILY_CALLS||50000);
 const ticks=Number(process.env.SCAN_TICKS_PER_DAY||2880);
 const fixtures=Number(process.env.FIXTURES_PER_TICK||12);
-const estimatedMinimum=calls+ticks*fixtures;
+// Conservative workload projection, not a guaranteed minimum: failed/empty fixtures\n// can now skip writes, and actual fixture count varies by scan.\nconst projectedWrites=calls+ticks*fixtures;
 const budget=Number(process.env.DO_FREE_DAILY_WRITE_BUDGET||1000);
-const result={schema:'DO_WRITE_FLOOR_V1',calls,ticks,fixtures,estimatedMinimum,configuredWriteBudget:budget,withinBudget:estimatedMinimum<=budget,excluded:['notify:status','scheduler','setAlarm','push latency','subscriptions','other inherited writes']};
+const result={schema:'DO_WRITE_PROJECTION_V2',calls,ticks,fixtures,projectedWrites,configuredWriteBudget:budget,withinBudget:projectedWrites<=budget,excluded:['notify:status','scheduler','setAlarm','push latency','subscriptions','other inherited writes']};
 console.log(JSON.stringify(result));
-assert.ok(estimatedMinimum>0);
-if(process.env.REQUIRE_DO_FREE_SAFE==='1')assert.ok(result.withinBudget,'DO write lower bound exceeds configured budget; block release');
+assert.ok(projectedWrites>0);
+if(process.env.REQUIRE_DO_FREE_SAFE==='1')assert.ok(result.withinBudget,'Projected DO writes exceed configured budget; block release');
