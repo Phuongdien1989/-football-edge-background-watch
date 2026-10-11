@@ -21,6 +21,7 @@ on:
       - 'wrangler.toml'
       - 'worker_notify_v137_quota50000.js'
       - '.github/workflows/test-do-free-isolated.yml'
+      - '.github/workflows/deploy-d1-candidate.yml'
   workflow_dispatch:
 jobs:
   source-regression:
