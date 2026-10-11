@@ -37,7 +37,7 @@ jobs:
         run: node tests/test-do-free-runtime.mjs
       - name: Verify deployed entrypoint inheritance
         run: node tests/test-do-free-entrypoint.mjs
-      - name: Verify quota exhaustion runtime behavior
+      - name: Verify prepaid quota block runtime behavior
         run: node tests/test-do-free-quota-runtime.mjs
       - name: Verify paused alarms do not rewrite status
         run: node tests/test-do-free-pause-no-rewrite.mjs
