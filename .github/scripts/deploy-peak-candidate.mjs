@@ -6,7 +6,7 @@ const candidate=process.env.CANDIDATE_SHA;
 const repository=process.env.GITHUB_REPOSITORY;
 const token=process.env.CLOUDFLARE_API_TOKEN,account=process.env.CLOUDFLARE_ACCOUNT_ID;
 const rollback='60781a4e-70cb-4c02-a036-2528c3048ed5';
-const expectedProduction='307dd3de-f193-4d4c-9dfd-ad8339f0bb8c';
+const expectedProduction='1fe19852-c574-44da-95df-86fb84c99fa9';
 const worker=evidence.worker,database=evidence.database?.uuid;
 const prefix='/accounts/'+encodeURIComponent(account);
 const report={commit:candidate,rollback,checks:{},productionDeploy:'NOT_ATTEMPTED'};
@@ -78,7 +78,7 @@ try{
   const response=await fetch(healthURL,{signal:AbortSignal.timeout(10000)});
   health=await response.json();
   report.healthAttempts.push({attempt:attempt+1,http:response.status,commit:health.deploy_commit,doStatus:health.peak_status_error||'OK',manualMode:health.peak_status?.manualMode||false});
-  healthy=response.ok&&health.deploy_commit===candidate&&health.peak_window?.enabled===false&&health.peak_status?.manualMode===true&&health.peak_status?.scan_budget?.limit===720&&health.notify_status?.provider?.classification==='V2'&&health.notify_status?.provider?.pacing?.bootstrap===true&&health.notify_status?.provider?.pacing?.configured_minute_limit===450&&health.notify_status?.provider?.pacing?.start_gap_ms>=143;
+  healthy=response.ok&&health.deploy_commit===candidate&&health.peak_window?.enabled===false&&health.peak_status?.manualMode===true&&health.peak_status?.scan_budget?.limit===720&&health.notify_status?.provider?.classification==='V2'&&health.notify_status?.provider?.pacing?.bootstrap===true&&health.notify_status?.provider?.pacing?.configured_minute_limit===450&&health.notify_status?.provider?.pacing?.start_gap_ms>=143&&typeof health.notify_status?.provider?.pacing?.cooldown_until==='number'&&typeof health.notify_status?.provider?.pacing?.consecutive_rate_failures==='number';
   if(healthy)break;
   // Permit old idle DO instances to evict before polling the new generation.
   await new Promise(resolve=>setTimeout(resolve,attempt===0?150000:5000));
@@ -100,11 +100,11 @@ try{
  report.error=String(error.message||error);
  if(deployed){
   try{
-   await api(prefix+'/workers/scripts/'+encodeURIComponent(worker)+'/deployments',{method:'POST',body:JSON.stringify({strategy:'percentage',versions:[{version_id:rollback,percentage:100}],annotations:{'workers/message':'Automatic rollback: peak-window deployment verification failed'}})});
-   report.productionDeploy='ROLLED_BACK';
+   await api(prefix+'/workers/scripts/'+encodeURIComponent(worker)+'/deployments',{method:'POST',body:JSON.stringify({strategy:'percentage',versions:[{version_id:expectedProduction,percentage:100}],annotations:{'workers/message':'Automatic rollback: peak-window deployment verification failed'}})});
+   report.productionDeploy='ROLLED_BACK';report.restoredVersion=expectedProduction;
    // Original 60781a4e production had no cron. Keep manual mode paused on rollback.
    await api(prefix+'/workers/scripts/'+encodeURIComponent(worker)+'/schedules',{method:'PUT',body:'[]'});
-   report.productionDeploy='ROLLED_BACK';
+   report.productionDeploy='ROLLED_BACK';report.restoredVersion=expectedProduction;
   }catch(rollbackError){report.rollbackError=String(rollbackError.message||rollbackError);}
  }
  save();console.log(JSON.stringify(report,null,2));process.exitCode=1;
