@@ -39,6 +39,10 @@ const result={schema:'FE_OFFICIAL_FREE_TIER_RELEASE_GATE_V1',mode:'D1_ENABLED',c
 console.log(JSON.stringify(result));
 assert.ok(calls>=0&&ticks>=0&&fixtures>=0&&block>=1);
 if(process.env.REQUIRE_DO_FREE_SAFE==='1'){
+ if(/MANUAL_SCAN_MODE_ENABLED\s*=\s*"true"/.test(config)){
+  const configuredTicks=Number(config.match(/MANUAL_SCAN_TICKS_PER_DAY\s*=\s*"(\d+)"/)?.[1]);
+  assert.equal(ticks,configuredTicks,'release model must cover the actual manual scan allowance');
+ }
  assert.ok(doWrites<=officialDO,'DO projected rows written exceed official Workers Free daily limit');
  assert.ok(d1Writes<=officialD1,'D1 projected rows written exceed official Workers Free daily limit');
 }
