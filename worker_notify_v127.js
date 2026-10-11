@@ -29,7 +29,7 @@ export class BackgroundWatcher extends RetryWatcher{
         const control={enabled:b.enabled,updated:Date.now()};
         await this.ctx.storage.put('notify:scan-control',control);
         const prev=await this.ctx.storage.get('notify:status')||{};
-        await this.ctx.storage.put('notify:status',{...prev,at:Date.now(),paused:!control.enabled,scanEnabled:control.enabled});
+        await this.ctx.storage.put('notify:status',{...prev,controlUpdated:Date.now(),paused:!control.enabled,scanEnabled:control.enabled});
         if(control.enabled)await this.ctx.storage.setAlarm(Date.now()+1000);
         return reply({ok:true,scan_control:control});
       }catch(e){return reply({error:String(e?.message||e).slice(0,160)},500)}

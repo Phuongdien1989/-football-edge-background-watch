@@ -9,11 +9,13 @@ class QuotaWatcher {
  async scanControl(){const saved=await this.ctx?.storage.get?.('notify:scan-control');return saved||{enabled:manual,updated:123};}
  async alarm(){if((await this.scanControl()).enabled){superAlarms++;await this.api('/fixtures');}}
  async api(){quotaReservations++;providerCalls++;return [];}
- async fetch(){return new Response('{}');}
+ async fetch(request){return new Response(new URL(request.url).pathname==='/api/notify/status'?JSON.stringify({scan:data.get('notify:status')}):'{}');}
+ async devices(){return [{prefs:{enabled:true,h1:true}}];}
 }
 // Remove only import/export syntax, leaving the implementation under test intact.
 const moduleText=source.replace(/^import .*;\n/,'').replace('export function peakWindow','function peakWindow').replace('export class BackgroundWatcher','class BackgroundWatcher').split('export default')[0];
-const result=vm.runInNewContext(moduleText+';({peakWindow,BackgroundWatcher})',{QuotaWatcher,Date:{now:()=>now},Number,String,Math,Error,Response,JSON,URL,Request});
+class FixedDate extends Date{constructor(...args){super(...(args.length?args:[now]));}static now(){return now;}}
+const result=vm.runInNewContext(moduleText+';({peakWindow,BackgroundWatcher})',{QuotaWatcher,Date:FixedDate,Number,String,Math,Error,Response,JSON,URL,Request});
 const env={PEAK_SCAN_ENABLED:'true',PEAK_SCAN_START:'19:00',PEAK_SCAN_END:'05:00'};
 const at=s=>now=Date.parse(s);
 assert.equal(result.peakWindow(env).allowed,false,'18:59:59 Vietnam closed');
@@ -87,3 +89,21 @@ await w.alarm();assert.equal(providerCalls-before,3,'daily reset never automatic
 data.set('notify:scan-control',{enabled:true,updated:now});await w.alarm();
 assert.equal(providerCalls-before,4,'explicit ON works at any hour on a new day');
 console.log('PASS: default OFF, no automatic wake, persisted manual choice, serialized prepaid Free budget, restart/toggle guard, next-day manual resume');
+
+const today=new Date(now).toISOString().slice(0,10);
+const oldBudget={day:'2026-10-10',used:45241};
+data.set('notify:budget',oldBudget);
+data.set('notify:status',{at:now,startedAt:Date.parse('2026-10-10T20:00:00Z'),apiToday:45241,apiLimit:43000,errors:[{error:'NOTIFY_DAILY_BUDGET_REACHED'}]});
+w.env.NOTIFY_DAILY_BUDGET='43000';
+let status=await w.fetch(new Request('https://test/api/notify/status')).then(r=>r.json());
+assert.equal(status.scan.apiToday,0,'old day cannot appear as today usage');
+assert.equal(status.scan.apiDay,today);assert.equal(status.scan.errors.length,0);
+assert.equal(status.scan.at,data.get('notify:status').startedAt,'heartbeat reflects last scan rather than ON timestamp');
+assert.equal(data.get('notify:budget'),oldBudget,'status GET never resets persisted accounting');
+data.set('notify:budget',{day:today,used:45241});
+status=await w.fetch(new Request('https://test/api/notify/status')).then(r=>r.json());
+assert.equal(status.scan.apiToday,45241,'real exhausted current-day budget remains visible');
+assert.equal(status.scan.errors[0].error,'NOTIFY_DAILY_BUDGET_REACHED');
+assert.equal(status.notify_budget.remaining,0);
+const diagnostics=await w.notifyDiagnostics();assert.equal(diagnostics.enabled_devices,1);assert.equal(diagnostics.budget.exhausted,true);
+console.log('PASS: UTC date-aware notification status, preserved current-day exhaustion, read-only accounting, real-cycle heartbeat');

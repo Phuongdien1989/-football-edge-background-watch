@@ -112,3 +112,45 @@ jobs:
           path: cloudflare-readonly-preflight.json
           if-no-files-found: ignore
 
+  deploy-status-production:
+    needs: [source-regression, cloudflare-readonly-preflight]
+    if: github.event_name == 'pull_request' && github.event.pull_request.number == 5 && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref == 'fix/do-free-isolated-20261010'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    environment: football-edge-production
+    concurrency:
+      group: football-edge-production
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --no-save wrangler@4
+      - name: Refresh measured quota, schema and rollback evidence
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          FE_ROLLBACK_VERSION_ID: ${{ vars.FE_ROLLBACK_VERSION_ID || '60781a4e-70cb-4c02-a036-2528c3048ed5' }}
+          CANDIDATE_SHA: ${{ github.event.pull_request.head.sha }}
+        run: node .github/scripts/cloudflare-readonly-preflight.mjs
+      - name: Deploy status correction and verify current-day diagnostics
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CANDIDATE_SHA: ${{ github.event.pull_request.head.sha }}
+        run: node .github/scripts/deploy-peak-candidate.mjs
+      - name: Preserve production evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: status-production-result
+          path: |
+            peak-production-result.json
+            cloudflare-readonly-preflight.json
+          if-no-files-found: ignore

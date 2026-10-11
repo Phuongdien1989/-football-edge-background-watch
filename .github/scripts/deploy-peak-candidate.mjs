@@ -6,7 +6,7 @@ const candidate=process.env.CANDIDATE_SHA;
 const repository=process.env.GITHUB_REPOSITORY;
 const token=process.env.CLOUDFLARE_API_TOKEN,account=process.env.CLOUDFLARE_ACCOUNT_ID;
 const rollback='60781a4e-70cb-4c02-a036-2528c3048ed5';
-const expectedProduction='60781a4e-70cb-4c02-a036-2528c3048ed5';
+const expectedProduction='7147ee9d-f1d0-409a-8ea5-b9a1ecfcd916';
 const worker=evidence.worker,database=evidence.database?.uuid;
 const prefix='/accounts/'+encodeURIComponent(account);
 const report={commit:candidate,rollback,checks:{},productionDeploy:'NOT_ATTEMPTED'};
@@ -78,20 +78,22 @@ try{
   const response=await fetch(healthURL,{signal:AbortSignal.timeout(10000)});
   health=await response.json();
   report.healthAttempts.push({attempt:attempt+1,http:response.status,commit:health.deploy_commit,doStatus:health.peak_status_error||'OK',manualMode:health.peak_status?.manualMode||false});
-  healthy=response.ok&&health.deploy_commit===candidate&&health.peak_window?.enabled===false&&health.peak_status?.manualMode===true&&health.peak_status?.scan_budget?.limit===720;
+  healthy=response.ok&&health.deploy_commit===candidate&&health.peak_window?.enabled===false&&health.peak_status?.manualMode===true&&health.peak_status?.scan_budget?.limit===720&&Boolean(health.notify_status?.budget?.day);
   if(healthy)break;
   // Permit old idle DO instances to evict before polling the new generation.
   await new Promise(resolve=>setTimeout(resolve,attempt===0?150000:5000));
  }
  report.health=health;
  if(!healthy)throw Error('PRODUCTION_MANUAL_HEALTH_FAILED');
- if(health.peak_status.enabled!==false||health.peak_status.manualEnabled!==false||health.next_alarm!==null)throw Error('PRODUCTION_MANUAL_SCAN_NOT_OFF');
+ // Preserve explicit manual ON/OFF choices; this release updates read-only status views.
  const finalSchedulesResponse=await api(path+'/schedules');
  const finalSchedules=Array.isArray(finalSchedulesResponse)?finalSchedulesResponse:finalSchedulesResponse.schedules;
  if(!Array.isArray(finalSchedules)||finalSchedules.length!==0)throw Error('PRODUCTION_AUTOMATIC_CRON_NOT_REMOVED');
  report.checks.productionSchedule='PASS_NO_AUTOMATIC_CRON';
- report.checks.manualScanControl='PASS_OFF_NO_ALARM';
- report.checks.livePush='NOT_TESTED_USER_HAS_NOT_ENABLED_SCAN';
+ report.checks.manualScanControl=health.peak_status.manualEnabled?'PASS_USER_MANUALLY_ENABLED':'PASS_USER_MANUALLY_PAUSED';
+ report.checks.notifyBudget='PASS_CURRENT_UTC_DAY_STATUS';
+ report.checks.liveScan=health.notify_status.last_cycle_current_day&&health.notify_status.scanned>0?'CURRENT_DAY_FIXTURE_SCAN_OBSERVED':'NO_CURRENT_FIXTURE_SCAN_EVIDENCE';
+ report.checks.livePush='DEVICE_PUSH_DELIVERY_NOT_VERIFIED';
  report.checks.rollbackPreserved='PASS_OLD_VERSION_EXISTS_LEGACY_DO_UNTOUCHED';
  save();console.log(JSON.stringify(report,null,2));
 }catch(error){

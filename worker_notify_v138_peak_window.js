@@ -36,6 +36,18 @@ export class BackgroundWatcher extends QuotaWatcher{
     });
   }
   manualMode(){return String(this.env.MANUAL_SCAN_MODE_ENABLED)==='true';}
+  async notifyBudgetView(){
+    const day=new Date(Date.now()).toISOString().slice(0,10),stored=await this.ctx.storage.get('notify:budget');
+    const used=stored?.day===day?Math.max(0,Number(stored.used)||0):0;
+    const limit=Number(this.env.NOTIFY_DAILY_BUDGET)||43000;
+    return {day,stored_day:stored?.day||null,used,limit,remaining:Math.max(0,limit-used),exhausted:used>=limit};
+  }
+  async notifyDiagnostics(){
+    const budget=await this.notifyBudgetView(),status=await this.ctx.storage.get('notify:status');
+    const devices=(await this.devices()).filter(d=>d?.prefs?.enabled&&(d.prefs.h1||d.prefs.goal||d.prefs.gap));
+    const lastCycleAt=Number(status?.startedAt||0);
+    return {budget,enabled_devices:devices.length,last_cycle_at:lastCycleAt,last_cycle_current_day:lastCycleAt>0&&new Date(lastCycleAt).toISOString().slice(0,10)===budget.day,live:Number(status?.live||0),scanned:Number(status?.scanned||0)};
+  }
   async manualBudget(){
     const day=Math.floor(Date.now()/DAY),stored=await this.ctx.storage.get('notify:manual-ticks:v1');
     const limit=Number(this.env.MANUAL_SCAN_TICKS_PER_DAY);
@@ -111,8 +123,15 @@ export class BackgroundWatcher extends QuotaWatcher{
       }else await this.armPeakWake(control.peak_window);
       return reply({ok:true,scan_control:control});
     }
-    if(path==='/api/notify/peak-window'&&request.method==='GET')return reply({ok:true,scan_control:await this.scanControl(),next_alarm:await this.ctx.storage.getAlarm()});
+    if(path==='/api/notify/peak-window'&&request.method==='GET')return reply({ok:true,scan_control:await this.scanControl(),next_alarm:await this.ctx.storage.getAlarm(),notify_status:await this.notifyDiagnostics()});
     const response=await super.fetch(request);
+    if(path==='/api/notify/status'&&request.method==='GET'&&response.ok){
+      const data=await response.json(),budget=await this.notifyBudgetView();
+      const scan=data.scan?{...data.scan,apiDay:budget.day,apiToday:budget.used,apiLimit:budget.limit,
+        at:Number(data.scan.startedAt||data.scan.at||0),
+        errors:(data.scan.errors||[]).filter(e=>e?.error!=='NOTIFY_DAILY_BUDGET_REACHED'||budget.exhausted)}:null;
+      return reply({...data,scan,notify_budget:budget});
+    }
     if(this.manualMode()&&path==='/api/notify/scan-control'&&request.method==='POST'&&response.ok){
       const control=await this.scanControl();
       if(!control.enabled)await this.ctx.storage.deleteAlarm();
@@ -131,7 +150,7 @@ export default {...base,async fetch(request,env,ctx){
     const status=await env.BACKGROUND_WATCHER.get(id).fetch(new Request('https://internal/api/notify/peak-window'));
     if(!status.ok)return reply({...health,peak_window:peakWindow(env),peak_status_error:'HTTP_'+status.status},503);
     const peak=await status.json();
-    return reply({...health,deploy_commit:env.FE_DEPLOY_COMMIT||null,peak_window:peakWindow(env),peak_status:peak.scan_control,next_alarm:peak.next_alarm});
+    return reply({...health,deploy_commit:env.FE_DEPLOY_COMMIT||null,peak_window:peakWindow(env),peak_status:peak.scan_control,next_alarm:peak.next_alarm,notify_status:peak.notify_status});
   }
   return response;
 },async scheduled(controller,env){

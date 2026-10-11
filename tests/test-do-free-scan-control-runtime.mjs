@@ -8,7 +8,7 @@ assert.ok(begin>=0&&end>begin);
 const method=src.slice(begin,end);
 const reply=(data,status=200)=>new Response(JSON.stringify(data),{status});
 let writes=0,alarms=0;
-const state=new Map([['notify:scan-control',{enabled:false,updated:123}]]);
+const state=new Map([['notify:scan-control',{enabled:false,updated:123}],['notify:status',{at:100,startedAt:90}]]);
 const obj=vm.runInNewContext('({'+method+'})',{URL,Date,JSON,Number,Response,reply});
 obj.ctx={storage:{get:async key=>state.get(key),put:async(key,value)=>{writes++;state.set(key,value)},setAlarm:async()=>{alarms++}}};
 obj.scanControl=async()=>{const c=state.get('notify:scan-control');return {enabled:c?.enabled!==false,updated:Number(c?.updated||0)}};
@@ -23,6 +23,8 @@ const resumed=await call(true);
 assert.equal(resumed.scan_control.enabled,true);
 assert.equal(writes,2,'transition persists control and status');
 assert.equal(alarms,1,'resume schedules exactly once');
+assert.equal(state.get('notify:status').at,100,'ON must not invent a fresh scan heartbeat');
+assert.equal(state.get('notify:status').startedAt,90);
 for(let i=0;i<12;i++){const result=await call(true);assert.equal(result.unchanged,true)}
 assert.equal(writes,2,'repeated resume should not write');
 assert.equal(alarms,1,'repeated resume should not schedule alarms');
