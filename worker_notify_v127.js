@@ -23,6 +23,9 @@ export class BackgroundWatcher extends RetryWatcher{
         const raw=await request.text();if(raw.length>5000)return reply({error:'REQUEST_TOO_LARGE'},413);
         const b=JSON.parse(raw||'{}');
         if(typeof b.enabled!=='boolean')return reply({error:'ENABLED_REQUIRED'},400);
+        const previous=await this.scanControl();
+        // Idempotent control requests must not spend DO writes or re-arm alarms.
+        if(previous.enabled===b.enabled)return reply({ok:true,scan_control:previous,unchanged:true});
         const control={enabled:b.enabled,updated:Date.now()};
         await this.ctx.storage.put('notify:scan-control',control);
         const prev=await this.ctx.storage.get('notify:status')||{};
