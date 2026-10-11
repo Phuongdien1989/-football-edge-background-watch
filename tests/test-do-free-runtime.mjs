@@ -18,6 +18,8 @@ const storage={
 };
 const obj=vm.runInNewContext('({'+method+'})',{Date:DateMock,num});
 obj.ctx={storage};
+obj.getNotifyMatch=id=>storage.get('notify:match:'+id);
+obj.putNotifyMatch=(id,item)=>storage.put('notify:match:'+id,item);
 let reason='GAP_NEAR';
 obj.hotPriorityCandidates=async()=>({rows:[{id:123,score:1075,reason}],cfg:{hotMs:20000,normalMs:30000,hotSlots:6},totalHot:1});
 const run=()=>obj.applyHotPriority();
