@@ -23,6 +23,11 @@ if(token&&account&&worker&&database){
   const deployments=await api(prefix+'/workers/scripts/'+encodeURIComponent(worker)+'/deployments');
   report.checks.deployments_read='PASS';report.currentDeployments=deployments;
  }catch(e){block('WORKERS_DEPLOYMENTS_READ:'+e.message)}
+ try{
+  const settings=await api(prefix+'/workers/scripts/'+encodeURIComponent(worker)+'/settings');
+  report.workerBindingNames=(settings.bindings||[]).map(x=>({name:x.name,type:x.type,namespace_id:x.namespace_id,id:x.id}));
+  report.checks.worker_settings_read='PASS';
+ }catch(e){block('WORKER_SETTINGS_READ:'+e.message)}
  if(rollback&&rollback.startsWith('60781a4e')){
   try{
    let full=rollback;
@@ -83,10 +88,18 @@ if(token&&account){
    const sums=await fields(unwrap(sf.type));
    const names=sums.map(x=>x.name).filter(x=>/row|write|read/i.test(x));
    report.analytics[dataset]={availableSumFields:sums.map(x=>x.name)};
+   const dimensionField=df.find(x=>x.name==='dimensions');
+   const dimensionNames=dimensionField?(await fields(unwrap(dimensionField.type))).map(x=>x.name):[];
+   report.analytics[dataset].availableDimensions=dimensionNames;
    if(!names.length)continue;
    const query=`query($accountTag:string!,$start:Date,$end:Date){viewer{accounts(filter:{accountTag:$accountTag}){${dataset}(limit:10000,filter:{date_geq:$start,date_leq:$end}){sum{${names.join(' ')}} dimensions{date}}}}}`;
    const data=await gql(query,{accountTag:account,start:yesterday,end:today});
    report.analytics[dataset].daily=(data.viewer?.accounts||[]).flatMap(x=>x[dataset]||[]);
+   const group=dimensionNames.find(x=>x==='scriptName')||dimensionNames.find(x=>x==='namespaceId')||(dataset==='d1AnalyticsAdaptiveGroups'?dimensionNames.find(x=>x==='databaseId'):null);
+   if(group){
+    const grouped=await gql(`query($accountTag:string!,$start:Date,$end:Date){viewer{accounts(filter:{accountTag:$accountTag}){${dataset}(limit:10000,filter:{date_geq:$start,date_leq:$end}){sum{${names.join(' ')}} dimensions{date ${group}}}}}`,{accountTag:account,start:yesterday,end:today});
+    report.analytics[dataset].byResource=(grouped.viewer?.accounts||[]).flatMap(x=>x[dataset]||[]);
+   }
   }
   report.checks.analytics_read='PASS';report.checks.account_wide_usage='METRICS_RETRIEVED_REQUIRES_UNIT_AND_HEADROOM_REVIEW';
  }catch(e){block('CLOUDFLARE_ANALYTICS_READ:'+e.message)}

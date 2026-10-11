@@ -70,7 +70,13 @@ export class BackgroundWatcher extends QuotaWatcher{
   }
 }
 
-export default {...base,async scheduled(controller,env){
+export default {...base,async fetch(request,env,ctx){
+  const response=await base.fetch(request,env,ctx);
+  if(new URL(request.url).pathname==='/health'&&response.ok){
+    const health=await response.json();return reply({...health,peak_window:peakWindow(env)});
+  }
+  return response;
+},async scheduled(controller,env){
   // Daily start also recovers a worker with no existing alarm after deployment.
   const id=env.BACKGROUND_WATCHER.idFromName('football-edge-global');
   const response=await env.BACKGROUND_WATCHER.get(id).fetch(new Request('https://internal/api/notify/peak-wake',{method:'POST'}));

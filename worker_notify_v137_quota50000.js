@@ -40,15 +40,18 @@ export class BackgroundWatcher extends HotPriorityWatcher{
     await this._liveTableReady;
   }
   async listNotifyMatches(){
+    if(this.d1LiveEnabled()&&this._liveStateCache)return [...this._liveStateCache.values()].map(row=>JSON.parse(JSON.stringify(row)));
     const legacy=[...(await this.ctx.storage.list({prefix:'notify:match:'})).values()];
     if(!this.d1LiveEnabled())return legacy;
     await this.ensureLiveTable();
     const result=await this.env.FOOTBALL_DB.prepare('SELECT fixture_id,payload FROM fe_notify_live_state').all();
     const map=new Map(legacy.map(row=>[Number(row.id),row]));
     for(const row of result.results||[]){const state=JSON.parse(row.payload);if(state?.__fe_deleted===true)map.delete(Number(row.fixture_id));else map.set(Number(row.fixture_id),state);}
-    return [...map.values()];
+    this._liveStateCache=map;
+    return [...map.values()].map(row=>JSON.parse(JSON.stringify(row)));
   }
   async getNotifyMatch(id){
+    if(this.d1LiveEnabled()&&this._liveStateCache){const row=this._liveStateCache.get(Number(id));return row?JSON.parse(JSON.stringify(row)):null;}
     if(!this.d1LiveEnabled())return this.ctx.storage.get('notify:match:'+id);
     await this.ensureLiveTable();
     const row=await this.env.FOOTBALL_DB.prepare('SELECT payload FROM fe_notify_live_state WHERE fixture_id=?').bind(Number(id)).first();
@@ -61,6 +64,7 @@ export class BackgroundWatcher extends HotPriorityWatcher{
     await this.env.FOOTBALL_DB.prepare(
       'INSERT INTO fe_notify_live_state(fixture_id,payload,updated_at) VALUES(?,?,?) ON CONFLICT(fixture_id) DO UPDATE SET payload=excluded.payload,updated_at=excluded.updated_at'
     ).bind(Number(id),JSON.stringify(item),Date.now()).run();
+    this._liveStateCache?.set(Number(id),JSON.parse(JSON.stringify(item)));
   }
   async deleteNotifyMatch(id){
     if(!this.d1LiveEnabled())return this.ctx.storage.delete('notify:match:'+id);
@@ -70,6 +74,7 @@ export class BackgroundWatcher extends HotPriorityWatcher{
     await this.env.FOOTBALL_DB.prepare(
       'INSERT INTO fe_notify_live_state(fixture_id,payload,updated_at) VALUES(?,?,?) ON CONFLICT(fixture_id) DO UPDATE SET payload=excluded.payload,updated_at=excluded.updated_at'
     ).bind(Number(id),JSON.stringify({__fe_deleted:true}),Date.now()).run();
+    this._liveStateCache?.delete(Number(id));
   }
   async reserveApiCall(){
     return this.quotaWork(async()=>{
