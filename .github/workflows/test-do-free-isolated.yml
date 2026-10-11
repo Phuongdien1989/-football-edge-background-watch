@@ -53,6 +53,8 @@ jobs:
         run: node tests/test-do-free-empty-fixture.mjs
       - name: Verify status write throttle
         run: node tests/test-do-free-status-throttle.mjs
+      - name: Verify D1 LIVE state migration and dedup regression
+        run: node tests/test-do-free-d1-live-state.mjs
       - name: Enforce conservative DO write budget release gate
         env:
           REQUIRE_DO_FREE_SAFE: '1'
