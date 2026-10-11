@@ -23,3 +23,17 @@ const base=readFileSync('worker.js','utf8');
 assert.ok(base.indexOf('await this.beforeProviderRequest()')<base.indexOf('const ctl=new AbortController(),timer=setTimeout(()=>ctl.abort(),12000);',base.indexOf('  async api(')),'network timeout starts after provider slot wait');
 assert.match(base,/await this\.beforeProviderRequest\(\)/,'each physical retry traverses the prepaid guard');
 console.log('PASS: structured API error codes, rate headers, Retry-After, secret redaction, last quota call, serialized request starts, per-attempt accounting');
+
+const start=base.indexOf('  async api(path,params={},strict=false){');
+const apiMethod=base.slice(start,base.indexOf('  async listWatches(){',start));
+let physical=0;
+const baseApi=vm.runInNewContext('({'+apiMethod+'})',{URL,AbortController,Error,Object,JSON,providerObservation,
+ setTimeout:()=>0,clearTimeout:()=>{},fetch:async()=>{physical++;return new Response(JSON.stringify({errors:[],response:[]}),{status:physical===1?503:200});}});
+class ResilientWatcher{async api(...args){return baseApi.api.call(this,...args);}}
+const retrySource=readFileSync('worker_notify_v126.js','utf8').replace(/^import .*;\n/,'').replace('export class BackgroundWatcher','class BackgroundWatcher').split('export default')[0];
+const Retry=vm.runInNewContext(retrySource+';BackgroundWatcher',{ResilientWatcher,Error,String,Promise,setTimeout:fn=>fn()});
+const retryWatcher=new Retry();retryWatcher.env={APISPORTS_KEY:'TEST_ONLY',APISPORTS_BASE:'https://provider.test'};
+let physicalReservations=0;retryWatcher.beforeProviderRequest=async()=>{physicalReservations++;};
+await retryWatcher.api('/fixtures',{live:'all'},true);
+assert.equal(physical,2);assert.equal(physicalReservations,2,'each actual retry must prepay a separate global token');
+console.log('PASS: real retry inheritance counts each outbound HTTP attempt before sending');

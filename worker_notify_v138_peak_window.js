@@ -47,7 +47,31 @@ export class BackgroundWatcher extends QuotaWatcher{
     const devices=(await this.devices()).filter(d=>d?.prefs?.enabled&&(d.prefs.h1||d.prefs.goal||d.prefs.gap));
     const lastCycleAt=Number(status?.startedAt||0);
     const publicObservation=o=>o?{at:o.at,http:o.http,code:o.code,limits:o.limits,retry_after_ms:o.retry_after_ms}:null;
-    return {budget,enabled_devices:devices.length,last_cycle_at:lastCycleAt,last_cycle_current_day:lastCycleAt>0&&new Date(lastCycleAt).toISOString().slice(0,10)===budget.day,live:Number(status?.live||0),scanned:Number(status?.scanned||0),error_count:(status?.errors||[]).length,provider:{latest:publicObservation(this._providerObservation),last_failure:publicObservation(await this.ctx.storage.get('api:last-provider-error:v1'))}};
+    const probeKey='api:provider-probe:v1:'+this.env.FE_PROVIDER_PROBE_RUN_ID;
+    return {budget,enabled_devices:devices.length,last_cycle_at:lastCycleAt,last_cycle_current_day:lastCycleAt>0&&new Date(lastCycleAt).toISOString().slice(0,10)===budget.day,live:Number(status?.live||0),scanned:Number(status?.scanned||0),error_count:(status?.errors||[]).length,provider:{latest:publicObservation(this._providerObservation),last_failure:publicObservation(await this.ctx.storage.get('api:last-provider-error:v1')),probe:this.env.FE_PROVIDER_PROBE_RUN_ID?await this.ctx.storage.get(probeKey)||null:null}};
+  }
+  async maybeStartProviderProbe(){
+    const runId=this.env.FE_PROVIDER_PROBE_RUN_ID;
+    if(!runId||runId!==this.env.FE_DEPLOY_COMMIT||String(this.env.FE_PROVIDER_PROBE_ENABLED)!=='true')return;
+    if(this._providerProbeStart)return this._providerProbeStart;
+    this._providerProbeStart=(async()=>{
+      const key='api:provider-probe:v1:'+runId;
+      if(await this.ctx.storage.get(key))return;
+      const state={run:runId,started_at:Date.now(),completed:false,samples:[]};
+      await this.ctx.storage.put(key,state); // Mark before any external request: restarts cannot repeat the pilot.
+      this.ctx.waitUntil((async()=>{
+        for(let i=0;i<3;i++){
+          if(i)await new Promise(resolve=>setTimeout(resolve,60000));
+          const sample={at:Date.now(),ok:false};
+          try{const live=await this.api('/fixtures',{live:'all'},true);sample.ok=true;sample.live_count=live.length;}catch(e){sample.error=String(e?.message||e).slice(0,120);}
+          const observation=this._providerObservation;
+          if(observation)sample.provider={http:observation.http,code:observation.code,limits:observation.limits};
+          state.samples.push(sample);state.completed=i===2;
+          await this.ctx.storage.put(key,state);
+        }
+      })());
+    })();
+    return this._providerProbeStart;
   }
   async manualBudget(){
     const day=Math.floor(Date.now()/DAY),stored=await this.ctx.storage.get('notify:manual-ticks:v1');
@@ -124,7 +148,10 @@ export class BackgroundWatcher extends QuotaWatcher{
       }else await this.armPeakWake(control.peak_window);
       return reply({ok:true,scan_control:control});
     }
-    if(path==='/api/notify/peak-window'&&request.method==='GET')return reply({ok:true,scan_control:await this.scanControl(),next_alarm:await this.ctx.storage.getAlarm(),notify_status:await this.notifyDiagnostics()});
+    if(path==='/api/notify/peak-window'&&request.method==='GET'){
+      await this.maybeStartProviderProbe();
+      return reply({ok:true,scan_control:await this.scanControl(),next_alarm:await this.ctx.storage.getAlarm(),notify_status:await this.notifyDiagnostics()});
+    }
     const response=await super.fetch(request);
     if(path==='/api/notify/status'&&request.method==='GET'&&response.ok){
       const data=await response.json(),budget=await this.notifyBudgetView();

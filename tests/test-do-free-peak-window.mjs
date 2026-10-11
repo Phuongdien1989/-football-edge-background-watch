@@ -15,7 +15,7 @@ class QuotaWatcher {
 // Remove only import/export syntax, leaving the implementation under test intact.
 const moduleText=source.replace(/^import .*;\n/,'').replace('export function peakWindow','function peakWindow').replace('export class BackgroundWatcher','class BackgroundWatcher').split('export default')[0];
 class FixedDate extends Date{constructor(...args){super(...(args.length?args:[now]));}static now(){return now;}}
-const result=vm.runInNewContext(moduleText+';({peakWindow,BackgroundWatcher})',{QuotaWatcher,Date:FixedDate,Number,String,Math,Error,Response,JSON,URL,Request});
+const result=vm.runInNewContext(moduleText+';({peakWindow,BackgroundWatcher})',{QuotaWatcher,Date:FixedDate,Number,String,Math,Error,Response,JSON,URL,Request,setTimeout:fn=>{fn();return 0;}});
 const env={PEAK_SCAN_ENABLED:'true',PEAK_SCAN_START:'19:00',PEAK_SCAN_END:'05:00'};
 const at=s=>now=Date.parse(s);
 assert.equal(result.peakWindow(env).allowed,false,'18:59:59 Vietnam closed');
@@ -107,3 +107,15 @@ assert.equal(status.scan.errors[0].error,'NOTIFY_DAILY_BUDGET_REACHED');
 assert.equal(status.notify_budget.remaining,0);
 const diagnostics=await w.notifyDiagnostics();assert.equal(diagnostics.enabled_devices,1);assert.equal(diagnostics.budget.exhausted,true);
 console.log('PASS: UTC date-aware notification status, preserved current-day exhaustion, read-only accounting, real-cycle heartbeat');
+
+w.env.FE_PROVIDER_PROBE_RUN_ID='explicit-approved-probe';w.env.FE_DEPLOY_COMMIT='explicit-approved-probe';w.env.FE_PROVIDER_PROBE_ENABLED='true';
+const pending=[];ctx.waitUntil=p=>pending.push(p);
+data.set('notify:scan-control',{enabled:false,updated:now});
+const beforeProbe=providerCalls;
+await Promise.all([w.maybeStartProviderProbe(),w.maybeStartProviderProbe()]);await Promise.all(pending);
+const pilot=data.get('api:provider-probe:v1:explicit-approved-probe');
+assert.equal(pilot.completed,true);assert.equal(pilot.samples.length,3);assert.equal(providerCalls-beforeProbe,3);
+w=await restart();await w.maybeStartProviderProbe();
+assert.equal(providerCalls-beforeProbe,3,'persisted pilot cannot repeat on restart or health polls');
+assert.equal(data.get('notify:scan-control').enabled,false,'diagnostic does not resume user-paused scanner');
+console.log('PASS: approved three-call provider pilot, concurrency/restart idempotence, manual OFF preserved');
