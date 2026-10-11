@@ -53,7 +53,7 @@ if(token&&account){
  }
  try{
   const unwrap=t=>{if(!t)throw Error('GRAPHQL_TYPE_WRAPPER_DEPTH_EXCEEDED');return t.name||unwrap(t.ofType)};
-  const fields=async name=>(await gql('query($name:String!){__type(name:$name){fields{name type{kind name ofType{kind name ofType{kind name ofType{kind name ofType{kind name ofType{kind name}}}}}}}}}',{name})).__type?.fields||[];
+  const fields=async name=>(await gql('query($name:String!){__type(name:$name){fields{name description type{kind name ofType{kind name ofType{kind name ofType{kind name ofType{kind name ofType{kind name}}}}}}}}}',{name})).__type?.fields||[];
   const root=(await gql('{__schema{queryType{name}}}')).__schema.queryType.name;
   const rootFields=await fields(root),viewerField=rootFields.find(x=>x.name==='viewer');
   if(!viewerField)throw Error('GRAPHQL_VIEWER_SCHEMA_MISSING');
@@ -67,7 +67,19 @@ if(token&&account){
   for(const dataset of datasets){
    const f=af.find(x=>x.name===dataset);if(!f)throw Error('ANALYTICS_DATASET_NOT_AVAILABLE:'+dataset);
    const df=await fields(unwrap(f.type)),sf=df.find(x=>x.name==='sum');
-   if(!sf){report.analytics[dataset]={datasetFields:df.map(x=>x.name)};continue;}
+   if(!sf){
+    const mf=df.find(x=>x.name==='max');
+    report.analytics[dataset]={datasetFields:df.map(x=>x.name)};
+    if(mf){
+     const maxFields=await fields(unwrap(mf.type));report.analytics[dataset].availableMaxFields=maxFields.map(x=>({name:x.name,description:x.description}));
+     const names=maxFields.map(x=>x.name).filter(x=>/row|write|read/i.test(x));
+     if(names.length){
+      const data=await gql(`query($accountTag:string!,$start:Date,$end:Date){viewer{accounts(filter:{accountTag:$accountTag}){${dataset}(limit:10000,filter:{date_geq:$start,date_leq:$end}){max{${names.join(' ')}} dimensions{date}}}}}`,{accountTag:account,start:yesterday,end:today});
+      report.analytics[dataset].daily=(data.viewer?.accounts||[]).flatMap(x=>x[dataset]||[]);
+     }
+    }
+    continue;
+   }
    const sums=await fields(unwrap(sf.type));
    const names=sums.map(x=>x.name).filter(x=>/row|write|read/i.test(x));
    report.analytics[dataset]={availableSumFields:sums.map(x=>x.name)};

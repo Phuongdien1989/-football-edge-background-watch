@@ -20,7 +20,7 @@ jobs:
         env:
           CF_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CF_ACCOUNT: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          ROLLBACK: ${{ vars.FE_ROLLBACK_VERSION_ID }}
+          ROLLBACK: ${{ vars.FE_ROLLBACK_VERSION_ID || '60781a4e-70cb-4c02-a036-2528c3048ed5' }}
         run: |
           test -n "$CF_TOKEN" || { echo 'BLOCKER: CLOUDFLARE_API_TOKEN secret missing'; exit 1; }
           test -n "$CF_ACCOUNT" || { echo 'BLOCKER: CLOUDFLARE_ACCOUNT_ID secret missing'; exit 1; }
@@ -32,6 +32,28 @@ jobs:
           node tests/test-do-free-d1-live-state.mjs
           node tests/test-do-free-quota-runtime.mjs
           REQUIRE_DO_FREE_SAFE=1 API_DAILY_CALLS=50000 SCAN_TICKS_PER_DAY=2880 FIXTURES_PER_TICK=12 node tests/test-do-free-write-floor.mjs
+      - name: Check production rollback and D1 using read-only Cloudflare APIs
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          FE_ROLLBACK_VERSION_ID: ${{ vars.FE_ROLLBACK_VERSION_ID || '60781a4e-70cb-4c02-a036-2528c3048ed5' }}
+          CANDIDATE_SHA: ${{ github.sha }}
+        run: node .github/scripts/cloudflare-readonly-preflight.mjs
+      - name: Enforce HOT 20-second workload before any production deploy
+        run: REQUIRE_DO_FREE_SAFE=1 API_DAILY_CALLS=50000 SCAN_TICKS_PER_DAY=4320 FIXTURES_PER_TICK=12 node tests/test-do-free-write-floor.mjs
+      - name: Compare account D1 baseline with candidate offload before deploying
+        run: |
+          node --input-type=module <<'NODE'
+          import {readFileSync} from 'node:fs';
+          const evidence=JSON.parse(readFileSync('cloudflare-readonly-preflight.json','utf8'));
+          const rows=evidence.analytics?.d1AnalyticsAdaptiveGroups?.daily;
+          if(!Array.isArray(rows)||!rows.length)throw Error('D1_ACCOUNT_USAGE_EVIDENCE_MISSING');
+          const yesterday=new Date(Date.now()-86400000).toISOString().slice(0,10);
+          const baseline=rows.filter(x=>x.dimensions?.date===yesterday).reduce((n,x)=>n+Number(x.sum?.rowsWritten||0),0);
+          const minimumCandidateSnapshots=4320*12;
+          console.log(JSON.stringify({baselineDay:yesterday,baselineRowsWritten:baseline,candidateSnapshots:minimumCandidateSnapshots,projectedCombined:baseline+minimumCandidateSnapshots,limit:100000,modelOnly:true}));
+          if(baseline+minimumCandidateSnapshots>100000)throw Error('D1_ACCOUNT_HEADROOM_INSUFFICIENT_FOR_HOT_MODEL');
+          NODE
       - name: Install Wrangler
         run: npm install --no-save wrangler@4
       - name: Validate Cloudflare authentication and candidate bundle
