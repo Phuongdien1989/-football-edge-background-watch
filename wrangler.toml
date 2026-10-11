@@ -8,6 +8,9 @@ compatibility_date = "2026-09-11"
 # P1.3 adds a global hard cap across Notification + Smart Follow + Evidence + Validation.
 # It does NOT pace or slow requests while quota remains available.
 API_TOTAL_DAILY_BUDGET = "50000"
+# LIVE state offload: preserve DO rows for fallback and rollback.
+LIVE_STATE_D1_ENABLED = "true"
+API_RESERVATION_BLOCK_SIZE = "64"
 NOTIFY_DAILY_BUDGET = "43000"
 VALIDATION_DAILY_BUDGET = "3000"
 APISPORTS_BASE = "https://v3.football.api-sports.io"
