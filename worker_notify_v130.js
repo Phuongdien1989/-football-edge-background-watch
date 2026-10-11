@@ -184,7 +184,13 @@ export class BackgroundWatcher extends DeepLinkWatcher{
     const previousBudget=await this.ctx.storage.get('notify:budget');
     const budgetChanged=previousBudget?.day!==budget.day||Number(previousBudget?.used)!==Number(budget.used);
     if(budgetChanged)await this.ctx.storage.put('notify:budget',budget);
-    await this.ctx.storage.put('notify:status',status);
+    // Diagnostic status is not a crossing/dedup source of truth. Bound its
+    // write frequency; persist failures and accepted alerts immediately.
+    const priorStatus=await this.ctx.storage.get('notify:status');
+    const statusDue=!priorStatus?.at||status.at-Number(priorStatus.at)>=120000;
+    const urgent=Boolean(status.errors.length||status.alertsAccepted||status.signalCrossings);
+    const urgentChanged=urgent&&JSON.stringify({errors:status.errors,alertsAccepted:status.alertsAccepted,signalCrossings:status.signalCrossings})!==JSON.stringify({errors:priorStatus?.errors||[],alertsAccepted:priorStatus?.alertsAccepted||0,signalCrossings:priorStatus?.signalCrossings||0});
+    if(statusDue||urgentChanged)await this.ctx.storage.put('notify:status',status);
   }
 
   async alarm(){
