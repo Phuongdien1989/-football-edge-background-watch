@@ -22,6 +22,7 @@ on:
       - 'worker_notify_v137_quota50000.js'
       - '.github/workflows/test-do-free-isolated.yml'
       - '.github/workflows/deploy-d1-candidate.yml'
+      - '.github/scripts/cloudflare-readonly-preflight.mjs'
   workflow_dispatch:
 jobs:
   source-regression:
@@ -74,3 +75,33 @@ jobs:
           FIXTURES_PER_TICK: '12'
           API_RESERVATION_BLOCK_SIZE: '64'
         run: node tests/test-do-free-write-floor.mjs
+
+  cloudflare-readonly-preflight:
+    if: github.event_name == 'pull_request' && github.event.pull_request.number == 5 && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref == 'fix/do-free-isolated-20261010'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    environment: football-edge-production
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Read credentials availability, production versions and D1 schema (no deploy)
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          FE_ROLLBACK_VERSION_ID: ${{ vars.FE_ROLLBACK_VERSION_ID }}
+          CANDIDATE_SHA: ${{ github.event.pull_request.head.sha }}
+        run: node .github/scripts/cloudflare-readonly-preflight.mjs
+      - name: Preserve read-only preflight evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cloudflare-readonly-preflight
+          path: cloudflare-readonly-preflight.json
+          if-no-files-found: ignore
