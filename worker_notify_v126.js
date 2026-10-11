@@ -25,7 +25,9 @@ export class BackgroundWatcher extends ResilientWatcher{
     }
     if(liveDiscovery){
       // Never convert an upstream failure into a fake zero-live scan.
-      throw new Error(`LIVE_DISCOVERY_UPSTREAM_ERROR:${message(lastError)}`);
+      const error=new Error(`LIVE_DISCOVERY_UPSTREAM_ERROR:${message(lastError)}`);
+      error.http=lastError?.http;
+      throw error;
     }
     throw lastError;
   }

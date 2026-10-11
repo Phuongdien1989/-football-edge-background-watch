@@ -9,7 +9,7 @@ class QuotaWatcher {
  constructor(ctx,env){this.ctx=ctx;this.env=env;}
  async scanControl(){const saved=await this.ctx?.storage.get?.('notify:scan-control');return saved||{enabled:manual,updated:123};}
  async alarm(){if((await this.scanControl()).enabled){superAlarms++;await this.api('/fixtures');}}
- async api(path,params){lastApiParams=params;quotaReservations++;providerCalls++;return [];}
+ async api(path,params){lastApiParams=params;quotaReservations++;providerCalls++;return this._testApiResponse||[];}
  async fetch(request){return new Response(new URL(request.url).pathname==='/api/notify/status'?JSON.stringify({scan:data.get('notify:status')}):'{}');}
  async quotaStatus(){return {used:123,remaining:49877};}
  providerPacingCfg(){return {configured_minute_limit:450,effective_minute_limit:450,start_gap_ms:143,bootstrap:true};}
@@ -127,3 +127,10 @@ const normalized=new result.BackgroundWatcher(ctx,{MANUAL_SCAN_MODE_ENABLED:'fal
 await normalized.api('/fixtures',{live:'all'},true);assert.equal(lastApiParams.timezone,'Asia/Ho_Chi_Minh');
 await normalized.api('/fixtures',{live:'all',timezone:'Europe/London'},true);assert.equal(lastApiParams.timezone,'Europe/London','explicit timezone is preserved');
 console.log('PASS: strict LIVE discovery uses Smart Follow catalog parameters without changing explicit timezones');
+
+const shared=new result.BackgroundWatcher(ctx,{TZ:'Asia/Ho_Chi_Minh'});shared._manualCycleActive=true;shared._testApiResponse=[{fixture:{id:7}}];
+const beforeShared=providerCalls;
+const [a,b]=await Promise.all([shared.api('/fixtures',{live:'all'},true),shared.api('/fixtures',{live:'all',timezone:'Asia/Ho_Chi_Minh'},false)]);
+assert.equal(providerCalls-beforeShared,1,'notification and Smart Follow share one strict physical catalog call');a[0].fixture.id=99;assert.equal(b[0].fixture.id,7,'callers cannot mutate each others fixtures');
+shared._manualCycleActive=false;shared._liveCatalogWorks=null;await shared.api('/fixtures',{live:'all'},true);assert.equal(providerCalls-beforeShared,2,'later cycles fetch a fresh catalog');
+console.log('PASS: one strict LIVE catalog per cycle, independent snapshots and no cross-cycle stale cache');

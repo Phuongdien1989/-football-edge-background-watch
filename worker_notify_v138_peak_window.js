@@ -47,14 +47,14 @@ export class BackgroundWatcher extends QuotaWatcher{
     const budget=await this.notifyBudgetView(),status=await this.ctx.storage.get('notify:status');
     const devices=(await this.devices()).filter(d=>d?.prefs?.enabled&&(d.prefs.h1||d.prefs.goal||d.prefs.gap));
     const lastCycleAt=Number(status?.startedAt||0);
-    const publicObservation=o=>o?{at:o.at,http:o.http,code:o.code,limits:o.limits,retry_after_ms:o.retry_after_ms,rate_scope:providerRateScope(o.detail),request_kind:o.request_kind||null}:null;
+    const publicObservation=o=>o?{at:o.at,http:o.http,code:o.code,limits:o.limits,retry_after_ms:o.retry_after_ms,rate_scope:providerRateScope(o.detail),request_kind:o.request_kind||null,response_count:o.response_count??null}:null;
     const probeKey='api:provider-probe:v1:'+this.env.FE_PROVIDER_PROBE_RUN_ID;
     const lastSuccess=await this.ctx.storage.get('api:last-provider-success:v1');
     const lastFailure=await this.ctx.storage.get('api:last-provider-error:v1');
     const latest=[this._providerObservation,lastSuccess,lastFailure].filter(Boolean).sort((a,b)=>b.at-a.at)[0];
     const cycleErrors=(status?.errors||[]).map(x=>String(x?.error||'')).map(code=>/^[A-Z][A-Z0-9_:]{0,119}$/.test(code)?code:'UNCLASSIFIED_SCAN_ERROR');
     const globalQuota=await this.quotaStatus();
-    return {diagnostics_version:'PACING_COOLDOWN_QUOTA_V3',budget,global_api_quota:globalQuota,enabled_devices:devices.length,last_cycle_at:lastCycleAt,last_cycle_current_day:lastCycleAt>0&&new Date(lastCycleAt).toISOString().slice(0,10)===budget.day,live:Number(status?.live||0),scanned:Number(status?.scanned||0),error_count:(status?.errors||[]).length,cycle_errors:cycleErrors,provider:{classification:'V2',latest:publicObservation(latest),last_failure:publicObservation(lastFailure),pacing:{...this.providerPacingCfg(),cooldown_until:Number(this._providerRetryAt||0),consecutive_rate_failures:this._providerRateFailures||0,instance_physical_attempts:this._providerPhysicalAttempts||0,instance_max_starts_per_second:this._providerMaxStartsPerSecond||0},probe:this.env.FE_PROVIDER_PROBE_RUN_ID?await this.ctx.storage.get(probeKey)||null:null}};
+    return {diagnostics_version:'PACING_COOLDOWN_QUOTA_V4',budget,global_api_quota:globalQuota,enabled_devices:devices.length,last_cycle_at:lastCycleAt,last_cycle_current_day:lastCycleAt>0&&new Date(lastCycleAt).toISOString().slice(0,10)===budget.day,live:Number(status?.live||0),scanned:Number(status?.scanned||0),error_count:(status?.errors||[]).length,cycle_errors:cycleErrors,provider:{classification:'V2',latest:publicObservation(latest),last_failure:publicObservation(lastFailure),pacing:{...this.providerPacingCfg(),cooldown_until:Number(this._providerRetryAt||0),consecutive_rate_failures:this._providerRateFailures||0,instance_physical_attempts:this._providerPhysicalAttempts||0,instance_max_starts_per_second:this._providerMaxStartsPerSecond||0},probe:this.env.FE_PROVIDER_PROBE_RUN_ID?await this.ctx.storage.get(probeKey)||null:null}};
   }
   async maybeStartProviderProbe(){
     const runId=this.env.FE_PROVIDER_PROBE_RUN_ID;
@@ -106,9 +106,11 @@ export class BackgroundWatcher extends QuotaWatcher{
         const budget=control.scan_budget;
         await this.ctx.storage.put('notify:manual-ticks:v1',{day:budget.day,used:budget.used+1});
         this._manualCycleActive=true;
+        this._liveCatalogWorks=new Map();
         try{return await super.alarm();}
         finally{
           this._manualCycleActive=false;
+          this._liveCatalogWorks=null;
           const after=await this.scanControl();
           if(after.quotaPaused&&after.manualEnabled)await this.ctx.storage.put('notify:scan-control',{enabled:false,updated:Date.now()});
           if(!after.enabled)await this.ctx.storage.deleteAlarm();
@@ -139,6 +141,18 @@ export class BackgroundWatcher extends QuotaWatcher{
     // Use the same supported LIVE catalog parameters as Smart Follow.
     // Timezone affects fixture clock formatting, never elapsed-minute scoring.
     if(path==='/fixtures'&&String(params?.live||'').toLowerCase()==='all'&&!params.timezone)params={...params,timezone:this.env.TZ||'Asia/Ho_Chi_Minh'};
+    if(this._manualCycleActive&&path==='/fixtures'&&String(params?.live||'').toLowerCase()==='all'){
+      const key=JSON.stringify(Object.entries(params).sort(([a],[b])=>a.localeCompare(b)));
+      this._liveCatalogWorks ||=new Map();
+      if(!this._liveCatalogWorks.has(key))this._liveCatalogWorks.set(key,super.api(path,params,true));
+      try{return JSON.parse(JSON.stringify(await this._liveCatalogWorks.get(key)));}
+      catch(error){
+        // Preserve legacy tolerant Smart Follow for HTTP 200 rate bodies;
+        // strict notification discovery still fails and never invents a catalog.
+        if(!strict&&error.http===200&&/API_PROVIDER_RATE_LIMIT/.test(error.message))return [];
+        throw error;
+      }
+    }
     return super.api(path,params,strict);
   }
   async fetch(request){

@@ -119,7 +119,7 @@ export class BackgroundWatcher extends HotPriorityWatcher{
   async beforeProviderRequest(){
     const run=async()=>{
       if(!this._providerCooldownLoaded){
-        const saved=await this.ctx.storage.get('api:provider-cooldown:v2');
+        const saved=await this.ctx.storage.get('api:provider-cooldown:v3');
         this._providerRetryAt=Math.max(this._providerRetryAt||0,Number(saved?.until||0));
         this._providerRateFailures=Number(saved?.failures||0);
         this._providerCooldownLoaded=true;
@@ -165,10 +165,10 @@ export class BackgroundWatcher extends HotPriorityWatcher{
       const previousUntil=Number(this._providerRetryAt||0);
       // Responses from one in-flight batch share a single cooldown episode.
       if(!active||observation.retry_after_ms)this._providerRetryAt=Math.max(previousUntil,Date.now()+delay);
-      if(this._providerRetryAt!==previousUntil)await this.ctx.storage.put('api:provider-cooldown:v2',{until:this._providerRetryAt,failures:this._providerRateFailures});
+      if(this._providerRetryAt!==previousUntil)await this.ctx.storage.put('api:provider-cooldown:v3',{until:this._providerRetryAt,failures:this._providerRateFailures});
     }else if(observation.code==='OK'&&this._providerRateFailures&&Date.now()>=Number(this._providerRetryAt||0)){
       this._providerRateFailures=0;this._providerRetryAt=0;
-      await this.ctx.storage.put('api:provider-cooldown:v2',{until:0,failures:0});
+      await this.ctx.storage.put('api:provider-cooldown:v3',{until:0,failures:0});
     }
     if(observation.code!=='OK'){
       const previous=await this.ctx.storage.get('api:last-provider-error:v1');

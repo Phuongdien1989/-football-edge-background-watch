@@ -47,7 +47,7 @@ console.log('PASS: shared cooldown blocks all physical calls and reservations, s
 const observerMethod=source.slice(source.indexOf('  async recordProviderObservation('),source.indexOf('  async fetch(request)',source.indexOf('  async recordProviderObservation(')));
 const saved=new Map();let cooldownWrites=0;
 const observer=vm.runInNewContext('({'+observerMethod+'})',{Date:{now:()=>now},Number,Math});
-observer.ctx={storage:{get:async k=>saved.get(k),put:async(k,v)=>{saved.set(k,v);if(k==='api:provider-cooldown:v2')cooldownWrites++;}}};
+observer.ctx={storage:{get:async k=>saved.get(k),put:async(k,v)=>{saved.set(k,v);if(k==='api:provider-cooldown:v3')cooldownWrites++;}}};
 const rate=()=>({http:200,at:now,code:'API_PROVIDER_RATE_LIMIT',limits:{minute_limit:null},retry_after_ms:0});
 await observer.recordProviderObservation(rate());const firstUntil=observer._providerRetryAt;
 for(let i=0;i<18;i++)await observer.recordProviderObservation(rate());
