@@ -27,6 +27,12 @@ if(token&&account&&worker&&database){
   const settings=await api(prefix+'/workers/scripts/'+encodeURIComponent(worker)+'/settings');
   report.workerBindingNames=(settings.bindings||[]).map(x=>({name:x.name,type:x.type,namespace_id:x.namespace_id,id:x.id}));
   report.checks.worker_settings_read='PASS';
+  const schedules=await api(prefix+'/workers/scripts/'+encodeURIComponent(worker)+'/schedules');
+  report.workerSchedules=Array.isArray(schedules)?schedules:schedules.schedules;
+  const domain=await api(prefix+'/workers/subdomain');
+  const healthURL='https://'+worker+'.'+domain.subdomain+'.workers.dev/health';
+  const response=await fetch(healthURL,{signal:AbortSignal.timeout(20000)});
+  report.currentProductionHealth=await response.json();report.productionHealthHTTP=response.status;
   const namespaces=await api(prefix+'/workers/durable_objects/namespaces');
   const namespace=report.workerBindingNames.find(x=>x.name==='BACKGROUND_WATCHER')?.namespace_id;
   report.boundNamespace=(Array.isArray(namespaces)?namespaces:namespaces.namespaces||[]).find(x=>x.id===namespace)||null;
