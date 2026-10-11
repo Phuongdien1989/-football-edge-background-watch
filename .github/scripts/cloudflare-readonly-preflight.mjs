@@ -54,7 +54,12 @@ if(token&&account){
  try{
   const unwrap=t=>t?.name||unwrap(t?.ofType);
   const fields=async name=>(await gql('query($name:String!){__type(name:$name){fields{name type{kind name ofType{kind name ofType{kind name}}}}}}',{name})).__type?.fields||[];
-  const af=await fields('Account');
+  const root=(await gql('{__schema{queryType{name}}}')).__schema.queryType.name;
+  const rootFields=await fields(root),viewerField=rootFields.find(x=>x.name==='viewer');
+  if(!viewerField)throw Error('GRAPHQL_VIEWER_SCHEMA_MISSING');
+  const viewerFields=await fields(unwrap(viewerField.type)),accountsField=viewerFields.find(x=>x.name==='accounts');
+  if(!accountsField)throw Error('GRAPHQL_ACCOUNTS_SCHEMA_MISSING');
+  const af=await fields(unwrap(accountsField.type));
   report.analytics={};
   const today=new Date().toISOString().slice(0,10),yesterday=new Date(Date.now()-86400000).toISOString().slice(0,10);
   for(const dataset of ['durableObjectsStorageGroups','d1AnalyticsAdaptiveGroups']){
