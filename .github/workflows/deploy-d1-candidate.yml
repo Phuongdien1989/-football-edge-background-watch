@@ -1,0 +1,79 @@
+name: Football Edge D1 candidate deploy (manual guarded)
+on:
+  workflow_dispatch:
+    inputs:
+      deploy:
+        description: 'Deploy only after reviewing dry-run, Cloudflare usage, and rollback version'
+        type: boolean
+        required: true
+        default: false
+jobs:
+  candidate:
+    runs-on: ubuntu-latest
+    environment: football-edge-production
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify credentials and rollback checkpoint
+        env:
+          CF_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CF_ACCOUNT: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          ROLLBACK: ${{ vars.FE_ROLLBACK_VERSION_ID || '60781a4e-70cb-4c02-a036-2528c3048ed5' }}
+        run: |
+          test -n "$CF_TOKEN" || { echo 'BLOCKER: CLOUDFLARE_API_TOKEN secret missing'; exit 1; }
+          test -n "$CF_ACCOUNT" || { echo 'BLOCKER: CLOUDFLARE_ACCOUNT_ID secret missing'; exit 1; }
+          test -n "$ROLLBACK" || { echo 'BLOCKER: FE_ROLLBACK_VERSION_ID repository/environment variable missing'; exit 1; }
+          echo "Rollback version is configured (value withheld)"
+      - name: Verify D1 configuration and full regression
+        run: |
+          node --check worker_notify_v137_quota50000.js
+          node tests/test-do-free-d1-live-state.mjs
+          node tests/test-do-free-quota-runtime.mjs
+          REQUIRE_DO_FREE_SAFE=1 API_DAILY_CALLS=50000 SCAN_TICKS_PER_DAY=720 FIXTURES_PER_TICK=12 node tests/test-do-free-write-floor.mjs
+      - name: Check production rollback and D1 using read-only Cloudflare APIs
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          FE_ROLLBACK_VERSION_ID: ${{ vars.FE_ROLLBACK_VERSION_ID || '60781a4e-70cb-4c02-a036-2528c3048ed5' }}
+          CANDIDATE_SHA: ${{ github.sha }}
+        run: node .github/scripts/cloudflare-readonly-preflight.mjs
+      - name: Enforce scheduled HOT workload before any production deploy
+        run: REQUIRE_DO_FREE_SAFE=1 API_DAILY_CALLS=50000 SCAN_TICKS_PER_DAY=720 FIXTURES_PER_TICK=12 node tests/test-do-free-write-floor.mjs
+      - name: Compare account D1 baseline with candidate offload before deploying
+        run: |
+          node --input-type=module <<'NODE'
+          import {readFileSync} from 'node:fs';
+          const evidence=JSON.parse(readFileSync('cloudflare-readonly-preflight.json','utf8'));
+          const rows=evidence.analytics?.d1AnalyticsAdaptiveGroups?.daily;
+          if(!Array.isArray(rows)||!rows.length)throw Error('D1_ACCOUNT_USAGE_EVIDENCE_MISSING');
+          const yesterday=new Date(Date.now()-86400000).toISOString().slice(0,10);
+          const baseline=rows.filter(x=>x.dimensions?.date===yesterday).reduce((n,x)=>n+Number(x.sum?.rowsWritten||0),0);
+          const config=readFileSync('wrangler.toml','utf8');
+          const clock=key=>{const value=config.match(new RegExp('^'+key+'\\s*=\\s*"([0-9]{2}:[0-9]{2})"','m'))?.[1];if(!value)throw Error('PEAK_CLOCK_MISSING');const [h,m]=value.split(':').map(Number);return h*60+m;};
+          const minutes=(clock('PEAK_SCAN_END')-clock('PEAK_SCAN_START')+1440)%1440;
+          if(minutes!==240)throw Error('PEAK_WINDOW_REQUIRES_RECALCULATED_RELEASE_MODEL');
+          const minimumCandidateSnapshots=720*(12+12+6); // snapshots, tombstones, HOT reason changes
+          const maxTicks=minutes*60000/20000;
+          if(maxTicks!==720)throw Error('PEAK_WINDOW_TICK_MODEL_MISMATCH');
+          console.log(JSON.stringify({baselineDay:yesterday,baselineRowsWritten:baseline,candidateSnapshots:minimumCandidateSnapshots,projectedCombined:baseline+minimumCandidateSnapshots,limit:100000,modelOnly:true}));
+          if(baseline+minimumCandidateSnapshots>100000)throw Error('D1_ACCOUNT_HEADROOM_INSUFFICIENT_FOR_HOT_MODEL');
+          NODE
+      - name: Install Wrangler
+        run: npm install --no-save wrangler@4
+      - name: Validate Cloudflare authentication and candidate bundle
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          npx wrangler whoami
+          npx wrangler deploy --dry-run --outdir /tmp/fe-d1-candidate
+      - name: Deploy only on explicit production approval
+        if: ${{ inputs.deploy == true }}
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          npx wrangler deploy
+          npx wrangler deployments list

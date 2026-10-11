@@ -103,9 +103,9 @@ export class BackgroundWatcher extends DeepLinkWatcher{
     try{
       const live=(await api('/fixtures',{live:'all'},true)).filter(f=>['1H','2H','LIVE'].includes(f.fixture?.status?.short)&&Number(f.fixture?.status?.elapsed)>=1&&Number(f.fixture?.status?.elapsed)<=90);
       status.live=live.length;
-      const all=[...(await this.ctx.storage.list({prefix:'notify:match:'})).values()],byId=new Map(all.map(x=>[x.id,x]));
+      const all=await this.listNotifyMatches(),byId=new Map(all.map(x=>[x.id,x]));
       const batch=live.sort((a,b)=>(byId.get(a.fixture.id)?.lastAt||0)-(byId.get(b.fixture.id)?.lastAt||0)).slice(0,12);
-      const activeIds=new Set(live.map(f=>f.fixture.id));for(const old of all)if(!activeIds.has(old.id)&&now-old.lastAt>3600000)await this.ctx.storage.delete('notify:match:'+old.id);
+      const activeIds=new Set(live.map(f=>f.fixture.id));for(const old of all)if(!activeIds.has(old.id)&&now-old.lastAt>3600000)await this.deleteNotifyMatch(old.id);
       const calibrations={};for(const d of devices){const cal={FT:[],legacyFT:[]};for(const key of Object.keys(cal))for(let i=0;i<5;i++)cal[key].push(...(await this.ctx.storage.get(`notify:cal:${d.id}:${key}:${i}`)||[]));calibrations[d.id]=createEngine(cal)}
       const engine=createEngine();
       for(const f of batch){
@@ -170,13 +170,27 @@ export class BackgroundWatcher extends DeepLinkWatcher{
         }catch(e){status.errors.push({fixture:id,error:errText(e)})}
         item.lastAt=Date.now();const bytes=()=>new TextEncoder().encode(JSON.stringify(item)).byteLength;
         while(item.oddsHistory.length>2&&bytes()>100000)item.oddsHistory.shift();while(item.history.length>2&&bytes()>100000){item.history.shift();if(item.h1History.length>2)item.h1History.shift();if(item.hcHistory.length>2)item.hcHistory.shift()}
-        await this.ctx.storage.put('notify:match:'+id,item);
+        // Do not persist a brand-new empty fixture shell when all provider reads
+        // failed before any useful snapshot was captured. Existing fixture state
+        // still persists, preserving alert crossings and retry order.
+        const hasSnapshot=Boolean(item.last)||item.history.length>0||item.h1History.length>0||item.hcHistory.length>0||item.oddsHistory.length>0;
+        if(byId.has(id)||hasSnapshot)await this.putNotifyMatch(id,item);
       }
       const cycleSec=Math.max(30,Math.ceil((Date.now()-now)/1000));
       status.rotationEstimateSeconds=Math.ceil(live.length/12)*cycleSec;
     }catch(e){status.errors.push({error:errText(e)})}
     status.apiToday=budget.used;status.durationMs=Date.now()-now;status.targetCadenceMs=SCAN_TARGET_MS;status.startedAt=now;status.at=Date.now();
-    await this.ctx.storage.put({'notify:status':status,'notify:budget':budget});
+    // Budget only changes when an API attempt is reserved; skip redundant writes on idle cycles.
+    const previousBudget=await this.ctx.storage.get('notify:budget');
+    const budgetChanged=previousBudget?.day!==budget.day||Number(previousBudget?.used)!==Number(budget.used);
+    if(budgetChanged)await this.ctx.storage.put('notify:budget',budget);
+    // Diagnostic status is not a crossing/dedup source of truth. Bound its
+    // write frequency; persist failures and accepted alerts immediately.
+    const priorStatus=await this.ctx.storage.get('notify:status');
+    const statusDue=!priorStatus?.at||status.at-Number(priorStatus.at)>=120000;
+    const urgent=Boolean(status.errors.length||status.alertsAccepted||status.signalCrossings);
+    const urgentChanged=urgent&&JSON.stringify({errors:status.errors,alertsAccepted:status.alertsAccepted,signalCrossings:status.signalCrossings})!==JSON.stringify({errors:priorStatus?.errors||[],alertsAccepted:priorStatus?.alertsAccepted||0,signalCrossings:priorStatus?.signalCrossings||0});
+    if(statusDue||urgentChanged)await this.ctx.storage.put('notify:status',status);
   }
 
   async alarm(){

@@ -31,7 +31,7 @@ export class BackgroundWatcher extends FullPauseWatcher{
     const gapThreshold=Math.min(...devices.filter(d=>d.prefs?.gap).map(d=>num(d.prefs.gapThreshold,70)),70);
     const focusRows=[...(await this.ctx.storage.list({prefix:'watch:'})).values()];
     const focusIds=new Set(focusRows.filter(w=>w?.level==='focus'&&!w?.ended&&num(w?.expires_at,now+1)>now).map(w=>Number(w.fixture_id)));
-    const items=[...(await this.ctx.storage.list({prefix:'notify:match:'})).values()];
+    const items=await this.listNotifyMatches();
     const rows=[];
     for(const item of items){
       if(!item?.id)continue;
@@ -52,24 +52,31 @@ export class BackgroundWatcher extends FullPauseWatcher{
   async applyHotPriority(){
     const now=Date.now(),hot=await this.hotPriorityCandidates();
     for(const h of hot.rows){
-      const key='notify:match:'+h.id,item=await this.ctx.storage.get(key);if(!item)continue;
+      const key='notify:match:'+h.id,item=await this.getNotifyMatch(h.id);if(!item)continue;
       // v130 sorts by lastAt ascending. Boost only a bounded number of HOT rows so
       // at least 12-hotSlots positions remain available to normal oldest-first rotation.
+      // Persist a boost only when it is absent or stale. Rewriting every HOT
+      // fixture on every 20s tick exhausts Durable Object Free write quota.
+      const previousBoost=num(item.scheduler?.boosted_at,0);
+      if(item.scheduler?.hot&&item.scheduler?.reason===h.reason&&now-previousBoost<120000)continue;
       item.lastAt=Math.min(num(item.lastAt,now),now-86400000-h.score);
       item.scheduler={hot:true,reason:h.reason,boosted_at:now};
-      await this.ctx.storage.put(key,item);
+      await this.putNotifyMatch(h.id,item);
     }
-    await this.ctx.storage.put('notify:scheduler-status',{
+    const status={
       at:now,mode:hot.rows.length?'HOT':'NORMAL',hot_selected:hot.rows.length,hot_total:hot.totalHot||0,
       hot_ids:hot.rows.map(x=>x.id),hot_reasons:hot.rows.map(x=>({fixture_id:x.id,reason:x.reason})),
       hot_interval_ms:hot.cfg.hotMs,normal_interval_ms:hot.cfg.normalMs,hot_slots:hot.cfg.hotSlots
-    });
+    };
+    const previous=await this.ctx.storage.get('notify:scheduler-status');
+    // Status is observational, not an engine input. Throttle its persistence.
+    if(!previous||now-num(previous.at,0)>=120000)await this.ctx.storage.put('notify:scheduler-status',status);
     return hot;
   }
 
   async send(device,payload){
     const detectedAt=num(payload?.created_at,Date.now()),fixtureId=num(payload?.fixture_id,0);
-    const prev=fixtureId?await this.ctx.storage.get('notify:match:'+fixtureId):null;
+    const prev=fixtureId?await this.getNotifyMatch(fixtureId):null;
     const previousDeepAt=num(prev?.last?.at||prev?.lastAt,0),sendStartedAt=Date.now();
     const ok=await super.send(device,payload),acceptedAt=Date.now();
     if(ok){
