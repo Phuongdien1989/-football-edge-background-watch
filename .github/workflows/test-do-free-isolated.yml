@@ -38,6 +38,10 @@ jobs:
           node --check worker_notify_v130.js
           node --check tests/test-do-free-write-floor.mjs
           node --check tests/test-do-free-d1-live-state.mjs
+      - name: Validate Cloudflare Worker deploy bundle (no credentials)
+        run: |
+          npm install --no-save wrangler@4
+          npx wrangler deploy --dry-run --outdir /tmp/fe-d1-bundle
       - name: Verify DO throttle and push scan invariants
         run: node tests/test-do-free-write-throttle.mjs
       - name: Simulate scheduler runtime writes
