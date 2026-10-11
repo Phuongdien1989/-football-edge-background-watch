@@ -14,7 +14,11 @@ const n=(v,d=0)=>Number.isFinite(Number(v))?Number(v):d;
 
 export class BackgroundWatcher extends HotPriorityWatcher{
   quotaCfg(){
-    return {total:Math.max(1000,n(this.env.API_TOTAL_DAILY_BUDGET,50000))};
+    const planCap=Math.max(1,Math.floor(n(this.env.API_TOTAL_DAILY_BUDGET,50000)));
+    // An API quota is not a DO write allowance. Cap *background* API attempts
+    // conservatively until observed DO write capacity is verified in production.
+    const safeCap=Math.max(1,Math.floor(n(this.env.DO_FREE_API_DAILY_CAP,500)));
+    return {total:Math.min(planCap,safeCap),planCap,safeCap};
   }
 
   quotaWork(fn){
