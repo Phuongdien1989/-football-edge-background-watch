@@ -78,7 +78,7 @@ try{
   const response=await fetch(healthURL,{signal:AbortSignal.timeout(10000)});
   health=await response.json();
   report.healthAttempts.push({attempt:attempt+1,http:response.status,commit:health.deploy_commit,doStatus:health.peak_status_error||'OK',manualMode:health.peak_status?.manualMode||false});
-  healthy=response.ok&&health.deploy_commit===candidate&&health.peak_window?.enabled===false&&health.peak_status?.manualMode===true&&health.peak_status?.scan_budget?.limit===720&&health.notify_status?.provider?.classification==='V2'&&health.notify_status?.provider?.pacing?.bootstrap===true&&health.notify_status?.provider?.pacing?.configured_minute_limit===450&&health.notify_status?.provider?.pacing?.start_gap_ms>=143&&typeof health.notify_status?.provider?.pacing?.cooldown_until==='number'&&typeof health.notify_status?.provider?.pacing?.consecutive_rate_failures==='number';
+  healthy=response.ok&&health.deploy_commit===candidate&&health.peak_window?.enabled===false&&health.peak_status?.manualMode===true&&health.peak_status?.scan_budget?.limit===720&&health.notify_status?.diagnostics_version==='PACING_COOLDOWN_QUOTA_V1'&&health.notify_status?.provider?.classification==='V2'&&health.notify_status?.provider?.pacing?.bootstrap===true&&health.notify_status?.provider?.pacing?.configured_minute_limit===450&&health.notify_status?.provider?.pacing?.start_gap_ms>=143&&typeof health.notify_status?.provider?.pacing?.cooldown_until==='number'&&typeof health.notify_status?.provider?.pacing?.consecutive_rate_failures==='number';
   if(healthy)break;
   // Permit old idle DO instances to evict before polling the new generation.
   await new Promise(resolve=>setTimeout(resolve,attempt===0?150000:5000));

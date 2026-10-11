@@ -11,6 +11,7 @@ class QuotaWatcher {
  async alarm(){if((await this.scanControl()).enabled){superAlarms++;await this.api('/fixtures');}}
  async api(){quotaReservations++;providerCalls++;return [];}
  async fetch(request){return new Response(new URL(request.url).pathname==='/api/notify/status'?JSON.stringify({scan:data.get('notify:status')}):'{}');}
+ async quotaStatus(){return {used:123,remaining:49877};}
  providerPacingCfg(){return {configured_minute_limit:450,effective_minute_limit:450,start_gap_ms:143,bootstrap:true};}
  async devices(){return [{prefs:{enabled:true,h1:true}}];}
 }
