@@ -47,7 +47,15 @@ try{
  const path=prefix+'/workers/scripts/'+encodeURIComponent(worker);
  const active=await api(path+'/deployments');
  if(active.deployments?.[0]?.versions?.length!==1||active.deployments[0].versions[0].version_id!==rollback||active.deployments[0].versions[0].percentage!==100)throw Error('PRODUCTION_CHANGED_SINCE_ROLLBACK_CHECKPOINT');
- previousSchedules=await api(path+'/schedules');report.previousSchedules=previousSchedules;
+ const scheduleResponse=await api(path+'/schedules');
+ previousSchedules=Array.isArray(scheduleResponse)?scheduleResponse:scheduleResponse.schedules;
+ if(!Array.isArray(previousSchedules))throw Error('SCHEDULE_API_SHAPE_NOT_SUPPORTED');
+ // The first attempt restored the old version but left this newly added cron.
+ // Its recorded pre-deployment schedule was empty; repair only that exact case.
+ if(previousSchedules.length===1&&previousSchedules[0].cron==='0 13 * * *'){
+  await api(path+'/schedules',{method:'PUT',body:'[]'});previousSchedules=[];
+ }
+ report.previousSchedules=previousSchedules;
  await api(prefix+'/d1/database/'+database+'/query',{method:'POST',body:JSON.stringify({sql:'CREATE TABLE IF NOT EXISTS fe_notify_live_state (fixture_id INTEGER PRIMARY KEY, payload TEXT NOT NULL, updated_at INTEGER NOT NULL)'})});
  const columns=await api(prefix+'/d1/database/'+database+'/query',{method:'POST',body:JSON.stringify({sql:"PRAGMA table_info('fe_notify_live_state')"})});
  const names=columns.flatMap(x=>x.results||[]);
@@ -67,9 +75,19 @@ try{
  report.deployment=after.deployments?.[0];
  const versions=report.deployment?.versions;
  if(versions?.length!==1||versions[0].version_id===rollback||versions[0].percentage!==100)throw Error('NEW_PRODUCTION_VERSION_NOT_CONFIRMED');
- const response=await fetch(healthURL,{signal:AbortSignal.timeout(20000)});
- const health=await response.json();report.health=health;
- if(!response.ok||health.deploy_commit!==candidate||health.peak_window?.start!=='20:00'||health.peak_window?.end!=='00:00'||!health.peak_status)throw Error('PRODUCTION_PEAK_HEALTH_FAILED');
+ let health=null,healthy=false;
+ report.healthAttempts=[];
+ // Worker and Durable Object rollout may propagate at different times.
+ for(let attempt=0;attempt<20;attempt++){
+  const response=await fetch(healthURL,{signal:AbortSignal.timeout(10000)});
+  health=await response.json();
+  report.healthAttempts.push({attempt:attempt+1,http:response.status,commit:health.deploy_commit,doStatus:health.peak_status_error||'OK'});
+  healthy=response.ok&&health.deploy_commit===candidate&&health.peak_window?.start==='20:00'&&health.peak_window?.end==='00:00'&&Boolean(health.peak_status);
+  if(healthy)break;
+  await new Promise(resolve=>setTimeout(resolve,2000));
+ }
+ report.health=health;
+ if(!healthy)throw Error('PRODUCTION_PEAK_HEALTH_FAILED');
  if(!health.peak_window.allowed&&health.peak_status.enabled!==false)throw Error('PRODUCTION_SCAN_NOT_PAUSED_OUTSIDE_WINDOW');
  report.checks.productionSchedule='PASS';
  report.checks.manualScanControl=health.peak_status.manualEnabled?'ENABLED_SCHEDULE_CONTROLS_SCANNING':'MANUALLY_PAUSED_REQUIRES_RESUME';
@@ -81,6 +99,7 @@ try{
  if(deployed){
   try{
    await api(prefix+'/workers/scripts/'+encodeURIComponent(worker)+'/deployments',{method:'POST',body:JSON.stringify({strategy:'percentage',versions:[{version_id:rollback,percentage:100}],annotations:{'workers/message':'Automatic rollback: peak-window deployment verification failed'}})});
+   report.productionDeploy='ROLLED_BACK';
    if(previousSchedules)await api(prefix+'/workers/scripts/'+encodeURIComponent(worker)+'/schedules',{method:'PUT',body:JSON.stringify(previousSchedules.map(x=>({cron:x.cron})))});
    report.productionDeploy='ROLLED_BACK';
   }catch(rollbackError){report.rollbackError=String(rollbackError.message||rollbackError);}

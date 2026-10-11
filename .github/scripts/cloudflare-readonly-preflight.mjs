@@ -27,6 +27,9 @@ if(token&&account&&worker&&database){
   const settings=await api(prefix+'/workers/scripts/'+encodeURIComponent(worker)+'/settings');
   report.workerBindingNames=(settings.bindings||[]).map(x=>({name:x.name,type:x.type,namespace_id:x.namespace_id,id:x.id}));
   report.checks.worker_settings_read='PASS';
+  const namespaces=await api(prefix+'/workers/durable_objects/namespaces');
+  const namespace=report.workerBindingNames.find(x=>x.name==='BACKGROUND_WATCHER')?.namespace_id;
+  report.boundNamespace=(Array.isArray(namespaces)?namespaces:namespaces.namespaces||[]).find(x=>x.id===namespace)||null;
  }catch(e){block('WORKER_SETTINGS_READ:'+e.message)}
  if(rollback&&rollback.startsWith('60781a4e')){
   try{
