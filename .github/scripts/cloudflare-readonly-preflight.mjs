@@ -20,6 +20,23 @@ async function api(path,options={}){
 if(token&&account&&worker&&database){
  const prefix='/accounts/'+encodeURIComponent(account);
  try{
+  const scripts=await api(prefix+'/workers/scripts');
+  report.providerCallerInventory=[];
+  for(const script of scripts){
+   const item={worker:script.id};
+   try{
+    const path=prefix+'/workers/scripts/'+encodeURIComponent(script.id);
+    const settings=await api(path+'/settings');
+    const bindings=settings.bindings||[];
+    item.apiCredentialBindingNames=bindings.filter(x=>/APISPORTS|API_FOOTBALL/i.test(x.name)).map(x=>({name:x.name,type:x.type}));
+    const schedules=await api(path+'/schedules');
+    item.schedules=Array.isArray(schedules)?schedules:schedules.schedules;
+   }catch(e){item.readError=e.message;}
+   report.providerCallerInventory.push(item);
+  }
+  report.checks.providerCallerInventory='PASS_READ_ONLY_NO_SECRET_VALUES';
+ }catch(e){report.providerCallerInventoryError=e.message;}
+ try{
   const deployments=await api(prefix+'/workers/scripts/'+encodeURIComponent(worker)+'/deployments');
   report.checks.deployments_read='PASS';report.currentDeployments=deployments;
  }catch(e){block('WORKERS_DEPLOYMENTS_READ:'+e.message)}
