@@ -1,0 +1,12 @@
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+const src=readFileSync(new URL('../worker_notify_v130.js',import.meta.url),'utf8');
+assert.match(src,/const hasSnapshot=Boolean\(item\.last\)/);
+assert.match(src,/if\(byId\.has\(id\)\|\|hasSnapshot\)await this\.ctx\.storage\.put\('notify:match:'\+id,item\)/);
+const persist=(existing,item)=>existing||Boolean(item.last)||item.history.length>0||item.h1History.length>0||item.hcHistory.length>0||item.oddsHistory.length>0;
+const empty={history:[],h1History:[],hcHistory:[],oddsHistory:[]};
+assert.equal(persist(false,empty),false,'new empty fixture should not write');
+assert.equal(persist(true,empty),true,'existing fixture should still persist');
+assert.equal(persist(false,{...empty,last:{reason:'STATS_UNAVAILABLE'}}),true,'degraded snapshot should persist');
+assert.equal(persist(false,{...empty,history:[{minute:1}]}),true,'history should persist');
+console.log('PASS: empty fixture write guard retains existing and degraded state');
