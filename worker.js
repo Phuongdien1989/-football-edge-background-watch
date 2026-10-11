@@ -346,20 +346,29 @@ export class BackgroundWatcher extends DurableObject {
     const base=String(this.env.APISPORTS_BASE||"https://v3.football.api-sports.io").replace(/\/$/,"");
     const u=new URL(base+path);
     for(const [k,v] of Object.entries(params))if(v!==undefined&&v!==null&&v!=="")u.searchParams.set(k,String(v));
-    if(typeof this.beforeProviderRequest==='function')await this.beforeProviderRequest();
+    const requestKind=path==='/fixtures'&&String(params?.live||'').toLowerCase()==='all'?(params.timezone?'LIVE_WITH_TIMEZONE':'LIVE_WITHOUT_TIMEZONE'):path==='/fixtures/statistics'?'STATISTICS':path==='/fixtures/events'?'EVENTS':path==='/odds/live'?'ODDS':'OTHER_ENDPOINT';
+    if(typeof this.beforeProviderRequest==='function'){
+      try{await this.beforeProviderRequest(requestKind);}
+      catch(error){
+        // Optional feed cooldowns preserve the original tolerant behavior
+        // without another physical request or a failed parent alarm.
+        if(!strict&&error.message==='API_PROVIDER_COOLDOWN'&&error.cooldownScope&&error.cooldownScope!=='GLOBAL')return [];
+        throw error;
+      }
+    }
     const ctl=new AbortController(),timer=setTimeout(()=>ctl.abort(),12000);
     try{
       const r=await fetch(u,{headers:{"x-apisports-key":this.env.APISPORTS_KEY,"accept":"application/json"},signal:ctl.signal});
       const txt=await r.text();let data={};try{data=JSON.parse(txt)}catch{}
       const observation=providerObservation(r,data,this.env.APISPORTS_KEY);
-      observation.request_kind=path==='/fixtures'&&String(params?.live||'').toLowerCase()==='all'?(params.timezone?'LIVE_WITH_TIMEZONE':'LIVE_WITHOUT_TIMEZONE'):path==='/fixtures/statistics'?'STATISTICS':path==='/fixtures/events'?'EVENTS':path==='/odds/live'?'ODDS':'OTHER_ENDPOINT';
+      observation.request_kind=requestKind;
       observation.response_count=Array.isArray(data?.response)?data.response.length:null;
       if(typeof this.recordProviderObservation==='function')await this.recordProviderObservation(observation);
       if(observation.code!=='OK'&&(strict||!r.ok)){
         const error=new Error(observation.code);
         error.http=observation.http;
         const softRate=observation.code==='API_PROVIDER_RATE_LIMIT'&&r.status===200&&observation.limits.minute_remaining!==0;
-        error.retryAfterMs=observation.retry_after_ms||(softRate?Math.max(1000,Number(this._providerRetryAt||0)-Date.now()):0);
+        error.retryAfterMs=observation.retry_after_ms||(softRate?Math.max(1000,Number(this._providerScopedCooldowns?.[requestKind]?.until||this._providerRetryAt||0)-Date.now()):0);
         error.retryable=observation.code==='API_PROVIDER_SERVER_ERROR'||softRate&&error.retryAfterMs<=10000;
         throw error;
       }

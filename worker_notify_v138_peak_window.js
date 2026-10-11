@@ -47,14 +47,16 @@ export class BackgroundWatcher extends QuotaWatcher{
     const budget=await this.notifyBudgetView(),status=await this.ctx.storage.get('notify:status');
     const devices=(await this.devices()).filter(d=>d?.prefs?.enabled&&(d.prefs.h1||d.prefs.goal||d.prefs.gap));
     const lastCycleAt=Number(status?.startedAt||0);
-    const publicObservation=o=>o?{at:o.at,http:o.http,code:o.code,limits:o.limits,retry_after_ms:o.retry_after_ms,rate_scope:providerRateScope(o.detail),request_kind:o.request_kind||null,response_count:o.response_count??null}:null;
+    const publicObservation=o=>o?{at:o.at,http:o.http,code:o.code,limits:o.limits,retry_after_ms:o.retry_after_ms,rate_scope:providerRateScope(o.detail),request_kind:o.request_kind||null,cooldown_scope:o.cooldown_scope||null,response_count:o.response_count??null}:null;
     const probeKey='api:provider-probe:v1:'+this.env.FE_PROVIDER_PROBE_RUN_ID;
     const lastSuccess=await this.ctx.storage.get('api:last-provider-success:v1');
     const lastFailure=await this.ctx.storage.get('api:last-provider-error:v1');
     const latest=[this._providerObservation,lastSuccess,lastFailure].filter(Boolean).sort((a,b)=>b.at-a.at)[0];
     const cycleErrors=(status?.errors||[]).map(x=>String(x?.error||'')).map(code=>/^[A-Z][A-Z0-9_:]{0,119}$/.test(code)?code:'UNCLASSIFIED_SCAN_ERROR');
     const globalQuota=await this.quotaStatus();
-    return {diagnostics_version:'PACING_COOLDOWN_QUOTA_V4',budget,global_api_quota:globalQuota,enabled_devices:devices.length,last_cycle_at:lastCycleAt,last_cycle_current_day:lastCycleAt>0&&new Date(lastCycleAt).toISOString().slice(0,10)===budget.day,live:Number(status?.live||0),scanned:Number(status?.scanned||0),error_count:(status?.errors||[]).length,cycle_errors:cycleErrors,provider:{classification:'V2',latest:publicObservation(latest),last_failure:publicObservation(lastFailure),pacing:{...this.providerPacingCfg(),cooldown_until:Number(this._providerRetryAt||0),consecutive_rate_failures:this._providerRateFailures||0,instance_physical_attempts:this._providerPhysicalAttempts||0,instance_max_starts_per_second:this._providerMaxStartsPerSecond||0},probe:this.env.FE_PROVIDER_PROBE_RUN_ID?await this.ctx.storage.get(probeKey)||null:null}};
+    const globalCooldown=await this.ctx.storage.get('api:provider-cooldown:global:v1');
+    const endpointCooldowns=await this.ctx.storage.get('api:provider-cooldown:scoped:v1')||{};
+    return {diagnostics_version:'PACING_COOLDOWN_QUOTA_V5',budget,global_api_quota:globalQuota,enabled_devices:devices.length,last_cycle_at:lastCycleAt,last_cycle_current_day:lastCycleAt>0&&new Date(lastCycleAt).toISOString().slice(0,10)===budget.day,live:Number(status?.live||0),scanned:Number(status?.scanned||0),error_count:(status?.errors||[]).length,cycle_errors:cycleErrors,provider:{classification:'V2',latest:publicObservation(latest),last_failure:publicObservation(lastFailure),pacing:{...this.providerPacingCfg(),cooldown_until:Math.max(Number(this._providerRetryAt||0),Number(globalCooldown?.until||0)),consecutive_rate_failures:this._providerRateFailures||globalCooldown?.failures||0,endpoint_cooldowns:Object.entries(endpointCooldowns).map(([request_kind,s])=>({request_kind,until:Number(s.until||0),failures:Number(s.failures||0)})),instance_physical_attempts:this._providerPhysicalAttempts||0,instance_max_starts_per_second:this._providerMaxStartsPerSecond||0},probe:this.env.FE_PROVIDER_PROBE_RUN_ID?await this.ctx.storage.get(probeKey)||null:null}};
   }
   async maybeStartProviderProbe(){
     const runId=this.env.FE_PROVIDER_PROBE_RUN_ID;
@@ -150,6 +152,7 @@ export class BackgroundWatcher extends QuotaWatcher{
         // Preserve legacy tolerant Smart Follow for HTTP 200 rate bodies;
         // strict notification discovery still fails and never invents a catalog.
         if(!strict&&error.http===200&&/API_PROVIDER_RATE_LIMIT/.test(error.message))return [];
+        if(!strict&&error.cooldownScope&&error.cooldownScope!=='GLOBAL'&&/API_PROVIDER_COOLDOWN/.test(error.message))return [];
         throw error;
       }
     }

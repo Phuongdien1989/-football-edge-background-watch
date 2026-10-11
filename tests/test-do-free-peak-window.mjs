@@ -4,12 +4,12 @@ import vm from 'node:vm';
 import {providerRateScope} from '../provider_errors.mjs';
 const source=readFileSync(new URL('../worker_notify_v138_peak_window.js',import.meta.url),'utf8');
 let now=Date.parse('2026-10-11T11:59:59Z'),manual=true,superAlarms=0,providerCalls=0,quotaReservations=0;
-let alarmAt=null,alarmWrites=0,lastApiParams=null;
+let alarmAt=null,alarmWrites=0,lastApiParams=null,lastApiStrict=null;
 class QuotaWatcher {
  constructor(ctx,env){this.ctx=ctx;this.env=env;}
  async scanControl(){const saved=await this.ctx?.storage.get?.('notify:scan-control');return saved||{enabled:manual,updated:123};}
  async alarm(){if((await this.scanControl()).enabled){superAlarms++;await this.api('/fixtures');}}
- async api(path,params){lastApiParams=params;quotaReservations++;providerCalls++;return this._testApiResponse||[];}
+ async api(path,params,strict){lastApiParams=params;lastApiStrict=strict;quotaReservations++;providerCalls++;if(this._testApiError)throw this._testApiError;return this._testApiResponse||[];}
  async fetch(request){return new Response(new URL(request.url).pathname==='/api/notify/status'?JSON.stringify({scan:data.get('notify:status')}):'{}');}
  async quotaStatus(){return {used:123,remaining:49877};}
  providerPacingCfg(){return {configured_minute_limit:450,effective_minute_limit:450,start_gap_ms:143,bootstrap:true};}
@@ -130,7 +130,13 @@ console.log('PASS: strict LIVE discovery uses Smart Follow catalog parameters wi
 
 const shared=new result.BackgroundWatcher(ctx,{TZ:'Asia/Ho_Chi_Minh'});shared._manualCycleActive=true;shared._testApiResponse=[{fixture:{id:7}}];
 const beforeShared=providerCalls;
-const [a,b]=await Promise.all([shared.api('/fixtures',{live:'all'},true),shared.api('/fixtures',{live:'all',timezone:'Asia/Ho_Chi_Minh'},false)]);
+const [a,b]=await Promise.all([shared.api('/fixtures',{live:'all'},false),shared.api('/fixtures',{live:'all',timezone:'Asia/Ho_Chi_Minh'},true)]);
+assert.equal(lastApiStrict,true,'tolerant first caller still creates strict shared discovery');
 assert.equal(providerCalls-beforeShared,1,'notification and Smart Follow share one strict physical catalog call');a[0].fixture.id=99;assert.equal(b[0].fixture.id,7,'callers cannot mutate each others fixtures');
 shared._manualCycleActive=false;shared._liveCatalogWorks=null;await shared.api('/fixtures',{live:'all'},true);assert.equal(providerCalls-beforeShared,2,'later cycles fetch a fresh catalog');
 console.log('PASS: one strict LIVE catalog per cycle, independent snapshots and no cross-cycle stale cache');
+
+const failedShared=new result.BackgroundWatcher(ctx,{});failedShared._manualCycleActive=true;const catalogError=new Error('LIVE_DISCOVERY_UPSTREAM_ERROR:API_PROVIDER_RATE_LIMIT');catalogError.http=200;failedShared._testApiError=catalogError;
+const catalogResults=await Promise.allSettled([failedShared.api('/fixtures',{live:'all'},false),failedShared.api('/fixtures',{live:'all'},true)]);
+assert.equal(catalogResults[0].status,'fulfilled');assert.equal(catalogResults[0].value.length,0);assert.equal(catalogResults[1].status,'rejected','strict discovery never turns a provider error into zero LIVE');
+console.log('PASS: shared strict provider failure is visible to notifications while tolerant Smart Follow remains safe');

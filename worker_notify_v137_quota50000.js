@@ -116,21 +116,23 @@ export class BackgroundWatcher extends HotPriorityWatcher{
     const gap=rpm>=60?Math.ceil(1000/Math.floor(rpm/60)):Math.ceil(60000/rpm);
     return {configured_minute_limit:configured,effective_minute_limit:rpm,start_gap_ms:gap,bootstrap:true};
   }
-  async beforeProviderRequest(){
+  async beforeProviderRequest(requestKind='OTHER_ENDPOINT'){
     const run=async()=>{
       if(!this._providerCooldownLoaded){
-        const saved=await this.ctx.storage.get('api:provider-cooldown:v3');
-        this._providerRetryAt=Math.max(this._providerRetryAt||0,Number(saved?.until||0));
-        this._providerRateFailures=Number(saved?.failures||0);
+        const [global,scoped]=await Promise.all([
+          this.ctx.storage.get('api:provider-cooldown:global:v1'),
+          this.ctx.storage.get('api:provider-cooldown:scoped:v1')
+        ]);
+        this._providerRetryAt=Math.max(this._providerRetryAt||0,Number(global?.until||0));
+        this._providerRateFailures=Number(global?.failures||0);
+        this._providerScopedCooldowns=scoped||{};
         this._providerCooldownLoaded=true;
       }
-      // Recheck after waiting: an in-flight response may extend Retry-After.
       for(;;){
-        if(Number(this._providerRetryAt||0)>Date.now()){
-          const error=new Error('API_PROVIDER_COOLDOWN');
-          error.retryAfterMs=this._providerRetryAt-Date.now();
-          // Strict discovery can wait out a brief cooldown started by another
-          // branch. Long cooldowns remain terminal for this scan cycle.
+        const until=Math.max(Number(this._providerRetryAt||0),Number(this._providerScopedCooldowns?.[requestKind]?.until||0));
+        if(until>Date.now()){
+          const error=new Error('API_PROVIDER_COOLDOWN');error.retryAfterMs=until-Date.now();
+          error.cooldownScope=Number(this._providerRetryAt||0)>Date.now()?'GLOBAL':requestKind;
           error.retryable=error.retryAfterMs<=10000;throw error;
         }
         const wait=Math.max(0,Number(this._providerNextStart||0)-Date.now());
@@ -152,23 +154,39 @@ export class BackgroundWatcher extends HotPriorityWatcher{
     this._providerObservation=observation;
     const rpm=observation.limits.minute_limit;
     if(Number.isFinite(rpm)&&rpm>0)this._providerMinuteLimit=rpm;
+    const kind=observation.request_kind||'OTHER_ENDPOINT';
+    this._providerScopedCooldowns ||= {};
     if(observation.code==='API_PROVIDER_RATE_LIMIT'){
-      const active=Number(this._providerRetryAt||0)>Date.now();
-      if(!active)this._providerRateFailures=(this._providerRateFailures||0)+1;
-      // HTTP 200 rate errors with no exhausted-minute header may be brief
-      // proxy protection. Give original strict LIVE retries 1s/2s recovery,
-      // then stop all branches for a full minute if all three attempts fail.
-      const soft=observation.http===200&&observation.limits.minute_remaining!==0;
-      const failures=this._providerRateFailures||1;
-      const fallback=soft&&failures<3?1000*failures:Math.min(300000,60000*2**Math.min(3,Math.max(0,failures-(soft?3:1))));
-      const delay=observation.retry_after_ms||fallback;
-      const previousUntil=Number(this._providerRetryAt||0);
-      // Responses from one in-flight batch share a single cooldown episode.
-      if(!active||observation.retry_after_ms)this._providerRetryAt=Math.max(previousUntil,Date.now()+delay);
-      if(this._providerRetryAt!==previousUntil)await this.ctx.storage.put('api:provider-cooldown:v3',{until:this._providerRetryAt,failures:this._providerRateFailures});
-    }else if(observation.code==='OK'&&this._providerRateFailures&&Date.now()>=Number(this._providerRetryAt||0)){
-      this._providerRateFailures=0;this._providerRetryAt=0;
-      await this.ctx.storage.put('api:provider-cooldown:v3',{until:0,failures:0});
+      // A soft HTTP 200 feed error must not mute unrelated discovery.
+      // Hard protocol, minute exhaustion and Retry-After remain global.
+      const hard=observation.http===429||observation.limits.minute_remaining===0||observation.retry_after_ms>0;
+      const state=hard?{until:this._providerRetryAt||0,failures:this._providerRateFailures||0}:{...(this._providerScopedCooldowns[kind]||{until:0,failures:0})};
+      const active=state.until>Date.now();
+      if(!active){
+        if(!hard&&state.failures>=3)state.failures=0;
+        state.failures++;
+      }
+      const fallback=hard?Math.min(300000,60000*2**Math.min(3,state.failures-1)):state.failures<3?1000*state.failures:60000;
+      const previousUntil=state.until;
+      if(!active||observation.retry_after_ms)state.until=Math.max(state.until,Date.now()+(observation.retry_after_ms||fallback));
+      observation.cooldown_scope=hard?'GLOBAL':kind;
+      if(hard){
+        this._providerRetryAt=state.until;this._providerRateFailures=state.failures;
+        if(state.until!==previousUntil)await this.ctx.storage.put('api:provider-cooldown:global:v1',state);
+      }else{
+        this._providerScopedCooldowns[kind]=state;
+        if(state.until!==previousUntil)await this.ctx.storage.put('api:provider-cooldown:scoped:v1',this._providerScopedCooldowns);
+      }
+    }else if(observation.code==='OK'){
+      if(this._providerRateFailures&&Date.now()>=Number(this._providerRetryAt||0)){
+        this._providerRateFailures=0;this._providerRetryAt=0;
+        await this.ctx.storage.put('api:provider-cooldown:global:v1',{until:0,failures:0});
+      }
+      const scoped=this._providerScopedCooldowns[kind];
+      if(scoped?.failures&&Date.now()>=Number(scoped.until||0)){
+        this._providerScopedCooldowns[kind]={until:0,failures:0};
+        await this.ctx.storage.put('api:provider-cooldown:scoped:v1',this._providerScopedCooldowns);
+      }
     }
     if(observation.code!=='OK'){
       const previous=await this.ctx.storage.get('api:last-provider-error:v1');
