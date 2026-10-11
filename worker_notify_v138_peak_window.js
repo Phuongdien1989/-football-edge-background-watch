@@ -78,7 +78,7 @@ export default {...base,async fetch(request,env,ctx){
     const status=await env.BACKGROUND_WATCHER.get(id).fetch(new Request('https://internal/api/notify/peak-window'));
     if(!status.ok)return reply({...health,peak_window:peakWindow(env),peak_status_error:'HTTP_'+status.status},503);
     const peak=await status.json();
-    return reply({...health,peak_window:peakWindow(env),peak_status:peak.scan_control,next_alarm:peak.next_alarm});
+    return reply({...health,deploy_commit:env.FE_DEPLOY_COMMIT||null,peak_window:peakWindow(env),peak_status:peak.scan_control,next_alarm:peak.next_alarm});
   }
   return response;
 },async scheduled(controller,env){

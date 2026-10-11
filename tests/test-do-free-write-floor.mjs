@@ -18,9 +18,9 @@ const doBreakdown={
   apiReservation:Math.ceil(calls/block),
   alarm:4*ticks,
   notificationBudget:ticks,
-  diagnosticStatus:Math.ceil(ticks/4),
+  diagnosticStatus:ticks,
   schedulerStatus:Math.ceil(ticks/4),
-  reserveOther:10000
+  reserveOther:50000 // Conservative allowance for inherited follow/evidence/device/push writes.
 };
 const d1Breakdown={
   fixtureSnapshots:ticks*fixtures,
