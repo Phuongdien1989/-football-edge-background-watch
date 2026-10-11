@@ -8,7 +8,9 @@ assert.match(v130,/await this\.ctx\.storage\.put\('notify:match:'\+id,item\)/,'f
 const calls=Number(process.env.API_DAILY_CALLS||50000);
 const ticks=Number(process.env.SCAN_TICKS_PER_DAY||2880);
 const fixtures=Number(process.env.FIXTURES_PER_TICK||12);
-// Conservative workload projection, not a guaranteed minimum: failed/empty fixtures\n// can now skip writes, and actual fixture count varies by scan.\nconst projectedWrites=calls+ticks*fixtures;
+// Conservative workload projection, not a guaranteed minimum: failed/empty fixtures
+// can now skip writes, and actual fixture count varies by scan.
+const projectedWrites=calls+ticks*fixtures;
 const budget=Number(process.env.DO_FREE_DAILY_WRITE_BUDGET||1000);
 const result={schema:'DO_WRITE_PROJECTION_V2',calls,ticks,fixtures,projectedWrites,configuredWriteBudget:budget,withinBudget:projectedWrites<=budget,excluded:['notify:status','scheduler','setAlarm','push latency','subscriptions','other inherited writes']};
 console.log(JSON.stringify(result));
