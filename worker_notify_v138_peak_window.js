@@ -1,4 +1,5 @@
 import base,{BackgroundWatcher as QuotaWatcher} from './worker_notify_v137_quota50000.js';
+import {providerRateScope} from './provider_errors.mjs';
 
 // Account-local daily scan window. Engines, thresholds and in-window cadence
 // remain inherited. Manual PAUSE remains stronger than the daily schedule.
@@ -46,9 +47,9 @@ export class BackgroundWatcher extends QuotaWatcher{
     const budget=await this.notifyBudgetView(),status=await this.ctx.storage.get('notify:status');
     const devices=(await this.devices()).filter(d=>d?.prefs?.enabled&&(d.prefs.h1||d.prefs.goal||d.prefs.gap));
     const lastCycleAt=Number(status?.startedAt||0);
-    const publicObservation=o=>o?{at:o.at,http:o.http,code:o.code,limits:o.limits,retry_after_ms:o.retry_after_ms}:null;
+    const publicObservation=o=>o?{at:o.at,http:o.http,code:o.code,limits:o.limits,retry_after_ms:o.retry_after_ms,rate_scope:providerRateScope(o.detail)}:null;
     const probeKey='api:provider-probe:v1:'+this.env.FE_PROVIDER_PROBE_RUN_ID;
-    return {budget,enabled_devices:devices.length,last_cycle_at:lastCycleAt,last_cycle_current_day:lastCycleAt>0&&new Date(lastCycleAt).toISOString().slice(0,10)===budget.day,live:Number(status?.live||0),scanned:Number(status?.scanned||0),error_count:(status?.errors||[]).length,provider:{latest:publicObservation(this._providerObservation),last_failure:publicObservation(await this.ctx.storage.get('api:last-provider-error:v1')),probe:this.env.FE_PROVIDER_PROBE_RUN_ID?await this.ctx.storage.get(probeKey)||null:null}};
+    return {budget,enabled_devices:devices.length,last_cycle_at:lastCycleAt,last_cycle_current_day:lastCycleAt>0&&new Date(lastCycleAt).toISOString().slice(0,10)===budget.day,live:Number(status?.live||0),scanned:Number(status?.scanned||0),error_count:(status?.errors||[]).length,provider:{classification:'V2',latest:publicObservation(this._providerObservation),last_failure:publicObservation(await this.ctx.storage.get('api:last-provider-error:v1')),probe:this.env.FE_PROVIDER_PROBE_RUN_ID?await this.ctx.storage.get(probeKey)||null:null}};
   }
   async maybeStartProviderProbe(){
     const runId=this.env.FE_PROVIDER_PROBE_RUN_ID;

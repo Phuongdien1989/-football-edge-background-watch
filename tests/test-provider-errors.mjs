@@ -1,8 +1,12 @@
 import assert from 'node:assert/strict';
-import {providerObservation} from '../provider_errors.mjs';
+import {providerObservation,providerRateScope} from '../provider_errors.mjs';
 import {readFileSync} from 'node:fs';
 import vm from 'node:vm';
 const response=(status,headers={})=>new Response('{}',{status,headers});
+assert.equal(providerRateScope('Too many requests from your IP address'),'IP');
+assert.equal(providerRateScope('per-minute request limit'),'MINUTE');
+assert.equal(providerRateScope('per-second limit'),'SECOND');
+assert.equal(providerRateScope('opaque provider error'),'UNSPECIFIED');
 let p=providerObservation(response(200),{errors:{rateLimit:'Too many requests. You have reached your per-minute request limit.'},response:[]});
 assert.equal(p.code,'API_PROVIDER_RATE_LIMIT');
 p=providerObservation(response(429,{'retry-after':'12','x-ratelimit-limit':'450'}),{errors:[],response:[]});

@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import vm from 'node:vm';
+import {providerRateScope} from '../provider_errors.mjs';
 const source=readFileSync(new URL('../worker_notify_v138_peak_window.js',import.meta.url),'utf8');
 let now=Date.parse('2026-10-11T11:59:59Z'),manual=true,superAlarms=0,providerCalls=0,quotaReservations=0;
 let alarmAt=null,alarmWrites=0;
@@ -13,9 +14,9 @@ class QuotaWatcher {
  async devices(){return [{prefs:{enabled:true,h1:true}}];}
 }
 // Remove only import/export syntax, leaving the implementation under test intact.
-const moduleText=source.replace(/^import .*;\n/,'').replace('export function peakWindow','function peakWindow').replace('export class BackgroundWatcher','class BackgroundWatcher').split('export default')[0];
+const moduleText=source.replace(/^import .*;\n/gm,'').replace('export function peakWindow','function peakWindow').replace('export class BackgroundWatcher','class BackgroundWatcher').split('export default')[0];
 class FixedDate extends Date{constructor(...args){super(...(args.length?args:[now]));}static now(){return now;}}
-const result=vm.runInNewContext(moduleText+';({peakWindow,BackgroundWatcher})',{QuotaWatcher,Date:FixedDate,Number,String,Math,Error,Response,JSON,URL,Request,setTimeout:fn=>{fn();return 0;}});
+const result=vm.runInNewContext(moduleText+';({peakWindow,BackgroundWatcher})',{QuotaWatcher,providerRateScope,Date:FixedDate,Number,String,Math,Error,Response,JSON,URL,Request,setTimeout:fn=>{fn();return 0;}});
 const env={PEAK_SCAN_ENABLED:'true',PEAK_SCAN_START:'19:00',PEAK_SCAN_END:'05:00'};
 const at=s=>now=Date.parse(s);
 assert.equal(result.peakWindow(env).allowed,false,'18:59:59 Vietnam closed');

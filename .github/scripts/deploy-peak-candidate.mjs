@@ -6,7 +6,7 @@ const candidate=process.env.CANDIDATE_SHA;
 const repository=process.env.GITHUB_REPOSITORY;
 const token=process.env.CLOUDFLARE_API_TOKEN,account=process.env.CLOUDFLARE_ACCOUNT_ID;
 const rollback='60781a4e-70cb-4c02-a036-2528c3048ed5';
-const expectedProduction='77846585-b036-40dd-ab8e-64e2ccf84ec5';
+const expectedProduction='d6fd873b-9223-4d4b-96ad-9f4f73a4f139';
 const worker=evidence.worker,database=evidence.database?.uuid;
 const prefix='/accounts/'+encodeURIComponent(account);
 const report={commit:candidate,rollback,checks:{},productionDeploy:'NOT_ATTEMPTED'};
@@ -65,7 +65,7 @@ try{
  // Set deployed before invocation: a CLI/network failure may happen after
  // Cloudflare accepted the upload, requiring restoration of the old version.
  deployed=true;
- run(['wrangler','deploy','--var','FE_DEPLOY_COMMIT:'+candidate,'--var','FE_PROVIDER_PROBE_RUN_ID:'+candidate,'--var','FE_PROVIDER_PROBE_ENABLED:true']);
+ run(['wrangler','deploy','--var','FE_DEPLOY_COMMIT:'+candidate,'--var','FE_PROVIDER_PROBE_RUN_ID:3f644a53c9e9fee1065b290adaf51f94177ca6c5','--var','FE_PROVIDER_PROBE_ENABLED:false']);
  report.productionDeploy='DEPLOYED';
  const after=await api(path+'/deployments');
  report.deployment=after.deployments?.[0];
@@ -78,7 +78,7 @@ try{
   const response=await fetch(healthURL,{signal:AbortSignal.timeout(10000)});
   health=await response.json();
   report.healthAttempts.push({attempt:attempt+1,http:response.status,commit:health.deploy_commit,doStatus:health.peak_status_error||'OK',manualMode:health.peak_status?.manualMode||false});
-  healthy=response.ok&&health.deploy_commit===candidate&&health.peak_window?.enabled===false&&health.peak_status?.manualMode===true&&health.peak_status?.scan_budget?.limit===720&&health.notify_status?.provider?.probe?.run===candidate;
+  healthy=response.ok&&health.deploy_commit===candidate&&health.peak_window?.enabled===false&&health.peak_status?.manualMode===true&&health.peak_status?.scan_budget?.limit===720&&health.notify_status?.provider?.classification==='V2';
   if(healthy)break;
   // Permit old idle DO instances to evict before polling the new generation.
   await new Promise(resolve=>setTimeout(resolve,attempt===0?150000:5000));

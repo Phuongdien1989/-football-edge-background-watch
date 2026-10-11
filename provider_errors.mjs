@@ -1,3 +1,9 @@
+export function providerRateScope(detail=''){
+ if(/\bip\b|ip.address|address.*limit/i.test(detail))return 'IP';
+ if(/per.second|each.second|second.*limit/i.test(detail))return 'SECOND';
+ if(/per.minute|each.minute|minute.*limit/i.test(detail))return 'MINUTE';
+ return 'UNSPECIFIED';
+}
 export function providerObservation(response,data,secret='',now=Date.now()){
  const number=name=>{const raw=response.headers.get(name);return raw!==null&&Number.isFinite(Number(raw))?Number(raw):null;};
  const limits={daily_limit:number('x-ratelimit-requests-limit'),daily_remaining:number('x-ratelimit-requests-remaining'),minute_limit:number('x-ratelimit-limit'),minute_remaining:number('x-ratelimit-remaining')};
