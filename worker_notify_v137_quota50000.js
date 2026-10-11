@@ -118,9 +118,19 @@ export class BackgroundWatcher extends HotPriorityWatcher{
   }
   async beforeProviderRequest(){
     const run=async()=>{
+      if(!this._providerCooldownLoaded){
+        const saved=await this.ctx.storage.get('api:provider-cooldown:v1');
+        this._providerRetryAt=Math.max(this._providerRetryAt||0,Number(saved?.until||0));
+        this._providerRateFailures=Number(saved?.failures||0);
+        this._providerCooldownLoaded=true;
+      }
       // Recheck after waiting: an in-flight response may extend Retry-After.
       for(;;){
-        const wait=Math.max(0,Number(this._providerNextStart||0)-Date.now(),Number(this._providerRetryAt||0)-Date.now());
+        if(Number(this._providerRetryAt||0)>Date.now()){
+          const error=new Error('API_PROVIDER_COOLDOWN');error.retryable=false;
+          error.retryAfterMs=this._providerRetryAt-Date.now();throw error;
+        }
+        const wait=Math.max(0,Number(this._providerNextStart||0)-Date.now());
         if(wait<=0)break;
         await new Promise(resolve=>setTimeout(resolve,wait));
       }
@@ -139,7 +149,18 @@ export class BackgroundWatcher extends HotPriorityWatcher{
     this._providerObservation=observation;
     const rpm=observation.limits.minute_limit;
     if(Number.isFinite(rpm)&&rpm>0)this._providerMinuteLimit=rpm;
-    if(observation.code==='API_PROVIDER_RATE_LIMIT')this._providerRetryAt=Math.max(this._providerRetryAt||0,Date.now()+(observation.retry_after_ms||1000));
+    if(observation.code==='API_PROVIDER_RATE_LIMIT'){
+      const active=Number(this._providerRetryAt||0)>Date.now();
+      if(!active)this._providerRateFailures=(this._providerRateFailures||0)+1;
+      const delay=observation.retry_after_ms||Math.min(300000,60000*2**Math.min(3,this._providerRateFailures-1));
+      const previousUntil=Number(this._providerRetryAt||0);
+      // Responses from one in-flight batch share a single cooldown episode.
+      if(!active||observation.retry_after_ms)this._providerRetryAt=Math.max(previousUntil,Date.now()+delay);
+      if(this._providerRetryAt!==previousUntil)await this.ctx.storage.put('api:provider-cooldown:v1',{until:this._providerRetryAt,failures:this._providerRateFailures});
+    }else if(observation.code==='OK'&&this._providerRateFailures&&Date.now()>=Number(this._providerRetryAt||0)){
+      this._providerRateFailures=0;this._providerRetryAt=0;
+      await this.ctx.storage.put('api:provider-cooldown:v1',{until:0,failures:0});
+    }
     if(observation.code!=='OK'){
       const previous=await this.ctx.storage.get('api:last-provider-error:v1');
       if(!previous||previous.code!==observation.code||Date.now()-previous.at>=120000)await this.ctx.storage.put('api:last-provider-error:v1',observation);

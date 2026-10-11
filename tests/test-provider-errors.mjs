@@ -20,7 +20,7 @@ const source=readFileSync('worker_notify_v137_quota50000.js','utf8');
 const method=source.slice(source.indexOf('  providerPacingCfg(){'),source.indexOf('  async recordProviderObservation(')).replace('\n  async beforeProviderRequest()',',\n  async beforeProviderRequest()');
 let now=1000,reservations=0,waits=[];
 const watcher=vm.runInNewContext('({'+method+'})',{Date:{now:()=>now},n:(v,d=0)=>Number.isFinite(Number(v))?Number(v):d,Number,Math,Promise,setTimeout:(fn,ms)=>{waits.push(ms);now+=ms;fn();}});
-watcher.env={API_PROVIDER_MINUTE_LIMIT:'450'};watcher.reserveApiCall=async()=>{reservations++;};watcher._providerMinuteLimit=450;
+watcher.ctx={storage:{get:async()=>null}};watcher.env={API_PROVIDER_MINUTE_LIMIT:'450'};watcher.reserveApiCall=async()=>{reservations++;};watcher._providerMinuteLimit=450;
 await Promise.all([watcher.beforeProviderRequest(),watcher.beforeProviderRequest(),watcher.beforeProviderRequest()]);
 assert.equal(reservations,3);assert.equal(waits.length,2,'concurrent starts obey provider slots');
 // Cold-start burst before any successful provider header: the previous code sent
@@ -36,6 +36,27 @@ for(const learned of [undefined,450,300]){
 watcher._providerMinuteLimit=900;assert.equal(watcher.providerPacingCfg().effective_minute_limit,450,'advertised higher limit cannot exceed configured subscription');
 watcher._providerMinuteLimit=undefined;assert.equal(watcher.providerPacingCfg().start_gap_ms,143,'missing rate headers preserve bootstrap spacing');
 console.log('PASS: cold-start 18-request burst prevented, restart bootstrap and stricter provider limits');
+// Cooldown prevents all branches from spending tokens or sending a request.
+watcher._providerRetryAt=now+60000;let duringCooldown=0;watcher.reserveApiCall=async()=>duringCooldown++;
+const blocked=await Promise.allSettled(Array.from({length:18},()=>watcher.beforeProviderRequest()));
+assert.ok(blocked.every(x=>x.status==='rejected'&&x.reason.message==='API_PROVIDER_COOLDOWN'&&x.reason.retryable===false));assert.equal(duringCooldown,0);
+watcher._providerCooldownLoaded=false;watcher._providerRetryAt=0;watcher.ctx.storage.get=async()=>({until:now+60000,failures:2});
+await assert.rejects(watcher.beforeProviderRequest(),/API_PROVIDER_COOLDOWN/);assert.equal(duringCooldown,0,'restart cannot bypass provider cooldown');
+console.log('PASS: shared cooldown blocks all physical calls and reservations, survives restart');
+const observerMethod=source.slice(source.indexOf('  async recordProviderObservation('),source.indexOf('  async fetch(request)',source.indexOf('  async recordProviderObservation(')));
+const saved=new Map();let cooldownWrites=0;
+const observer=vm.runInNewContext('({'+observerMethod+'})',{Date:{now:()=>now},Number,Math});
+observer.ctx={storage:{get:async k=>saved.get(k),put:async(k,v)=>{saved.set(k,v);if(k==='api:provider-cooldown:v1')cooldownWrites++;}}};
+const rate=()=>({at:now,code:'API_PROVIDER_RATE_LIMIT',limits:{minute_limit:null},retry_after_ms:0});
+await observer.recordProviderObservation(rate());const firstUntil=observer._providerRetryAt;
+for(let i=0;i<18;i++)await observer.recordProviderObservation(rate());
+assert.equal(observer._providerRateFailures,1);assert.equal(cooldownWrites,1,'one batch shares one durable cooldown episode');
+await observer.recordProviderObservation({at:now,code:'OK',limits:{minute_limit:450}});
+assert.equal(observer._providerRetryAt,firstUntil,'old in-flight success cannot cancel active cooldown');
+now=firstUntil;await observer.recordProviderObservation(rate());assert.equal(observer._providerRetryAt-now,120000,'repeat failure increases backoff');
+now=observer._providerRetryAt;await observer.recordProviderObservation({at:now,code:'OK',limits:{minute_limit:450}});
+assert.equal(observer._providerRateFailures,0);assert.equal(observer._providerRetryAt,0,'successful recovery resets cooldown');
+console.log('PASS: bounded progressive cooldown, in-flight race guard and successful recovery');
 const base=readFileSync('worker.js','utf8');
 assert.ok(base.indexOf('await this.beforeProviderRequest()')<base.indexOf('const ctl=new AbortController(),timer=setTimeout(()=>ctl.abort(),12000);',base.indexOf('  async api(')),'network timeout starts after provider slot wait');
 assert.match(base,/await this\.beforeProviderRequest\(\)/,'each physical retry traverses the prepaid guard');
