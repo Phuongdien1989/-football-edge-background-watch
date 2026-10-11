@@ -1,7 +1,7 @@
 import base,{BackgroundWatcher as HotPriorityWatcher} from './worker_notify_v136_hot_priority.js';
 
 // P1.3 GLOBAL 50K HARD CAP
-// Quota safety only. No pacing and no H1/FT/HC engine, threshold, HOT scheduler,
+// Quota and outbound request pacing only. No H1/FT/HC engine, threshold, HOT scheduler,
 // Push, validation semantics or D1 schema changes.
 // Every API-Football request made through the BackgroundWatcher shares one
 // Durable Object counter so notification + Smart Follow + Evidence + Validation
@@ -107,15 +107,29 @@ export class BackgroundWatcher extends HotPriorityWatcher{
     return {ok:true,schema:'FE_API_QUOTA_50000_GLOBAL_V1',day,used,limit:cfg.total,remaining,utilization_pct:Math.round((used/cfg.total)*10000)/100,hard_cap:true,pacing:false,accounting:'PREPAID_BLOCK_UPPER_BOUND',usage_note:'used includes prepaid reservations that may not have been sent; unused reservations are forfeited on restart',block_size:Math.max(1,Math.min(256,Math.floor(n(this.env.API_RESERVATION_BLOCK_SIZE,64))))};
   }
 
+  providerPacingCfg(){
+    // Bootstrap from the verified subscription, before the first HTTP response.
+    // A stricter advertised limit wins; missing/error headers cannot disable pacing.
+    const configured=Math.max(1,n(this.env.API_PROVIDER_MINUTE_LIMIT,60));
+    const learned=Number(this._providerMinuteLimit||0);
+    const rpm=learned>0?Math.min(configured,learned):configured;
+    const gap=rpm>=60?Math.ceil(1000/Math.floor(rpm/60)):Math.ceil(60000/rpm);
+    return {configured_minute_limit:configured,effective_minute_limit:rpm,start_gap_ms:gap,bootstrap:true};
+  }
   async beforeProviderRequest(){
     const run=async()=>{
-      const wait=Math.max(0,Number(this._providerNextStart||0)-Date.now(),Number(this._providerRetryAt||0)-Date.now());
-      if(wait>0)await new Promise(resolve=>setTimeout(resolve,wait));
+      // Recheck after waiting: an in-flight response may extend Retry-After.
+      for(;;){
+        const wait=Math.max(0,Number(this._providerNextStart||0)-Date.now(),Number(this._providerRetryAt||0)-Date.now());
+        if(wait<=0)break;
+        await new Promise(resolve=>setTimeout(resolve,wait));
+      }
       await this.reserveApiCall();
-      const rpm=Number(this._providerMinuteLimit||0);
-      // Respect provider-advertised speed, including its operational per-second layer.
-      const gap=rpm>=60?Math.ceil(1000/Math.floor(rpm/60)):rpm>0?Math.ceil(60000/rpm):0;
-      this._providerNextStart=Date.now()+gap;
+      const now=Date.now();
+      this._providerNextStart=now+this.providerPacingCfg().start_gap_ms;
+      this._providerStarts=(this._providerStarts||[]).filter(at=>now-at<1000).concat(now);
+      this._providerMaxStartsPerSecond=Math.max(this._providerMaxStartsPerSecond||0,this._providerStarts.length);
+      this._providerPhysicalAttempts=(this._providerPhysicalAttempts||0)+1;
     };
     const promise=(this._providerStartWork||Promise.resolve()).then(run);
     this._providerStartWork=promise.catch(()=>{});
@@ -129,6 +143,9 @@ export class BackgroundWatcher extends HotPriorityWatcher{
     if(observation.code!=='OK'){
       const previous=await this.ctx.storage.get('api:last-provider-error:v1');
       if(!previous||previous.code!==observation.code||Date.now()-previous.at>=120000)await this.ctx.storage.put('api:last-provider-error:v1',observation);
+    }else if(!this._providerSuccessSavedAt||Date.now()-this._providerSuccessSavedAt>=120000){
+      await this.ctx.storage.put('api:last-provider-success:v1',observation);
+      this._providerSuccessSavedAt=Date.now();
     }
   }
 

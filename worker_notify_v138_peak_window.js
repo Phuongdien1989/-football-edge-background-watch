@@ -49,7 +49,10 @@ export class BackgroundWatcher extends QuotaWatcher{
     const lastCycleAt=Number(status?.startedAt||0);
     const publicObservation=o=>o?{at:o.at,http:o.http,code:o.code,limits:o.limits,retry_after_ms:o.retry_after_ms,rate_scope:providerRateScope(o.detail)}:null;
     const probeKey='api:provider-probe:v1:'+this.env.FE_PROVIDER_PROBE_RUN_ID;
-    return {budget,enabled_devices:devices.length,last_cycle_at:lastCycleAt,last_cycle_current_day:lastCycleAt>0&&new Date(lastCycleAt).toISOString().slice(0,10)===budget.day,live:Number(status?.live||0),scanned:Number(status?.scanned||0),error_count:(status?.errors||[]).length,provider:{classification:'V2',latest:publicObservation(this._providerObservation),last_failure:publicObservation(await this.ctx.storage.get('api:last-provider-error:v1')),probe:this.env.FE_PROVIDER_PROBE_RUN_ID?await this.ctx.storage.get(probeKey)||null:null}};
+    const lastSuccess=await this.ctx.storage.get('api:last-provider-success:v1');
+    const lastFailure=await this.ctx.storage.get('api:last-provider-error:v1');
+    const latest=[this._providerObservation,lastSuccess,lastFailure].filter(Boolean).sort((a,b)=>b.at-a.at)[0];
+    return {budget,enabled_devices:devices.length,last_cycle_at:lastCycleAt,last_cycle_current_day:lastCycleAt>0&&new Date(lastCycleAt).toISOString().slice(0,10)===budget.day,live:Number(status?.live||0),scanned:Number(status?.scanned||0),error_count:(status?.errors||[]).length,provider:{classification:'V2',latest:publicObservation(latest),last_failure:publicObservation(lastFailure),pacing:{...this.providerPacingCfg(),instance_physical_attempts:this._providerPhysicalAttempts||0,instance_max_starts_per_second:this._providerMaxStartsPerSecond||0},probe:this.env.FE_PROVIDER_PROBE_RUN_ID?await this.ctx.storage.get(probeKey)||null:null}};
   }
   async maybeStartProviderProbe(){
     const runId=this.env.FE_PROVIDER_PROBE_RUN_ID;

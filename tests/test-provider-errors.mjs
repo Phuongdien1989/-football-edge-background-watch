@@ -17,12 +17,25 @@ p=providerObservation(response(401),{errors:{token:'bad SECRETKEY secret@example
 assert.equal(p.code,'API_AUTH_OR_SUBSCRIPTION_ERROR');assert.ok(!p.detail.includes('SECRETKEY'));assert.ok(!p.detail.includes('secret@example.com'));
 assert.equal(providerObservation(response(503),{response:[]}).code,'API_PROVIDER_SERVER_ERROR');
 const source=readFileSync('worker_notify_v137_quota50000.js','utf8');
-const method=source.slice(source.indexOf('  async beforeProviderRequest(){'),source.indexOf('  async recordProviderObservation('));
+const method=source.slice(source.indexOf('  providerPacingCfg(){'),source.indexOf('  async recordProviderObservation(')).replace('\n  async beforeProviderRequest()',',\n  async beforeProviderRequest()');
 let now=1000,reservations=0,waits=[];
-const watcher=vm.runInNewContext('({'+method+'})',{Date:{now:()=>now},Number,Math,Promise,setTimeout:fn=>{waits.push(1);now+=150;fn();}});
-watcher.reserveApiCall=async()=>{reservations++;};watcher._providerMinuteLimit=450;
+const watcher=vm.runInNewContext('({'+method+'})',{Date:{now:()=>now},n:(v,d=0)=>Number.isFinite(Number(v))?Number(v):d,Number,Math,Promise,setTimeout:(fn,ms)=>{waits.push(ms);now+=ms;fn();}});
+watcher.env={API_PROVIDER_MINUTE_LIMIT:'450'};watcher.reserveApiCall=async()=>{reservations++;};watcher._providerMinuteLimit=450;
 await Promise.all([watcher.beforeProviderRequest(),watcher.beforeProviderRequest(),watcher.beforeProviderRequest()]);
 assert.equal(reservations,3);assert.equal(waits.length,2,'concurrent starts obey provider slots');
+// Cold-start burst before any successful provider header: the previous code sent
+// all 18 parallel detail requests at the same timestamp.
+for(const learned of [undefined,450,300]){
+  now=0;const starts=[];delete watcher._providerNextStart;delete watcher._providerStartWork;
+  watcher._providerMinuteLimit=learned;watcher.reserveApiCall=async()=>starts.push(now);
+  await Promise.all(Array.from({length:18},()=>watcher.beforeProviderRequest()));
+  const cap=learned===300?5:7;
+  for(const at of starts)assert.ok(starts.filter(t=>t>=at&&t<at+1000).length<=cap,'cold start and stricter learned headers obey rolling second cap');
+  assert.ok(starts.at(-1)>2000,'requests cannot burst before first successful response');
+}
+watcher._providerMinuteLimit=900;assert.equal(watcher.providerPacingCfg().effective_minute_limit,450,'advertised higher limit cannot exceed configured subscription');
+watcher._providerMinuteLimit=undefined;assert.equal(watcher.providerPacingCfg().start_gap_ms,143,'missing rate headers preserve bootstrap spacing');
+console.log('PASS: cold-start 18-request burst prevented, restart bootstrap and stricter provider limits');
 const base=readFileSync('worker.js','utf8');
 assert.ok(base.indexOf('await this.beforeProviderRequest()')<base.indexOf('const ctl=new AbortController(),timer=setTimeout(()=>ctl.abort(),12000);',base.indexOf('  async api(')),'network timeout starts after provider slot wait');
 assert.match(base,/await this\.beforeProviderRequest\(\)/,'each physical retry traverses the prepaid guard');
