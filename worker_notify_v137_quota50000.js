@@ -23,20 +23,29 @@ export class BackgroundWatcher extends HotPriorityWatcher{
     return p;
   }
 
+  // Durable Object serializes reservations. Persist a *prepaid* block before
+  // consuming any request. Unused tokens are forfeited on restart: this can
+  // underuse the provider quota, but cannot overspend it.
   async reserveApiCall(){
     return this.quotaWork(async()=>{
       const cfg=this.quotaCfg(),day=new Date().toISOString().slice(0,10),key='api:q50000:global:v1';
+      if(this._apiLease?.day===day&&this._apiLease.remaining>0){
+        this._apiLease.remaining--;
+        return {day,used:this._apiLease.persistedUsed,limit:cfg.total,leased:true};
+      }
       let q=await this.ctx.storage.get(key);
       if(!q||q.day!==day)q={day,used:0,limit:cfg.total,updated:Date.now()};
       if(n(q.used)>=cfg.total){
-        // A rejected reservation does not change usage. Do not persist the
-        // unchanged counter on every denied request: this can exhaust DO Free
-        // writes precisely when the API budget has already been reached.
         const e=new Error('API_TOTAL_DAILY_BUDGET_REACHED');e.code='API_TOTAL_DAILY_BUDGET_REACHED';throw e;
       }
-      q.used=n(q.used)+1;q.limit=cfg.total;q.updated=Date.now();
+      const configured=Math.floor(n(this.env.API_RESERVATION_BLOCK_SIZE,64));
+      const block=Math.max(1,Math.min(256,configured));
+      const granted=Math.min(block,cfg.total-n(q.used));
+      q.used=n(q.used)+granted;q.limit=cfg.total;q.updated=Date.now();
+      // Fail closed: do not expose tokens until this durable write succeeds.
       await this.ctx.storage.put(key,q);
-      return q;
+      this._apiLease={day,remaining:granted-1,persistedUsed:q.used};
+      return {...q,leased:true,granted};
     });
   }
 
@@ -45,7 +54,7 @@ export class BackgroundWatcher extends HotPriorityWatcher{
     let q=await this.ctx.storage.get(key);
     if(!q||q.day!==day)q={day,used:0,limit:cfg.total,updated:0};
     const used=n(q.used),remaining=Math.max(0,cfg.total-used);
-    return {ok:true,schema:'FE_API_QUOTA_50000_GLOBAL_V1',day,used,limit:cfg.total,remaining,utilization_pct:Math.round((used/cfg.total)*10000)/100,hard_cap:true,pacing:false};
+    return {ok:true,schema:'FE_API_QUOTA_50000_GLOBAL_V1',day,used,limit:cfg.total,remaining,utilization_pct:Math.round((used/cfg.total)*10000)/100,hard_cap:true,pacing:false,accounting:'PREPAID_BLOCK_UPPER_BOUND',block_size:Math.max(1,Math.min(256,Math.floor(n(this.env.API_RESERVATION_BLOCK_SIZE,64))))};
   }
 
   async api(path,params={},strict=false){
