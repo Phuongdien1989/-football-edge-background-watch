@@ -14,6 +14,7 @@ async function api(path,options={}){
 const source=String.raw`
 export default {async fetch(request,env){
  if(request.headers.get('authorization')!=='Bearer '+env.AUDIT_AUTH)return new Response('Unauthorized',{status:401});
+ if(new URL(request.url).searchParams.has('ready'))return Response.json({ready:true});
  const stub=env.PRODUCTION_DO.get(env.PRODUCTION_DO.idFromName('football-edge-global'));
  const read=async path=>{const r=await stub.fetch(new Request('https://internal'+path));return {http:r.status,data:await r.json()}};
  const status=await read('/api/notify/status');
@@ -58,6 +59,13 @@ try{
  await api(prefix+'/workers/scripts/'+name+'/subdomain',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({enabled:true})});
  const domain=await api(prefix+'/workers/subdomain');
  const url='https://'+name+'.'+domain.subdomain+'.workers.dev/';
+ let ready=false;
+ for(let i=0;i<10;i++){
+  const r=await fetch(url+'?ready=1',{headers:{authorization:'Bearer '+auth},signal:AbortSignal.timeout(15000)});
+  if(r.ok){ready=true;break;}
+  await new Promise(resolve=>setTimeout(resolve,3000));
+ }
+ if(!ready)throw Error('AUDIT_ROUTE_NOT_READY');
  const response=await fetch(url,{headers:{authorization:'Bearer '+auth},signal:AbortSignal.timeout(60000)});
  if(!response.ok)throw Error('AUDIT_HTTP_'+response.status);
  report.audit=await response.json();
