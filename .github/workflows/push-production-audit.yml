@@ -1,0 +1,33 @@
+name: Football Edge PUSH production audit
+on:
+  pull_request:
+    paths:
+      - '.github/scripts/push-production-audit.mjs'
+      - '.github/workflows/push-production-audit.yml'
+jobs:
+  audit:
+    if: github.event.pull_request.number == 5 && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    environment: football-edge-production
+    concurrency:
+      group: football-edge-production-audit
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Audit device settings and actual push service acceptance
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CANDIDATE_SHA: ${{ github.event.pull_request.head.sha }}
+        run: node .github/scripts/push-production-audit.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: push-production-audit
+          path: push-production-audit.json

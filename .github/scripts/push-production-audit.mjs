@@ -1,0 +1,78 @@
+import {randomBytes} from 'node:crypto';
+import {writeFileSync} from 'node:fs';
+const account=process.env.CLOUDFLARE_ACCOUNT_ID,token=process.env.CLOUDFLARE_API_TOKEN;
+if(!account||!token)throw Error('CLOUDFLARE_CREDENTIALS_MISSING');
+const prefix='/accounts/'+account, production='football-edge-background-watch';
+const name='fe-notify-audit-'+String(process.env.GITHUB_RUN_ID);
+const auth=randomBytes(32).toString('hex');
+const report={commit:process.env.CANDIDATE_SHA,mode:'PUSH_AUDIT_NO_PRODUCTION_DEPLOY',measuredAt:Date.now(),tests:[],cleanup:false};
+async function api(path,options={}){
+ const r=await fetch('https://api.cloudflare.com/client/v4'+path,{...options,headers:{authorization:'Bearer '+token,...options.headers},signal:AbortSignal.timeout(30000)});
+ const b=await r.json();if(!r.ok||b.success===false)throw Error('CF_HTTP_'+r.status+':'+(b.errors||[]).map(x=>x.code).join(','));
+ return b.result;
+}
+const source=String.raw`
+export default {async fetch(request,env){
+ if(request.headers.get('authorization')!=='Bearer '+env.AUDIT_AUTH)return new Response('Unauthorized',{status:401});
+ const stub=env.PRODUCTION_DO.get(env.PRODUCTION_DO.idFromName('football-edge-global'));
+ const read=async path=>{const r=await stub.fetch(new Request('https://internal'+path));return {http:r.status,data:await r.json()}};
+ const status=await read('/api/notify/status');
+ const latency=await read('/api/notify/latency');
+ const peak=await read('/api/notify/peak-window');
+ const devices=status.data.devices||[];
+ const result={statusHTTP:status.http,scan:status.data.scan,scanControl:peak.data.scan_control,
+ devices:devices.map((d,i)=>({label:'device-'+(i+1),prefs:d.prefs,updated:d.updated})),
+ latency:latency.data.last,tests:[]};
+ if(new URL(request.url).searchParams.get('test')==='true'){
+  for(const [i,d] of devices.entries()){
+   if(d.prefs?.enabled===false)continue;
+   const r=await stub.fetch(new Request('https://internal/api/notify/test',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({id:d.id})}));
+   const b=await r.json();result.tests.push({device:'device-'+(i+1),http:r.status,accepted:b.ok===true,error:b.error||null});
+  }
+ }
+ return Response.json(result);
+}};
+`;
+let created=false;
+try{
+ const before=await api(prefix+'/workers/scripts/'+production+'/deployments');
+ report.productionVersionBefore=before.deployments?.[0]?.versions;
+ const settings=await api(prefix+'/workers/scripts/'+production+'/settings');
+ const namespace=(settings.bindings||[]).find(x=>x.name==='BACKGROUND_WATCHER')?.namespace_id;
+ if(namespace!=='a401c5da72a54ec1ba485db1b46d89c9')throw Error('PRODUCTION_NAMESPACE_MISMATCH');
+ const metadata={main_module:'audit.js',compatibility_date:'2026-10-01',bindings:[
+ {type:'durable_object_namespace',name:'PRODUCTION_DO',namespace_id:namespace},
+ {type:'plain_text',name:'AUDIT_AUTH',text:auth}
+ ]};
+ const form=new FormData();form.append('metadata',new Blob([JSON.stringify(metadata)],{type:'application/json'}));
+ form.append('audit.js',new Blob([source],{type:'application/javascript+module'}),'audit.js');
+ await api(prefix+'/workers/scripts/'+name,{method:'PUT',body:form});created=true;
+ await api(prefix+'/workers/scripts/'+name+'/subdomain',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({enabled:true})});
+ const domain=await api(prefix+'/workers/subdomain');
+ const url='https://'+name+'.'+domain.subdomain+'.workers.dev/';
+ let last;
+ for(let i=0;i<8;i++){
+  const r=await fetch(url,{headers:{authorization:'Bearer '+auth},signal:AbortSignal.timeout(60000)});
+  if(r.ok){report.audit=await r.json();last=null;break;}
+  last='AUDIT_HTTP_'+r.status;await new Promise(resolve=>setTimeout(resolve,3000));
+ }
+ if(last)throw Error(last);
+ const testResponse=await fetch(url+'?test=true',{headers:{authorization:'Bearer '+auth},signal:AbortSignal.timeout(60000)});
+ if(!testResponse.ok)throw Error('PUSH_TEST_AUDIT_HTTP_'+testResponse.status);
+ report.audit=await testResponse.json();
+ const database=(settings.bindings||[]).find(x=>x.name==='FOOTBALL_DB')?.id;
+ const read=async(sql,params=[])=>{
+  const rows=await api(prefix+'/d1/database/'+database+'/query',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({sql,params})});
+  return rows.flatMap(x=>x.results||[]);
+ };
+ report.liveReasons=await read("SELECT json_extract(payload,'$.last.reason') AS reason,json_extract(payload,'$.last.sourceHealth.stats') AS stats,COUNT(*) AS fixtures,MAX(updated_at) AS last_update FROM fe_notify_live_state WHERE COALESCE(json_extract(payload,'$.__fe_deleted'),0)=0 GROUP BY reason,stats");
+ report.alertStates=await read("SELECT CASE WHEN a.key LIKE '%:gap' THEN 'HC' WHEN a.key LIKE '%:h1' THEN 'H1' ELSE 'FT' END AS kind,COUNT(*) AS states,SUM(CASE WHEN json_extract(a.value,'$.armed')=0 THEN 1 ELSE 0 END) AS disarmed,MAX(json_extract(a.value,'$.lastSent')) AS last_accepted FROM fe_notify_live_state t,json_each(t.payload,'$.alerts') a GROUP BY kind");
+ report.validationRecent=await read("SELECT validation_type,result_key,COUNT(*) AS n,MAX(created_at) AS last_created FROM validation_results WHERE validation_type LIKE 'PUSH_%' AND created_at>=? GROUP BY validation_type,result_key",[Date.now()-86400000]);
+ const after=await api(prefix+'/workers/scripts/'+production+'/deployments');
+ report.productionVersionAfter=after.deployments?.[0]?.versions;
+ if(JSON.stringify(report.productionVersionAfter)!==JSON.stringify(report.productionVersionBefore))throw Error('PRODUCTION_CHANGED_DURING_AUDIT');
+}catch(e){report.error=e.message;process.exitCode=1;}
+finally{
+ if(created){try{await api(prefix+'/workers/scripts/'+name,{method:'DELETE'});report.cleanup=true;}catch(e){report.cleanupError=e.message;process.exitCode=1;}}
+ writeFileSync('push-production-audit.json',JSON.stringify(report,null,2));console.log(JSON.stringify(report,null,2));
+}
