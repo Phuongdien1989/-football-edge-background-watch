@@ -5,7 +5,7 @@ if(!account||!token)throw Error('CLOUDFLARE_CREDENTIALS_MISSING');
 const prefix='/accounts/'+account, production='football-edge-background-watch';
 const name='fe-notify-audit-'+String(process.env.GITHUB_RUN_ID);
 const auth=randomBytes(32).toString('hex');
-const report={commit:process.env.CANDIDATE_SHA,mode:'PUSH_AUDIT_NO_PRODUCTION_DEPLOY',measuredAt:Date.now(),tests:[],cleanup:false};
+const report={commit:process.env.CANDIDATE_SHA,mode:'PROVIDER_RPC_AUDIT_NO_SCAN_ENABLE',measuredAt:Date.now(),tests:[],cleanup:false};
 async function api(path,options={}){
  const r=await fetch('https://api.cloudflare.com/client/v4'+path,{...options,headers:{authorization:'Bearer '+token,...options.headers},signal:AbortSignal.timeout(30000)});
  const b=await r.json();if(!r.ok||b.success===false)throw Error('CF_HTTP_'+r.status+':'+(b.errors||[]).map(x=>x.code).join(','));
@@ -23,13 +23,21 @@ export default {async fetch(request,env){
  const result={statusHTTP:status.http,scan:status.data.scan,scanControl:peak.data.scan_control,
  devices:devices.map((d,i)=>({label:'device-'+(i+1),prefs:d.prefs,updated:d.updated})),
  latency:latency.data.last,tests:[]};
- if(new URL(request.url).searchParams.get('test')==='true'){
+ if(false){
   for(const [i,d] of devices.entries()){
    if(d.prefs?.enabled===false)continue;
    const r=await stub.fetch(new Request('https://internal/api/notify/test',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({id:d.id})}));
    const b=await r.json();result.tests.push({device:'device-'+(i+1),http:r.status,accepted:b.ok===true,error:b.error||null});
   }
  }
+ result.providerReads=[];
+ for(const params of [{fixture:1576501},{fixture:1576501,half:true}]){
+  try{
+   const rows=await stub.api('/fixtures/statistics',params,true);
+   result.providerReads.push({fixture:params.fixture,half:params.half||false,ok:true,rows:rows.length,statTypes:rows.flatMap(x=>(x.statistics||[]).map(s=>s.type)).slice(0,25)});
+  }catch(e){result.providerReads.push({fixture:params.fixture,half:params.half||false,ok:false,error:String(e.message||e).slice(0,180)});}
+ }
+ result.providerDiagnostic=await stub.notifyDiagnostics();
  return Response.json(result);
 }};
 `;
@@ -50,16 +58,9 @@ try{
  await api(prefix+'/workers/scripts/'+name+'/subdomain',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({enabled:true})});
  const domain=await api(prefix+'/workers/subdomain');
  const url='https://'+name+'.'+domain.subdomain+'.workers.dev/';
- let last;
- for(let i=0;i<8;i++){
-  const r=await fetch(url,{headers:{authorization:'Bearer '+auth},signal:AbortSignal.timeout(60000)});
-  if(r.ok){report.audit=await r.json();last=null;break;}
-  last='AUDIT_HTTP_'+r.status;await new Promise(resolve=>setTimeout(resolve,3000));
- }
- if(last)throw Error(last);
- const testResponse=await fetch(url+'?test=true',{headers:{authorization:'Bearer '+auth},signal:AbortSignal.timeout(60000)});
- if(!testResponse.ok)throw Error('PUSH_TEST_AUDIT_HTTP_'+testResponse.status);
- report.audit=await testResponse.json();
+ const response=await fetch(url,{headers:{authorization:'Bearer '+auth},signal:AbortSignal.timeout(60000)});
+ if(!response.ok)throw Error('AUDIT_HTTP_'+response.status);
+ report.audit=await response.json();
  const database=(settings.bindings||[]).find(x=>x.name==='FOOTBALL_DB')?.id;
  const read=async(sql,params=[])=>{
   const rows=await api(prefix+'/d1/database/'+database+'/query',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({sql,params})});
