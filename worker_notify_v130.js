@@ -114,7 +114,7 @@ export class BackgroundWatcher extends DeepLinkWatcher{
         item.history=item.history||[];item.h1History=item.h1History||[];item.hcHistory=item.hcHistory||[];item.oddsHistory=item.oddsHistory||[];item.alerts=item.alerts||{};
         try{
           const health={},sourceWarnings=[];
-          const read=async(name,path,params)=>{try{const rows=await api(path,params,false);if(!Array.isArray(rows)){health[name]='INVALID';sourceWarnings.push(`${name}:INVALID_RESPONSE`);return []}health[name]=rows.length?'OK':'EMPTY';return rows}catch(e){health[name]='ERROR';sourceWarnings.push(`${name}:${errText(e)}`);return []}};
+          const read=async(name,path,params)=>{try{const rows=await api(path,params,name==='stats'||name==='half');if(!Array.isArray(rows)){health[name]='INVALID';sourceWarnings.push(`${name}:INVALID_RESPONSE`);return []}health[name]=rows.length?'OK':'EMPTY';return rows}catch(e){health[name]='ERROR';sourceWarnings.push(`${name}:${errText(e)}`);return []}};
           const [stats,events,odds,half]=await Promise.all([read('stats','/fixtures/statistics',{fixture:id}),read('events','/fixtures/events',{fixture:id}),read('odds','/odds/live',{fixture:id}),read('half','/fixtures/statistics',{fixture:id,half:true})]);
           if(sourceWarnings.length){status.warnings.push({fixture:id,sources:sourceWarnings.slice(0,4)});if(status.warnings.length>20)status.warnings.shift()}
           if(Date.now()-fixtureStarted>60000)throw Error('FIXTURE_SNAPSHOT_STALE');

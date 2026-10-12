@@ -50,6 +50,7 @@ jobs:
           node --check tests/test-do-free-d1-live-state.mjs
       - name: Verify provider error classification and per-attempt quota
         run: node tests/test-provider-errors.mjs
+          node tests/test-notify-statistics-errors.mjs
       - name: Validate Cloudflare Worker deploy bundle (no credentials)
         run: |
           npm install --no-save wrangler@4
