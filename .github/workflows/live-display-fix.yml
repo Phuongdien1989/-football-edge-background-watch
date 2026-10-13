@@ -1,15 +1,9 @@
 name: LIVE display stale-card fix
 on:
-  pull_request:
-    paths:
-      - '.github/scripts/live-display-patch.mjs'
-      - '.github/scripts/test-live-display.mjs'
-      - '.github/scripts/deploy-live-display.mjs'
-      - '.github/workflows/live-display-fix.yml'
   workflow_dispatch:
 jobs:
   verify-and-deploy:
-    if: github.event_name == 'pull_request' && github.event.pull_request.number == 5 && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref == 'fix/do-free-isolated-20261010'
+    if: false # Paused: public URL does not serve uploaded candidate; checkpoint required.
     runs-on: ubuntu-latest
     timeout-minutes: 6
     environment: football-edge-production
@@ -30,7 +24,6 @@ jobs:
         run: |
           curl -fsSL --max-time 30 https://shiny-silence-d892.ngophuonghuy.workers.dev/ -o frontend-baseline.html
           node .github/scripts/test-live-display.mjs frontend-baseline.html
-          npm install --no-save acorn@8
           node --check .github/scripts/deploy-live-display.mjs
       - name: Preserve frontend rollback and deploy exact presentation fix only
         env:
