@@ -25,7 +25,7 @@ try{
  await json('/versions/'+oldVersion);report.checks.rollback='PASS_VERSION_EXISTS';
  const settings=await json('/settings');
  if((settings.bindings||[]).some(b=>b.type==='durable_object_namespace'&&!b.script_name))throw Error('FRONTEND_LOCAL_DO_EXPORT_UNSUPPORTED');
- const response=await cf();const type=response.headers.get('content-type')||'';let main=response.headers.get('cf-entrypoint'),parts=[];
+ const response=await cf('/content');const type=response.headers.get('content-type')||'';let main=response.headers.get('cf-entrypoint'),parts=[];
  const raw=await response.arrayBuffer();
  if(type.includes('multipart/form-data')){
   const form=await new Response(raw,{headers:{'content-type':type}}).formData();
@@ -62,14 +62,19 @@ export default {...original,async fetch(request,env,ctx){
  if(isModule)metadata.main_module='fe-live-wrapper.mjs';
  else{
   if(parts.length!==1)throw Error('LEGACY_FRONTEND_MULTIPLE_PARTS_UNSUPPORTED');
-  const ast=parse(source,{ecmaVersion:'latest',sourceType:'script'}),calls=[];
-  function walk(node){if(!node||typeof node!=='object')return;
+  const ast=parse(source,{ecmaVersion:'latest',sourceType:'script'}),calls=[],literals=[];
+  function walk(node,parent){if(!node||typeof node!=='object')return;
+   let value;
+   if(node.type==='Literal'&&typeof node.value==='string')value=node.value;
+   if(node.type==='TemplateLiteral'&&!node.expressions.length&&parent?.type!=='TaggedTemplateExpression')value=node.quasis[0].value.cooked;
+   if(node.type==='TaggedTemplateExpression'&&node.tag?.type==='MemberExpression'&&node.tag.object.name==='String'&&node.tag.property.name==='raw'&&!node.quasi.expressions.length)value=node.quasi.quasis[0].value.raw;
+   if(typeof value==='string'&&value.length>100000&&hash(value)===expected)literals.push(node);
    if(node.type==='CallExpression'&&node.callee?.type==='MemberExpression'&&!node.callee.computed&&node.callee.property.name==='respondWith'){
     if(node.arguments.length!==1)throw Error('FETCH_RESPOND_WITH_SHAPE_UNSUPPORTED');calls.push(node.arguments[0]);
    }
-   for(const value of Object.values(node))if(Array.isArray(value))value.forEach(walk);else if(value&&typeof value==='object')walk(value);
+   for(const value of Object.values(node))if(Array.isArray(value))value.forEach(n=>walk(n,node));else if(value&&typeof value==='object')walk(value,node);
   }walk(ast);
-  if(calls.length!==1)throw Error('LEGACY_FETCH_HANDLER_AMBIGUOUS');
+  if(literals.length!==1&&calls.length!==1)throw Error('LEGACY_FETCH_HANDLER_AMBIGUOUS');
   const arg=calls[0];
   const transform=String(patch).replace(/export (const|function) /g,'$1 ');
   const helper=`\nasync function __feLiveDisplayResponse(input){
@@ -83,10 +88,11 @@ export default {...original,async fetch(request,env,ctx){
    headers.set('cache-control','no-store');headers.set('x-fe-live-display',marker);
    return new Response(body,{status:response.status,statusText:response.statusText,headers});
   }\n`;
-  const updated=source.slice(0,arg.start)+'__feLiveDisplayResponse('+source.slice(arg.start,arg.end)+')'+source.slice(arg.end)+helper;
+  const updated=literals.length===1?source.slice(0,literals[0].start)+JSON.stringify(patchLiveDisplay(live))+source.slice(literals[0].end)
+    :source.slice(0,arg.start)+'__feLiveDisplayResponse('+source.slice(arg.start,arg.end)+')'+source.slice(arg.end)+helper;
   parse(updated,{ecmaVersion:'latest',sourceType:'script'});
   parts[0].body=new TextEncoder().encode(updated);parts[0].type='application/javascript';metadata.body_part=parts[0].name;
-  report.checks.originalFetchHandler='PASS_AST_SINGLE_ARGUMENT_WRAPPER';
+  report.checks.originalFetchHandler=literals.length===1?'PASS_EXACT_HTML_LITERAL_ONLY':'PASS_AST_SINGLE_ARGUMENT_WRAPPER';
  }
  for(const key of ['usage_model','limits','placement','tail_consumers','logpush','observability'])if(settings[key]!=null)metadata[key]=settings[key];
  const current=await json('/deployments');if(current.deployments?.[0]?.versions?.[0]?.version_id!==oldVersion)throw Error('FRONTEND_CHANGED_BEFORE_UPLOAD');
@@ -98,7 +104,7 @@ export default {...original,async fetch(request,env,ctx){
  const after=await json('/deployments');report.productionVersion=after.deployments?.[0]?.versions?.[0]?.version_id;
  if(!report.productionVersion||report.productionVersion===oldVersion)throw Error('NEW_FRONTEND_VERSION_NOT_CONFIRMED');
  let verified=false;
- for(let i=0;i<12;i++){const r=await fetch(url+'?fe_verify='+Date.now(),{signal:AbortSignal.timeout(15000)});const html=await r.text();if(r.ok&&hash(html)===report.candidateHash&&r.headers.get('x-fe-live-display')===marker){verified=true;break;}await new Promise(resolve=>setTimeout(resolve,5000));}
+ for(let i=0;i<12;i++){const r=await fetch(url+'?fe_verify='+Date.now(),{signal:AbortSignal.timeout(15000)});const html=await r.text();if(r.ok&&hash(html)===report.candidateHash&&html.includes(marker)){verified=true;break;}await new Promise(resolve=>setTimeout(resolve,5000));}
  if(!verified)throw Error('FRONTEND_PUBLIC_HASH_VERIFICATION_FAILED');
  report.checks.publicHTML='PASS_EXACT_PATCHED_HASH';report.deployed=true;
 }catch(e){report.error=e.message;process.exitCode=1;
