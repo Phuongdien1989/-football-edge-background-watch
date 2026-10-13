@@ -28,7 +28,13 @@ async function createUiAudit(namespace){
  const stub=e.DO.get(e.DO.idFromName('football-edge-global'));
  const response=await stub.fetch(new Request('https://internal/api/notify/ui-state'));
  const data=await response.json().catch(()=>({}));
- return Response.json({http:response.status,schema:data.schema||null,snapshots:data.snapshots?.length||0,pending:data.pending?.length||0});
+ const result={http:response.status,schema:data.schema||null,snapshots:data.snapshots?.length||0,pending:data.pending?.length||0};
+ if(new URL(r.url).searchParams.has('statistics')){
+  try{const rows=await stub.api('/fixtures/statistics',{fixture:1576501},true);result.statistics={ok:true,rows:rows.length};}
+  catch(error){result.statistics={ok:false,error:String(error.message||error).slice(0,160)};}
+  const diag=await stub.notifyDiagnostics();result.statistics.provider=diag.provider?.latest;result.statistics.pacing=diag.provider?.pacing;
+ }
+ return Response.json(result);
  }};`;
  const form=new FormData();form.append('metadata',new Blob([JSON.stringify({main_module:'audit.js',compatibility_date:'2026-10-01',bindings:[{type:'durable_object_namespace',name:'DO',namespace_id:namespace},{type:'plain_text',name:'AUTH',text:auditAuth}]})],{type:'application/json'}));
  form.append('audit.js',new Blob([source],{type:'application/javascript+module'}),'audit.js');
@@ -45,7 +51,7 @@ async function createUiAudit(namespace){
  throw Error('UI_AUDIT_ROUTE_NOT_READY');
 }
 async function readUiAudit(url){
- const r=await fetch(url,{headers:{authorization:'Bearer '+auditAuth},signal:AbortSignal.timeout(15000)});
+ const r=await fetch(url,{headers:{authorization:'Bearer '+auditAuth},signal:AbortSignal.timeout(30000)});
  if(!r.ok)throw Error('UI_AUDIT_HTTP_'+r.status);
  return r.json();
 }
@@ -123,6 +129,8 @@ try{
  report.uiBridgeAfter=await readUiAudit(uiAuditURL);
  if(report.uiBridgeAfter.http!==200||report.uiBridgeAfter.schema!=='FE_NOTIFY_UI_STATE_V1')throw Error('UI_BRIDGE_PRODUCTION_FAILED');
  report.checks.uiBridge='PASS_ACTUAL_DURABLE_OBJECT_GET';
+ report.statisticsProbe=(await readUiAudit(uiAuditURL+'?statistics=1')).statistics;
+ report.checks.statisticsSource=report.statisticsProbe.ok&&report.statisticsProbe.rows>0?'PASS_REAL_STATISTICS_ROWS':'BLOCKED_OR_EMPTY';
  // Preserve explicit manual ON/OFF choices; this release updates read-only status views.
  const finalSchedulesResponse=await api(path+'/schedules');
  const finalSchedules=Array.isArray(finalSchedulesResponse)?finalSchedulesResponse:finalSchedulesResponse.schedules;
