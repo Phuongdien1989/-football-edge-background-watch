@@ -1,3 +1,4 @@
+import {randomBytes} from 'node:crypto';
 import {readFileSync,writeFileSync} from 'node:fs';
 import {spawnSync} from 'node:child_process';
 const evidence=JSON.parse(readFileSync('cloudflare-readonly-preflight.json','utf8'));
@@ -6,7 +7,7 @@ const candidate=process.env.CANDIDATE_SHA;
 const repository=process.env.GITHUB_REPOSITORY;
 const token=process.env.CLOUDFLARE_API_TOKEN,account=process.env.CLOUDFLARE_ACCOUNT_ID;
 const rollback='60781a4e-70cb-4c02-a036-2528c3048ed5';
-const expectedProduction='606c8c57-10dc-4112-b293-db0c6c5fc6be';
+const expectedProduction='9e1744be-7b2c-4fc5-b755-bba6cea2d2e0';
 const worker=evidence.worker,database=evidence.database?.uuid;
 const prefix='/accounts/'+encodeURIComponent(account);
 const report={commit:candidate,rollback,checks:{},productionDeploy:'NOT_ATTEMPTED'};
@@ -17,7 +18,39 @@ async function api(path,options={}){
 }
 const run=(args,env={})=>{const r=spawnSync('npx',args,{stdio:'inherit',env:{...process.env,...env}});if(r.status!==0)throw Error('COMMAND_FAILED:'+args.slice(0,2).join(' '));};
 const total=(rows,day,key)=>rows.filter(x=>x.dimensions?.date===day).reduce((n,x)=>n+Number(x.sum?.[key]||0),0);
-let previousSchedules=null,deployed=false;
+let previousSchedules=null,deployed=false,auditCreated=false;
+const auditName='fe-ui-audit-'+process.env.GITHUB_RUN_ID;
+const auditAuth=randomBytes(32).toString('hex');
+async function createUiAudit(namespace){
+ const source=`export default {async fetch(r,e){
+ if(r.headers.get('authorization')!=='Bearer '+e.AUTH)return new Response('Unauthorized',{status:401});
+ if(new URL(r.url).searchParams.has('ready'))return Response.json({ready:true});
+ const stub=e.DO.get(e.DO.idFromName('football-edge-global'));
+ const response=await stub.fetch(new Request('https://internal/api/notify/ui-state'));
+ const data=await response.json().catch(()=>({}));
+ return Response.json({http:response.status,schema:data.schema||null,snapshots:data.snapshots?.length||0,pending:data.pending?.length||0});
+ }};`;
+ const form=new FormData();form.append('metadata',new Blob([JSON.stringify({main_module:'audit.js',compatibility_date:'2026-10-01',bindings:[{type:'durable_object_namespace',name:'DO',namespace_id:namespace},{type:'plain_text',name:'AUTH',text:auditAuth}]})],{type:'application/json'}));
+ form.append('audit.js',new Blob([source],{type:'application/javascript+module'}),'audit.js');
+ const r=await fetch('https://api.cloudflare.com/client/v4'+prefix+'/workers/scripts/'+auditName,{method:'PUT',headers:{authorization:'Bearer '+token},body:form,signal:AbortSignal.timeout(30000)});
+ const b=await r.json();if(!r.ok||b.success===false)throw Error('UI_AUDIT_UPLOAD_FAILED');auditCreated=true;
+ await api(prefix+'/workers/scripts/'+auditName+'/subdomain',{method:'POST',body:JSON.stringify({enabled:true})});
+ const domain=await api(prefix+'/workers/subdomain');
+ const url='https://'+auditName+'.'+domain.subdomain+'.workers.dev/';
+ for(let i=0;i<10;i++){
+ const response=await fetch(url+'?ready=1',{headers:{authorization:'Bearer '+auditAuth},signal:AbortSignal.timeout(10000)});
+ if(response.ok)return url;
+ await new Promise(resolve=>setTimeout(resolve,3000));
+ }
+ throw Error('UI_AUDIT_ROUTE_NOT_READY');
+}
+async function readUiAudit(url){
+ const r=await fetch(url,{headers:{authorization:'Bearer '+auditAuth},signal:AbortSignal.timeout(15000)});
+ if(!r.ok)throw Error('UI_AUDIT_HTTP_'+r.status);
+ return r.json();
+}
+let uiAuditURL;
+
 try{
  if(!candidate||!token||!account||!database||!worker)throw Error('DEPLOY_INPUT_MISSING');
  if(evidence.commit!==candidate||evidence.blockers?.length)throw Error('PREFLIGHT_CHECKPOINT_MISMATCH_OR_BLOCKED');
@@ -57,6 +90,8 @@ try{
  const names=columns.flatMap(x=>x.results||[]);
  if(names.length!==3||!names.some(x=>x.name==='fixture_id'&&x.type==='INTEGER'&&x.pk===1)||!names.some(x=>x.name==='payload'&&x.type==='TEXT'&&x.notnull===1)||!names.some(x=>x.name==='updated_at'&&x.type==='INTEGER'&&x.notnull===1))throw Error('D1_LIVE_SCHEMA_MISMATCH');
  report.checks.d1Schema='PASS';
+ uiAuditURL=await createUiAudit(namespace);
+ report.uiBridgeBefore=await readUiAudit(uiAuditURL);
  const subdomain=await api(prefix+'/workers/subdomain');
  if(!subdomain.subdomain)throw Error('WORKER_PUBLIC_SUBDOMAIN_MISSING');
  const healthURL='https://'+worker+'.'+subdomain.subdomain+'.workers.dev/health';
@@ -78,13 +113,16 @@ try{
   const response=await fetch(healthURL,{signal:AbortSignal.timeout(10000)});
   health=await response.json();
   report.healthAttempts.push({attempt:attempt+1,http:response.status,commit:health.deploy_commit,doStatus:health.peak_status_error||'OK',manualMode:health.peak_status?.manualMode||false});
-  healthy=response.ok&&health.deploy_commit===candidate&&health.peak_window?.enabled===false&&health.peak_status?.manualMode===true&&health.peak_status?.scan_budget?.limit===720&&health.notify_status?.diagnostics_version==='PACING_COOLDOWN_QUOTA_V5'&&health.notify_status?.provider?.classification==='V2'&&health.notify_status?.provider?.pacing?.bootstrap===true&&health.notify_status?.provider?.pacing?.configured_minute_limit===450&&health.notify_status?.provider?.pacing?.start_gap_ms>=143&&typeof health.notify_status?.provider?.pacing?.cooldown_until==='number'&&typeof health.notify_status?.provider?.pacing?.consecutive_rate_failures==='number';
+  healthy=response.ok&&health.deploy_commit===candidate&&health.peak_window?.enabled===false&&health.peak_status?.manualMode===true&&health.peak_status?.scan_budget?.limit===720&&health.notify_status?.diagnostics_version==='PACING_COOLDOWN_QUOTA_V6_UI_SYNC'&&health.notify_status?.provider?.classification==='V2'&&health.notify_status?.provider?.pacing?.bootstrap===true&&health.notify_status?.provider?.pacing?.configured_minute_limit===450&&health.notify_status?.provider?.pacing?.start_gap_ms>=143&&typeof health.notify_status?.provider?.pacing?.cooldown_until==='number'&&typeof health.notify_status?.provider?.pacing?.consecutive_rate_failures==='number';
   if(healthy)break;
   // Permit old idle DO instances to evict before polling the new generation.
   await new Promise(resolve=>setTimeout(resolve,attempt===0?150000:5000));
  }
  report.health=health;
  if(!healthy)throw Error('PRODUCTION_MANUAL_HEALTH_FAILED');
+ report.uiBridgeAfter=await readUiAudit(uiAuditURL);
+ if(report.uiBridgeAfter.http!==200||report.uiBridgeAfter.schema!=='FE_NOTIFY_UI_STATE_V1')throw Error('UI_BRIDGE_PRODUCTION_FAILED');
+ report.checks.uiBridge='PASS_ACTUAL_DURABLE_OBJECT_GET';
  // Preserve explicit manual ON/OFF choices; this release updates read-only status views.
  const finalSchedulesResponse=await api(path+'/schedules');
  const finalSchedules=Array.isArray(finalSchedulesResponse)?finalSchedulesResponse:finalSchedulesResponse.schedules;
@@ -108,4 +146,7 @@ try{
   }catch(rollbackError){report.rollbackError=String(rollbackError.message||rollbackError);}
  }
  save();console.log(JSON.stringify(report,null,2));process.exitCode=1;
+}finally{
+ if(auditCreated){try{await api(prefix+'/workers/scripts/'+auditName,{method:'DELETE'});report.uiAuditCleanup='PASS';}catch(e){report.uiAuditCleanup=e.message;process.exitCode=1;}}
+ save();console.log(JSON.stringify(report,null,2));
 }

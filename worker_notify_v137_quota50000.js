@@ -1,3 +1,4 @@
+import {uiStatePacket} from './notify-ui-state.mjs';
 import base,{BackgroundWatcher as HotPriorityWatcher} from './worker_notify_v136_hot_priority.js';
 
 // P1.3 GLOBAL 50K HARD CAP
@@ -199,6 +200,15 @@ export class BackgroundWatcher extends HotPriorityWatcher{
 
   async fetch(request){
     const url=new URL(request.url);
+    if(url.pathname==='/api/notify/ui-state'&&request.method==='GET'){
+      const rawId=url.searchParams.get('fixture'),device=url.searchParams.get('device');
+      const id=rawId===null?null:Number(rawId);
+      if(rawId!==null&&(!Number.isSafeInteger(id)||id<=0))return reply({ok:false,error:'INVALID_FIXTURE'},400);
+      if(device!==null&&!/^[a-f0-9]{64}$/.test(device))return reply({ok:false,error:'INVALID_DEVICE'},400);
+      const items=id?[await this.getNotifyMatch(id)].filter(Boolean):await this.listNotifyMatches();
+      items.sort((a,b)=>Number(b.ui?.captured_at||0)-Number(a.ui?.captured_at||0));
+      return reply(uiStatePacket(items,{device}));
+    }
     if(url.pathname==='/api/notify/quota-status'&&request.method==='GET')return reply(await this.quotaStatus());
     if(url.pathname==='/api/notify/status'&&request.method==='GET'){
       const r=await super.fetch(request),d=await r.json().catch(()=>({}));
