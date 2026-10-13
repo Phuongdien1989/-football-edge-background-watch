@@ -25,7 +25,7 @@ try{
  await json('/versions/'+oldVersion);report.checks.rollback='PASS_VERSION_EXISTS';
  const settings=await json('/settings');
  if((settings.bindings||[]).some(b=>b.type==='durable_object_namespace'&&!b.script_name))throw Error('FRONTEND_LOCAL_DO_EXPORT_UNSUPPORTED');
- const response=await cf('/content');const type=response.headers.get('content-type')||'';let main=response.headers.get('cf-entrypoint'),parts=[];
+ const response=await cf('/content/v2');const type=response.headers.get('content-type')||'';let main=response.headers.get('cf-entrypoint'),parts=[];
  const raw=await response.arrayBuffer();
  if(type.includes('multipart/form-data')){
   const form=await new Response(raw,{headers:{'content-type':type}}).formData();
