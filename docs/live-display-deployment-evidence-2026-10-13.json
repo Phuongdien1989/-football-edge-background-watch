@@ -1,0 +1,179 @@
+{
+  "commit": "92c4ccda39e70b063c563ac219798707dabd2d0a",
+  "worker": "shiny-silence-d892",
+  "backendDeploy": false,
+  "checks": {
+    "patchAnchors": "PASS",
+    "rollback": "PASS_VERSION_EXISTS",
+    "originalFetchHandler": "PASS_ASSETS_ONLY_NO_HANDLER",
+    "assetPreservation": "KEEP_EXISTING_ASSETS_ROOT_HTML_ONLY"
+  },
+  "deployed": false,
+  "baselineHash": "157af7294df17b997f505a6fa0a4658699c8236808a643e29ca2d71bd1b8b392",
+  "candidateHash": "aa4f0f6318cd52c14ff62b195c5ea04c5267107455924da44c9aa78169fe7f28",
+  "rollbackVersion": "a3ffd320-54ec-4c5b-b7fd-eb6f95edb608",
+  "originalHandlers": [],
+  "assetConfigurationPresent": false,
+  "modules": [
+    {
+      "name": "fe-live-wrapper.mjs",
+      "bytes": 1360901
+    }
+  ],
+  "entrypoint": "fe-live-wrapper.mjs",
+  "productionVersion": "6821967f-5936-4f72-91dd-b0e2bc52e226",
+  "activeVersions": [
+    {
+      "version_id": "6821967f-5936-4f72-91dd-b0e2bc52e226",
+      "percentage": 100
+    }
+  ],
+  "publicChecks": [
+    {
+      "http": 200,
+      "hash": "157af7294df17b997f505a6fa0a4658699c8236808a643e29ca2d71bd1b8b392",
+      "marker": false,
+      "header": null
+    },
+    {
+      "http": 200,
+      "hash": "157af7294df17b997f505a6fa0a4658699c8236808a643e29ca2d71bd1b8b392",
+      "marker": false,
+      "header": null
+    },
+    {
+      "http": 200,
+      "hash": "157af7294df17b997f505a6fa0a4658699c8236808a643e29ca2d71bd1b8b392",
+      "marker": false,
+      "header": null
+    },
+    {
+      "http": 200,
+      "hash": "157af7294df17b997f505a6fa0a4658699c8236808a643e29ca2d71bd1b8b392",
+      "marker": false,
+      "header": null
+    },
+    {
+      "http": 200,
+      "hash": "157af7294df17b997f505a6fa0a4658699c8236808a643e29ca2d71bd1b8b392",
+      "marker": false,
+      "header": null
+    },
+    {
+      "http": 200,
+      "hash": "157af7294df17b997f505a6fa0a4658699c8236808a643e29ca2d71bd1b8b392",
+      "marker": false,
+      "header": null
+    },
+    {
+      "http": 200,
+      "hash": "157af7294df17b997f505a6fa0a4658699c8236808a643e29ca2d71bd1b8b392",
+      "marker": false,
+      "header": null
+    },
+    {
+      "http": 200,
+      "hash": "157af7294df17b997f505a6fa0a4658699c8236808a643e29ca2d71bd1b8b392",
+      "marker": false,
+      "header": null
+    },
+    {
+      "http": 200,
+      "hash": "157af7294df17b997f505a6fa0a4658699c8236808a643e29ca2d71bd1b8b392",
+      "marker": false,
+      "header": null
+    },
+    {
+      "http": 200,
+      "hash": "157af7294df17b997f505a6fa0a4658699c8236808a643e29ca2d71bd1b8b392",
+      "marker": false,
+      "header": null
+    },
+    {
+      "http": 200,
+      "hash": "157af7294df17b997f505a6fa0a4658699c8236808a643e29ca2d71bd1b8b392",
+      "marker": false,
+      "header": null
+    },
+    {
+      "http": 200,
+      "hash": "157af7294df17b997f505a6fa0a4658699c8236808a643e29ca2d71bd1b8b392",
+      "marker": false,
+      "header": null
+    },
+    {
+      "http": 200,
+      "hash": "157af7294df17b997f505a6fa0a4658699c8236808a643e29ca2d71bd1b8b392",
+      "marker": false,
+      "header": null
+    },
+    {
+      "http": 200,
+      "hash": "157af7294df17b997f505a6fa0a4658699c8236808a643e29ca2d71bd1b8b392",
+      "marker": false,
+      "header": null
+    },
+    {
+      "http": 200,
+      "hash": "157af7294df17b997f505a6fa0a4658699c8236808a643e29ca2d71bd1b8b392",
+      "marker": false,
+      "header": null
+    },
+    {
+      "http": 200,
+      "hash": "157af7294df17b997f505a6fa0a4658699c8236808a643e29ca2d71bd1b8b392",
+      "marker": false,
+      "header": null
+    },
+    {
+      "http": 200,
+      "hash": "157af7294df17b997f505a6fa0a4658699c8236808a643e29ca2d71bd1b8b392",
+      "marker": false,
+      "header": null
+    },
+    {
+      "http": 200,
+      "hash": "157af7294df17b997f505a6fa0a4658699c8236808a643e29ca2d71bd1b8b392",
+      "marker": false,
+      "header": null
+    },
+    {
+      "http": 200,
+      "hash": "157af7294df17b997f505a6fa0a4658699c8236808a643e29ca2d71bd1b8b392",
+      "marker": false,
+      "header": null
+    },
+    {
+      "http": 200,
+      "hash": "157af7294df17b997f505a6fa0a4658699c8236808a643e29ca2d71bd1b8b392",
+      "marker": false,
+      "header": null
+    },
+    {
+      "http": 200,
+      "hash": "157af7294df17b997f505a6fa0a4658699c8236808a643e29ca2d71bd1b8b392",
+      "marker": false,
+      "header": null
+    },
+    {
+      "http": 200,
+      "hash": "157af7294df17b997f505a6fa0a4658699c8236808a643e29ca2d71bd1b8b392",
+      "marker": false,
+      "header": null
+    },
+    {
+      "http": 200,
+      "hash": "157af7294df17b997f505a6fa0a4658699c8236808a643e29ca2d71bd1b8b392",
+      "marker": false,
+      "header": null
+    },
+    {
+      "http": 200,
+      "hash": "157af7294df17b997f505a6fa0a4658699c8236808a643e29ca2d71bd1b8b392",
+      "marker": false,
+      "header": null
+    }
+  ],
+  "error": "FRONTEND_PUBLIC_HASH_VERIFICATION_FAILED",
+  "restoredVersion": "a3ffd320-54ec-4c5b-b7fd-eb6f95edb608"
+}

@@ -111,7 +111,7 @@ export class BackgroundWatcher extends ContinuousWatcher{
   }
 
   async resolveGapValidation(key,v){
-    const item=await this.ctx.storage.get('notify:match:'+v.fixture_id),last=item?.last,age=last?.at?Date.now()-Number(last.at):Infinity,end=num(last?.gap),start=num(v.gap_signed),threshold=num(v.threshold,70);
+    const item=typeof this.getNotifyMatch==='function'?await this.getNotifyMatch(v.fixture_id):await this.ctx.storage.get('notify:match:'+v.fixture_id),last=item?.last,age=last?.at?Date.now()-Number(last.at):Infinity,end=num(last?.gap),start=num(v.gap_signed),threshold=num(v.threshold,70);
     if(start==null||end==null||age>150000)return this.deferValidation(key,v,'HC_STATE_NOT_FRESH');
     const same=Math.sign(start)===Math.sign(end),abs=Math.abs(end);let state;
     if(Math.abs(end)<20)state='NEUTRALIZED';

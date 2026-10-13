@@ -14,14 +14,17 @@ export class BackgroundWatcher extends NativeWatcher{
     const control=typeof this.scanControl==='function'?await this.scanControl():{enabled:true,updated:0};
     if(control?.enabled===false){
       const prev=await this.ctx.storage.get('notify:status')||{};
-      await this.ctx.storage.put('notify:status',{
-        ...prev,
-        at:Date.now(),
-        paused:true,
-        scanEnabled:false,
-        pauseScope:'ALL_BACKGROUND_API',
-        pauseUpdated:Number(control?.updated||0)
-      });
+      // Persist pause transition only once; repeated alarms must not consume DO writes.
+      if(prev.paused!==true||prev.scanEnabled!==false||prev.pauseUpdated!==Number(control?.updated||0)){
+        await this.ctx.storage.put('notify:status',{
+          ...prev,
+          at:Date.now(),
+          paused:true,
+          scanEnabled:false,
+          pauseScope:'ALL_BACKGROUND_API',
+          pauseUpdated:Number(control?.updated||0)
+        });
+      }
       // Deliberately do NOT call super.alarm() and do NOT reschedule.
       // Resume is already handled by worker_notify_v127 scan-control POST,
       // which sets a new alarm at Date.now()+1000.

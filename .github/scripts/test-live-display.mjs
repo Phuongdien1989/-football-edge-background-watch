@@ -1,0 +1,27 @@
+import assert from 'node:assert/strict';
+import vm from 'node:vm';
+import {readFileSync} from 'node:fs';
+import {guardSource,patchLiveDisplay,marker} from './live-display-patch.mjs';
+const html=readFileSync(process.argv[2]||'notify-audit/frontend-current.html','utf8');
+const patched=patchLiveDisplay(html);
+assert(patched.includes(marker));assert.throws(()=>patchLiveDisplay(patched));assert.throws(()=>patchLiveDisplay('wrong version'));
+for(const code of patched.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/g))if(code[1].trim())new vm.Script(code[1]);
+const now=1000000,old={id:1629937,state:'STALE',latest:{fresh_at:now-3166000,status:'2H'},history:[1,2]},fresh={id:10,state:'WATCH',latest:{fresh_at:now-1000,status:'2H'},history:[3]};
+const box={feSyncGuard:x=>JSON.parse(JSON.stringify(x)),Date:{now:()=>now},watchState:{items:[old,fresh]},h1WatchState:{items:[]},handicapWatchState:{pool:[]},state:{selected:{fixture:{id:old.id}},fixtures:[{fixture:{id:old.id}},{fixture:{id:10}}]}};
+vm.createContext(box);vm.runInContext(guardSource,box);
+assert.equal(box.feLiveDisplayCurrent(old),false);assert.equal(box.feLiveDisplayCurrent(fresh),true);
+assert.equal(box.feLiveDisplayCurrent({...fresh,latest:{...fresh.latest,status:'FT'}}),false);
+assert.equal(box.feLiveDisplayCurrent({...fresh,state:'ENDED'}),false);
+assert.equal(box.feLiveDisplayCurrent({...fresh,latest:{...fresh.latest,fresh_at:now+1}}),false);
+const original=JSON.stringify(box.watchState);const view=box.feLiveDisplaySelection();assert.equal(view.selected,null);assert.equal(view.fixtures.length,1);assert.equal(JSON.stringify(box.watchState),original);
+old.latest.fresh_at=now;old.state='WATCH';assert.equal(box.feLiveDisplayCurrent(old),true);assert.equal(old.history.length,2);
+// Execute the real sync function with the real schema/disposition implementation.
+const coreCode=html.match(/\/\* FE_STATE_CORE_START[\s\S]*?FE_STATE_CORE_END \*\//)?.[0];
+const core=readFileSync('tests/fixtures/fe-ui-sync-core.cjs','utf8');
+const sync=patched.slice(patched.indexOf('  function feSyncApply(packet){'),patched.indexOf('  function feSyncRender(){'));
+const context={window:{},module:{exports:{}},Date,watchState:{items:[]},h1WatchState:{items:[]},handicapWatchState:{pool:[]},state:{fixtures:[]},feSyncBuild:(row)=>({id:row.fixture_id,latest:{fixture:row.fixture},serverRow:row})};
+vm.createContext(context);vm.runInContext(core,context);context.window.FEStateCore=context.module.exports;context.FE_LEGACY_SYNC={store:context.window.FEStateCore.makeStore()};vm.runInContext(sync,context);
+const row={schema:'FE_NOTIFY_UI_SNAPSHOT_V1',fixture_id:1,captured_at:Date.now()-3166000,revision:1,version:'1:1',active_live:true,source_health:{stats:'OK'},fixture:{fixture:{id:1,status:{short:'2H',elapsed:57}}},runtime:{},snapshot:{}};
+assert(context.window.FEStateCore.valid(row));context.feSyncApply({schema:'FE_NOTIFY_UI_STATE_V1',server_at:Date.now(),snapshots:[row]});assert.equal(context.watchState.items.length,0);assert.equal(context.handicapWatchState.pool.length,0);
+row.captured_at=Date.now();row.revision=2;row.version='1:2';context.feSyncApply({schema:'FE_NOTIFY_UI_STATE_V1',server_at:Date.now(),snapshots:[row]});assert.equal(context.watchState.items.length,1);
+console.log('PASS live display expiry, retained history, recovery, stale sync rejection and inline-script syntax');

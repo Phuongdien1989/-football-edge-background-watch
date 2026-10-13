@@ -1,0 +1,38 @@
+name: LIVE display static asset release
+on:
+  workflow_dispatch:
+jobs:
+  deploy-static-frontend:
+    if: false # Completed one-time production release; preserve evidence without redeploy.
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    environment: football-edge-production
+    concurrency:
+      group: football-edge-frontend-production
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install original static asset deployment tool
+        run: npm install --no-save wrangler@4
+      - name: Verify original assets, preserve backup, deploy patched HTML and verify public bytes
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CANDIDATE_SHA: ${{ github.event.pull_request.head.sha }}
+        run: node .github/scripts/deploy-live-assets.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: frontend-static-assets-backup-and-result
+          path: |
+            frontend-assets-backup/
+            frontend-assets-candidate/
+            frontend-asset-deployment-result.json

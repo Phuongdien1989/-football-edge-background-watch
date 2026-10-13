@@ -1,0 +1,12 @@
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+const src=readFileSync(new URL('../worker_notify_v130.js',import.meta.url),'utf8');
+assert.match(src,/status\.at-Number\(priorStatus\.at\)>=120000/);
+assert.match(src,/status\.errors\.length\|\|status\.alertsAccepted\|\|status\.signalCrossings/);
+assert.match(src,/if\(statusDue\|\|urgentChanged\)await this\.ctx\.storage\.put\('notify:status',status\)/);
+const shouldWrite=(now,prior,urgent,changed)=>!prior||now-prior>=120000||(urgent&&changed);
+assert.equal(shouldWrite(100000,90000,false,false),false);
+assert.equal(shouldWrite(220000,90000,false,false),true);
+assert.equal(shouldWrite(100000,90000,true,true),true);
+assert.equal(shouldWrite(100000,90000,true,false),false);
+console.log('PASS: diagnostic writes throttled; changed alerts/errors persist');

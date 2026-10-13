@@ -103,9 +103,9 @@ export class BackgroundWatcher extends DeepLinkWatcher{
     try{
       const live=(await api('/fixtures',{live:'all'},true)).filter(f=>['1H','2H','LIVE'].includes(f.fixture?.status?.short)&&Number(f.fixture?.status?.elapsed)>=1&&Number(f.fixture?.status?.elapsed)<=90);
       status.live=live.length;
-      const all=[...(await this.ctx.storage.list({prefix:'notify:match:'})).values()],byId=new Map(all.map(x=>[x.id,x]));
+      const all=await this.listNotifyMatches(),byId=new Map(all.map(x=>[x.id,x]));
       const batch=live.sort((a,b)=>(byId.get(a.fixture.id)?.lastAt||0)-(byId.get(b.fixture.id)?.lastAt||0)).slice(0,12);
-      const activeIds=new Set(live.map(f=>f.fixture.id));for(const old of all)if(!activeIds.has(old.id)&&now-old.lastAt>3600000)await this.ctx.storage.delete('notify:match:'+old.id);
+      const activeIds=new Set(live.map(f=>f.fixture.id));for(const old of all)if(!activeIds.has(old.id)&&now-old.lastAt>3600000)await this.deleteNotifyMatch(old.id);
       const calibrations={};for(const d of devices){const cal={FT:[],legacyFT:[]};for(const key of Object.keys(cal))for(let i=0;i<5;i++)cal[key].push(...(await this.ctx.storage.get(`notify:cal:${d.id}:${key}:${i}`)||[]));calibrations[d.id]=createEngine(cal)}
       const engine=createEngine();
       for(const f of batch){
@@ -114,7 +114,7 @@ export class BackgroundWatcher extends DeepLinkWatcher{
         item.history=item.history||[];item.h1History=item.h1History||[];item.hcHistory=item.hcHistory||[];item.oddsHistory=item.oddsHistory||[];item.alerts=item.alerts||{};
         try{
           const health={},sourceWarnings=[];
-          const read=async(name,path,params)=>{try{const rows=await api(path,params,false);if(!Array.isArray(rows)){health[name]='INVALID';sourceWarnings.push(`${name}:INVALID_RESPONSE`);return []}health[name]=rows.length?'OK':'EMPTY';return rows}catch(e){health[name]='ERROR';sourceWarnings.push(`${name}:${errText(e)}`);return []}};
+          const read=async(name,path,params)=>{try{const rows=await api(path,params,name==='stats'||name==='half');if(!Array.isArray(rows)){health[name]='INVALID';sourceWarnings.push(`${name}:INVALID_RESPONSE`);return []}health[name]=rows.length?'OK':'EMPTY';return rows}catch(e){health[name]='ERROR';sourceWarnings.push(`${name}:${errText(e)}`);return []}};
           const [stats,events,odds,half]=await Promise.all([read('stats','/fixtures/statistics',{fixture:id}),read('events','/fixtures/events',{fixture:id}),read('odds','/odds/live',{fixture:id}),read('half','/fixtures/statistics',{fixture:id,half:true})]);
           if(sourceWarnings.length){status.warnings.push({fixture:id,sources:sourceWarnings.slice(0,4)});if(status.warnings.length>20)status.warnings.shift()}
           if(Date.now()-fixtureStarted>60000)throw Error('FIXTURE_SNAPSHOT_STALE');
@@ -136,10 +136,10 @@ export class BackgroundWatcher extends DeepLinkWatcher{
             const hs={...slim,metrics:hcMetrics},hi={history:item.hcHistory,preBaseline:{adv:0}},w3=engine.hcWindow(hi,hs,3),w5=engine.hcWindow(hi,hs,5),w10=engine.hcWindow(hi,hs,10),gap=engine.hcTeamStates(hi,hs,w3,w5,w10,engine.hcGameRegime(hs,w3,w5)).liveGap;
             item.hcHistory=item.hcHistory.filter(x=>stamp-x.captured_at<=1800000).concat(hs).slice(-40);
 
-            let h1Eval=null,h1Value=null;
+            let h1Eval=null,h1Value=null,h1s=null;
             const h1Route=['1H','LIVE'].includes(s.status)&&Number(s.minute)>=20&&Number(s.minute)<=45;
             if(h1Route){
-              const h1s={...slim,status:s.status,fresh_at:stamp,market:h1MarketInfo(compact,historySummary),dq:coverage.score,integrity:coverage.integrity_score};
+              h1s={...slim,status:s.status,fresh_at:stamp,market:h1MarketInfo(compact,historySummary),dq:coverage.score,integrity:coverage.integrity_score};
               const prev=item.h1History.at(-1),ev=resetType(prev,h1s);
               if(ev){item.h1History=[];item.h1ResetAt=stamp;item.h1CooldownUntil=stamp+(ev==='GOAL'?120000:180000)}
               item.h1History=item.h1History.filter(x=>stamp-x.captured_at<=1800000).concat(slim).slice(-40);
@@ -150,6 +150,7 @@ export class BackgroundWatcher extends DeepLinkWatcher{
             const hcReady=hcMetrics.dataTier==='FULL'&&(w3.usable||w5.usable);if(hcReady)status.mechanisms.hc++;
             if(s.status==='2H')status.mechanisms.ft++;
 
+            const goalEstimates={};
             for(const d of devices){
               const dp=d.prefs,signals={};
               if(dp.h1&&h1Eval&&(!item.h1CooldownUntil||stamp>=item.h1CooldownUntil)){
@@ -157,6 +158,7 @@ export class BackgroundWatcher extends DeepLinkWatcher{
               }
               if(dp.goal){
                 const goal=s.status==='2H'?calibrations[d.id].grEstimate(ft,'FT'):null,candidate=presence.core&&(!item.cooldown||stamp>=item.cooldown)?goal?.prob:null,check=crossing(item.alerts[d.id+':goal'],candidate,dp.goalThreshold,stamp);item.alerts[d.id+':goal']=check.state;if(check.send)signals.goal={value:candidate,threshold:dp.goalThreshold,source:goal?.source||'MODEL'};
+                goalEstimates[d.id]=goal;
               }
               if(dp.gap){
                 const candidate=presence.core&&(!item.cooldown||stamp>=item.cooldown)&&hcReady?Math.abs(gap):null,check=crossing(item.alerts[d.id+':gap'],candidate,dp.gapThreshold,stamp);item.alerts[d.id+':gap']=check.state;if(check.send)signals.gap={value:candidate,threshold:dp.gapThreshold,actual:`${gap>0?'+':''}${gap} • ${gap>0?f.teams.home.name:f.teams.away.name}`};
@@ -165,18 +167,39 @@ export class BackgroundWatcher extends DeepLinkWatcher{
             }
             status.signalEligible+=Number(!!h1Eval)+Number(s.status==='2H')+Number(hcReady);
             if(!presence.core)status.degraded++;
+            // Publish the exact snapshot/evaluations used above. Histories stay
+            // in their existing fields; the GET adapter never refetches/rescores.
+            const revision=Math.max(stamp,Number(item.ui?.revision||0)+1);
+            item.ui={fixture:f,captured_at:stamp,revision,version:id+':'+revision,
+              snapshot:{...s,market_rows:compact},engines:{FT:ft.eval,H1:h1Eval},
+              h1_snapshot:h1s,hc_snapshot:hs,goal_estimates:goalEstimates};
             item.last={goalMode:ft.eval.scoreMode,h1Score:h1Eval?.score??null,h1Mode:h1Eval?.scoreMode??null,gap,at:stamp,sourceHealth:health};status.scanned++;
           }
         }catch(e){status.errors.push({fixture:id,error:errText(e)})}
         item.lastAt=Date.now();const bytes=()=>new TextEncoder().encode(JSON.stringify(item)).byteLength;
         while(item.oddsHistory.length>2&&bytes()>100000)item.oddsHistory.shift();while(item.history.length>2&&bytes()>100000){item.history.shift();if(item.h1History.length>2)item.h1History.shift();if(item.hcHistory.length>2)item.hcHistory.shift()}
-        await this.ctx.storage.put('notify:match:'+id,item);
+        // Do not persist a brand-new empty fixture shell when all provider reads
+        // failed before any useful snapshot was captured. Existing fixture state
+        // still persists, preserving alert crossings and retry order.
+        const hasSnapshot=Boolean(item.last)||item.history.length>0||item.h1History.length>0||item.hcHistory.length>0||item.oddsHistory.length>0;
+        if(bytes()>100000&&item.ui){delete item.ui;item.uiError='SNAPSHOT_TOO_LARGE';}
+        if(byId.has(id)||hasSnapshot)await this.putNotifyMatch(id,item);
       }
       const cycleSec=Math.max(30,Math.ceil((Date.now()-now)/1000));
       status.rotationEstimateSeconds=Math.ceil(live.length/12)*cycleSec;
     }catch(e){status.errors.push({error:errText(e)})}
     status.apiToday=budget.used;status.durationMs=Date.now()-now;status.targetCadenceMs=SCAN_TARGET_MS;status.startedAt=now;status.at=Date.now();
-    await this.ctx.storage.put({'notify:status':status,'notify:budget':budget});
+    // Budget only changes when an API attempt is reserved; skip redundant writes on idle cycles.
+    const previousBudget=await this.ctx.storage.get('notify:budget');
+    const budgetChanged=previousBudget?.day!==budget.day||Number(previousBudget?.used)!==Number(budget.used);
+    if(budgetChanged)await this.ctx.storage.put('notify:budget',budget);
+    // Diagnostic status is not a crossing/dedup source of truth. Bound its
+    // write frequency; persist failures and accepted alerts immediately.
+    const priorStatus=await this.ctx.storage.get('notify:status');
+    const statusDue=!priorStatus?.at||status.at-Number(priorStatus.at)>=120000;
+    const urgent=Boolean(status.errors.length||status.alertsAccepted||status.signalCrossings);
+    const urgentChanged=urgent&&JSON.stringify({errors:status.errors,alertsAccepted:status.alertsAccepted,signalCrossings:status.signalCrossings})!==JSON.stringify({errors:priorStatus?.errors||[],alertsAccepted:priorStatus?.alertsAccepted||0,signalCrossings:priorStatus?.signalCrossings||0});
+    if(statusDue||urgentChanged)await this.ctx.storage.put('notify:status',status);
   }
 
   async alarm(){

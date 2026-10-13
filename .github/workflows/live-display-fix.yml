@@ -1,0 +1,41 @@
+name: LIVE display stale-card fix
+on:
+  workflow_dispatch:
+jobs:
+  verify-and-deploy:
+    if: false # Paused: public URL does not serve uploaded candidate; checkpoint required.
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    environment: football-edge-production
+    permissions:
+      contents: read
+    concurrency:
+      group: football-edge-frontend-production
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify exact existing frontend and display-only regression
+        run: |
+          curl -fsSL --max-time 30 https://shiny-silence-d892.ngophuonghuy.workers.dev/ -o frontend-baseline.html
+          node .github/scripts/test-live-display.mjs frontend-baseline.html
+          node --check .github/scripts/deploy-live-display.mjs
+      - name: Preserve frontend rollback and deploy exact presentation fix only
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CANDIDATE_SHA: ${{ github.event.pull_request.head.sha }}
+        run: node .github/scripts/deploy-live-display.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: frontend-live-display-evidence-and-backup
+          path: |
+            frontend-live-display-result.json
+            frontend-source-backup.bin
+            frontend-source-backup-metadata.json

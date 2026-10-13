@@ -1,0 +1,15 @@
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+const read=p=>readFileSync(new URL('../'+p,import.meta.url),'utf8');
+const config=read('wrangler.toml');
+const entry=config.match(/^main\s*=\s*"([^"]+)"/m)?.[1];
+assert.equal(entry,'worker_notify_v138_peak_window.js','entrypoint changed: re-audit before deploy');
+assert.match(read(entry),/from '\.\/worker_notify_v137_quota50000\.js'/,'peak window must inherit quota guard');
+const v137=read('worker_notify_v137_quota50000.js');
+assert.match(v137,/from '\.\/worker_notify_v136_hot_priority\.js'/,'deployed entry must inherit patched HOT scheduler');
+const v136=read('worker_notify_v136_hot_priority.js');
+assert.match(v136,/now-previousBoost<120000/);
+assert.match(v136,/now-num\(previous\.at,0\)>=120000/);
+assert.match(v137,/async reserveApiCall\(\)/,'API budget must remain present');
+assert.match(v137,/await this\.reserveApiCall\(\)/,'API budget guard must remain present');
+console.log('PASS: wrangler entrypoint inherits isolated HOT patch; API quota guard unchanged');
