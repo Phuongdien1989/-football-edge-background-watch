@@ -1,0 +1,28 @@
+{
+  "commit": "edb82107e659c85ee318b94c385e0118c0ed4360",
+  "worker": "shiny-silence-d892",
+  "mode": "ORIGINAL_THREE_FILE_ASSET_DEPLOYMENT",
+  "rollback": "a3ffd320-54ec-4c5b-b7fd-eb6f95edb608",
+  "checks": {
+    "rollback": "PASS_ACTIVE_ORIGINAL_VERSION",
+    "originalAssets": "PASS_EXACT_ORIGINAL_DEPLOYMENT_BUNDLE_HASHES",
+    "regression": "PASS",
+    "bundle": "PASS_DRY_RUN",
+    "publicHTML": "PASS_EXACT_PATCHED_HTML",
+    "pushAssets": "PASS_ORIGINAL_BYTES_UNCHANGED"
+  },
+  "backendChanged": false,
+  "deployed": true,
+  "expectedHash": "aa4f0f6318cd52c14ff62b195c5ea04c5267107455924da44c9aa78169fe7f28",
+  "activeVersions": [
+    {
+      "version_id": "03c1d55d-358a-448b-96f3-f356704831df",
+      "percentage": 100
+    }
+  ],
+  "productionVersion": "03c1d55d-358a-448b-96f3-f356704831df",
+  "publicChecks": [
+    "157af7294df17b997f505a6fa0a4658699c8236808a643e29ca2d71bd1b8b392",
+    "aa4f0f6318cd52c14ff62b195c5ea04c5267107455924da44c9aa78169fe7f28"
+  ]
+}

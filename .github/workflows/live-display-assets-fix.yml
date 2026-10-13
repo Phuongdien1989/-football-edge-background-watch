@@ -1,13 +1,9 @@
 name: LIVE display static asset release
 on:
-  pull_request:
-    paths:
-      - '.github/scripts/deploy-live-assets.mjs'
-      - '.github/workflows/live-display-assets-fix.yml'
   workflow_dispatch:
 jobs:
   deploy-static-frontend:
-    if: github.event_name == 'pull_request' && github.event.pull_request.number == 5 && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref == 'fix/do-free-isolated-20261010'
+    if: false # Completed one-time production release; preserve evidence without redeploy.
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
