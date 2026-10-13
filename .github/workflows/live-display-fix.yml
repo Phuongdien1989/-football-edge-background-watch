@@ -30,6 +30,7 @@ jobs:
         run: |
           curl -fsSL --max-time 30 https://shiny-silence-d892.ngophuonghuy.workers.dev/ -o frontend-baseline.html
           node .github/scripts/test-live-display.mjs frontend-baseline.html
+          npm install --no-save acorn@8
           node --check .github/scripts/deploy-live-display.mjs
       - name: Preserve frontend rollback and deploy exact presentation fix only
         env:

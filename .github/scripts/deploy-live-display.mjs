@@ -1,6 +1,7 @@
 import {createHash} from 'node:crypto';
 import {writeFileSync} from 'node:fs';
 import {patchLiveDisplay,marker} from './live-display-patch.mjs';
+import {parse} from 'acorn';
 const token=process.env.CLOUDFLARE_API_TOKEN,account=process.env.CLOUDFLARE_ACCOUNT_ID;
 const name='shiny-silence-d892',url='https://shiny-silence-d892.ngophuonghuy.workers.dev/';
 const expected='157af7294df17b997f505a6fa0a4658699c8236808a643e29ca2d71bd1b8b392';
@@ -37,7 +38,7 @@ try{
  if(!main&&parts.length===1)main=parts[0].name;
  if(!main||!parts.some(p=>p.name===main))throw Error('FRONTEND_ENTRYPOINT_NOT_IDENTIFIED');
  const source=new TextDecoder().decode(parts.find(p=>p.name===main).body);
- if(!/export\s*\{[^}]*default|export\s+default/.test(source))throw Error('FRONTEND_NOT_MODULE_DEFAULT_HANDLER');
+ const isModule=/export\s*\{[^}]*default|export\s+default/.test(source);
  if(parts.some(p=>['fe-live-wrapper.mjs','fe-live-display-patch.mjs'].includes(p.name)))throw Error('FRONTEND_WRAPPER_ALREADY_PRESENT');
  report.modules=parts.map(p=>({name:p.name,bytes:p.body.byteLength}));report.entrypoint=main;
  writeFileSync('frontend-source-backup.bin',new Uint8Array(raw));
@@ -57,13 +58,42 @@ export default {...original,async fetch(request,env,ctx){
  return new Response(body,{status:response.status,statusText:response.statusText,headers});
 }};`;
  const bindings=(settings.bindings||[]).filter(b=>b.type!=='secret_text');
- const metadata={main_module:'fe-live-wrapper.mjs',compatibility_date:settings.compatibility_date,compatibility_flags:settings.compatibility_flags||[],bindings,keep_bindings:['secret_text']};
+ const metadata={compatibility_date:settings.compatibility_date,compatibility_flags:settings.compatibility_flags||[],bindings,keep_bindings:['secret_text']};
+ if(isModule)metadata.main_module='fe-live-wrapper.mjs';
+ else{
+  if(parts.length!==1)throw Error('LEGACY_FRONTEND_MULTIPLE_PARTS_UNSUPPORTED');
+  const ast=parse(source,{ecmaVersion:'latest',sourceType:'script'}),calls=[];
+  function walk(node){if(!node||typeof node!=='object')return;
+   if(node.type==='CallExpression'&&node.callee?.type==='MemberExpression'&&!node.callee.computed&&node.callee.property.name==='respondWith'){
+    if(node.arguments.length!==1)throw Error('FETCH_RESPOND_WITH_SHAPE_UNSUPPORTED');calls.push(node.arguments[0]);
+   }
+   for(const value of Object.values(node))if(Array.isArray(value))value.forEach(walk);else if(value&&typeof value==='object')walk(value);
+  }walk(ast);
+  if(calls.length!==1)throw Error('LEGACY_FETCH_HANDLER_AMBIGUOUS');
+  const arg=calls[0];
+  const transform=String(patch).replace(/export (const|function) /g,'$1 ');
+  const helper=`\nasync function __feLiveDisplayResponse(input){
+   ${transform}
+   const response=await input;
+   if(!response.ok||!(response.headers.get('content-type')||'').includes('text/html'))return response;
+   const html=await response.clone().text();
+   if(!html.includes('FE_LEGACY_NOTIFY_SYNC_START')||html.includes(marker))return response;
+   const body=patchLiveDisplay(html),headers=new Headers(response.headers);
+   headers.delete('content-length');headers.delete('content-encoding');headers.delete('etag');
+   headers.set('cache-control','no-store');headers.set('x-fe-live-display',marker);
+   return new Response(body,{status:response.status,statusText:response.statusText,headers});
+  }\n`;
+  const updated=source.slice(0,arg.start)+'__feLiveDisplayResponse('+source.slice(arg.start,arg.end)+')'+source.slice(arg.end)+helper;
+  parse(updated,{ecmaVersion:'latest',sourceType:'script'});
+  parts[0].body=new TextEncoder().encode(updated);parts[0].type='application/javascript';metadata.body_part=parts[0].name;
+  report.checks.originalFetchHandler='PASS_AST_SINGLE_ARGUMENT_WRAPPER';
+ }
  for(const key of ['usage_model','limits','placement','tail_consumers','logpush','observability'])if(settings[key]!=null)metadata[key]=settings[key];
  const current=await json('/deployments');if(current.deployments?.[0]?.versions?.[0]?.version_id!==oldVersion)throw Error('FRONTEND_CHANGED_BEFORE_UPLOAD');
  const form=new FormData();form.append('metadata',new Blob([JSON.stringify(metadata)],{type:'application/json'}));
  for(const p of parts)form.append(p.name,new Blob([p.body],{type:p.type||'application/javascript+module'}),p.name);
- form.append('fe-live-wrapper.mjs',new Blob([wrapper],{type:'application/javascript+module'}),'fe-live-wrapper.mjs');
- form.append('fe-live-display-patch.mjs',new Blob([patch],{type:'application/javascript+module'}),'fe-live-display-patch.mjs');
+ if(isModule){form.append('fe-live-wrapper.mjs',new Blob([wrapper],{type:'application/javascript+module'}),'fe-live-wrapper.mjs');
+ form.append('fe-live-display-patch.mjs',new Blob([patch],{type:'application/javascript+module'}),'fe-live-display-patch.mjs');}
  deployed=true;await json('',{method:'PUT',body:form});
  const after=await json('/deployments');report.productionVersion=after.deployments?.[0]?.versions?.[0]?.version_id;
  if(!report.productionVersion||report.productionVersion===oldVersion)throw Error('NEW_FRONTEND_VERSION_NOT_CONFIRMED');
