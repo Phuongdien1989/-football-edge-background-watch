@@ -65,7 +65,7 @@ export default {...original,async fetch(request,env,ctx){
  const metadata={compatibility_date:settings.compatibility_date,compatibility_flags:settings.compatibility_flags||[],bindings,keep_bindings:['secret_text']};
  if(assetsOnly){
   metadata.main_module='fe-live-wrapper.mjs';metadata.keep_assets=true;
-  metadata.assets={config:{...(settings.assets?.config||originalVersion.resources?.assets?.config||{}),run_worker_first:['/','/index.html']}};
+  metadata.assets={config:{...(settings.assets?.config||originalVersion.resources?.assets?.config||{}),run_worker_first:true}};
   if(bindings.some(b=>b.name==='FE_ORIGINAL_ASSETS'))throw Error('ASSET_BINDING_NAME_CONFLICT');
   bindings.push({type:'assets',name:'FE_ORIGINAL_ASSETS'});
   const html=JSON.stringify(patchLiveDisplay(live));
@@ -116,9 +116,11 @@ export default {...original,async fetch(request,env,ctx){
  form.append('fe-live-display-patch.mjs',new Blob([patch],{type:'application/javascript+module'}),'fe-live-display-patch.mjs');}
  deployed=true;await json('',{method:'PUT',body:form});
  const after=await json('/deployments');report.productionVersion=after.deployments?.[0]?.versions?.[0]?.version_id;
+ report.activeVersions=after.deployments?.[0]?.versions;
  if(!report.productionVersion||report.productionVersion===oldVersion)throw Error('NEW_FRONTEND_VERSION_NOT_CONFIRMED');
  let verified=false;
- for(let i=0;i<12;i++){const r=await fetch(url+'?fe_verify='+Date.now(),{signal:AbortSignal.timeout(15000)});const html=await r.text();if(r.ok&&hash(html)===report.candidateHash&&html.includes(marker)){verified=true;break;}await new Promise(resolve=>setTimeout(resolve,5000));}
+ report.publicChecks=[];
+ for(let i=0;i<24;i++){const r=await fetch(url+'?fe_verify='+Date.now(),{headers:{'cache-control':'no-cache'},signal:AbortSignal.timeout(15000)});const html=await r.text();report.publicChecks.push({http:r.status,hash:hash(html),marker:html.includes(marker),header:r.headers.get('x-fe-live-display')});if(r.ok&&hash(html)===report.candidateHash&&html.includes(marker)){verified=true;break;}await new Promise(resolve=>setTimeout(resolve,5000));}
  if(!verified)throw Error('FRONTEND_PUBLIC_HASH_VERIFICATION_FAILED');
  report.checks.publicHTML='PASS_EXACT_PATCHED_HASH';report.deployed=true;
 }catch(e){report.error=e.message;process.exitCode=1;
