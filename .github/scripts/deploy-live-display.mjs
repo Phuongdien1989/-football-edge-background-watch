@@ -10,7 +10,7 @@ const hash=x=>createHash('sha256').update(x).digest('hex');
 const apiURL='https://api.cloudflare.com/client/v4/accounts/'+account+'/workers/scripts/'+name;
 async function cf(path='',options={}){
  const r=await fetch(apiURL+path,{...options,headers:{authorization:'Bearer '+token,...options.headers},signal:AbortSignal.timeout(30000)});
- if(!r.ok)throw Error('CF_HTTP_'+r.status+':'+path);return r;
+ if(!r.ok){const b=await r.json().catch(()=>({}));report.cloudflareErrors=(b.errors||[]).map(e=>({code:e.code,message:String(e.message||'').split(token).join('[REDACTED]').slice(0,250)}));throw Error('CF_HTTP_'+r.status+':'+path);}return r;
 }
 async function json(path,options={}){const b=await (await cf(path,options)).json();if(b.success===false)throw Error('CF_ERROR:'+path);return b.result;}
 let oldVersion,deployed=false;
