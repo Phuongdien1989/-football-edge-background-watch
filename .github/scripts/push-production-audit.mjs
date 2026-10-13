@@ -5,7 +5,7 @@ if(!account||!token)throw Error('CLOUDFLARE_CREDENTIALS_MISSING');
 const prefix='/accounts/'+account, production='football-edge-background-watch';
 const name='fe-notify-audit-'+String(process.env.GITHUB_RUN_ID);
 const auth=randomBytes(32).toString('hex');
-const report={commit:process.env.CANDIDATE_SHA,mode:'PROVIDER_RPC_AUDIT_NO_SCAN_ENABLE',measuredAt:Date.now(),tests:[],cleanup:false};
+const report={commit:process.env.CANDIDATE_SHA,mode:'LIVE_SCAN_READ_ONLY_TRACE_NO_PROVIDER_CALLS',measuredAt:Date.now(),tests:[],cleanup:false};
 async function api(path,options={}){
  const r=await fetch('https://api.cloudflare.com/client/v4'+path,{...options,headers:{authorization:'Bearer '+token,...options.headers},signal:AbortSignal.timeout(30000)});
  const b=await r.json();if(!r.ok||b.success===false)throw Error('CF_HTTP_'+r.status+':'+(b.errors||[]).map(x=>x.code).join(','));
@@ -31,13 +31,7 @@ export default {async fetch(request,env){
    const b=await r.json();result.tests.push({device:'device-'+(i+1),http:r.status,accepted:b.ok===true,error:b.error||null});
   }
  }
- result.providerReads=[];
- for(const params of [{fixture:1576501},{fixture:1576501,half:true}]){
-  try{
-   const rows=await stub.api('/fixtures/statistics',params,true);
-   result.providerReads.push({fixture:params.fixture,half:params.half||false,ok:true,rows:rows.length,statTypes:rows.flatMap(x=>(x.statistics||[]).map(s=>s.type)).slice(0,25)});
-  }catch(e){result.providerReads.push({fixture:params.fixture,half:params.half||false,ok:false,error:String(e.message||e).slice(0,180)});}
- }
+ result.providerReads=[]; // Observe ongoing scan only; no extra provider calls.
  result.providerDiagnostic=await stub.notifyDiagnostics();
  return Response.json(result);
 }};
@@ -75,6 +69,7 @@ try{
   return rows.flatMap(x=>x.results||[]);
  };
  report.liveReasons=await read("SELECT json_extract(payload,'$.last.reason') AS reason,json_extract(payload,'$.last.sourceHealth.stats') AS stats,COUNT(*) AS fixtures,MAX(updated_at) AS last_update FROM fe_notify_live_state WHERE COALESCE(json_extract(payload,'$.__fe_deleted'),0)=0 GROUP BY reason,stats");
+ report.recentFixtures=await read("SELECT fixture_id,updated_at,json_extract(payload,'$.last') AS last,json_extract(payload,'$.ui.snapshot.source_health') AS ui_source_health,json_extract(payload,'$.ui.captured_at') AS published_at,json_extract(payload,'$.ui.engines') AS engines,json_extract(payload,'$.uiError') AS ui_error,json_array_length(json_extract(payload,'$.history')) AS history_points,json_array_length(json_extract(payload,'$.h1History')) AS h1_history_points,json_array_length(json_extract(payload,'$.hcHistory')) AS hc_history_points FROM fe_notify_live_state WHERE COALESCE(json_extract(payload,'$.__fe_deleted'),0)=0 ORDER BY updated_at DESC LIMIT 12");
  report.alertStates=await read("SELECT CASE WHEN a.key LIKE '%:gap' THEN 'HC' WHEN a.key LIKE '%:h1' THEN 'H1' ELSE 'FT' END AS kind,COUNT(*) AS states,SUM(CASE WHEN json_extract(a.value,'$.armed')=0 THEN 1 ELSE 0 END) AS disarmed,MAX(json_extract(a.value,'$.lastSent')) AS last_accepted FROM fe_notify_live_state t,json_each(t.payload,'$.alerts') a GROUP BY kind");
  report.validationRecent=await read("SELECT validation_type,result_key,COUNT(*) AS n,MAX(created_at) AS last_created FROM validation_results WHERE validation_type LIKE 'PUSH_%' AND created_at>=? GROUP BY validation_type,result_key",[Date.now()-86400000]);
  const after=await api(prefix+'/workers/scripts/'+production+'/deployments');
