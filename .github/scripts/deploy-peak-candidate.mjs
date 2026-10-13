@@ -7,7 +7,7 @@ const candidate=process.env.CANDIDATE_SHA;
 const repository=process.env.GITHUB_REPOSITORY;
 const token=process.env.CLOUDFLARE_API_TOKEN,account=process.env.CLOUDFLARE_ACCOUNT_ID;
 const rollback='60781a4e-70cb-4c02-a036-2528c3048ed5';
-const expectedProduction='9e1744be-7b2c-4fc5-b755-bba6cea2d2e0';
+const expectedProduction='5f33a4b1-a299-4195-8a68-4646396a9214';
 const worker=evidence.worker,database=evidence.database?.uuid;
 const prefix='/accounts/'+encodeURIComponent(account);
 const report={commit:candidate,rollback,checks:{},productionDeploy:'NOT_ATTEMPTED'};
