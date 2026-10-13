@@ -113,7 +113,7 @@ export default {...original,async fetch(request,env,ctx){
  const current=await json('/deployments');if(current.deployments?.[0]?.versions?.[0]?.version_id!==oldVersion)throw Error('FRONTEND_CHANGED_BEFORE_UPLOAD');
  const form=new FormData();form.append('metadata',new Blob([JSON.stringify(metadata)],{type:'application/json'}));
  for(const p of parts)form.append(p.name,new Blob([p.body],{type:p.type||'application/javascript+module'}),p.name);
- if(isModule){form.append('fe-live-wrapper.mjs',new Blob([wrapper],{type:'application/javascript+module'}),'fe-live-wrapper.mjs');
+ if(isModule&&!assetsOnly){form.append('fe-live-wrapper.mjs',new Blob([wrapper],{type:'application/javascript+module'}),'fe-live-wrapper.mjs');
  form.append('fe-live-display-patch.mjs',new Blob([patch],{type:'application/javascript+module'}),'fe-live-display-patch.mjs');}
  deployed=true;await json('',{method:'PUT',body:form});
  const after=await json('/deployments');report.productionVersion=after.deployments?.[0]?.versions?.[0]?.version_id;
