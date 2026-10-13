@@ -19,6 +19,7 @@ try{
  const live=await fetch(url,{signal:AbortSignal.timeout(20000)}).then(r=>{if(!r.ok)throw Error('FRONTEND_FETCH_FAILED');return r.text()});
  report.baselineHash=hash(live);if(report.baselineHash!==expected)throw Error('FRONTEND_BASELINE_CHANGED');
  report.candidateHash=hash(patchLiveDisplay(live));report.checks.patchAnchors='PASS';
+ const assetScript=`const html=${JSON.stringify(patchLiveDisplay(live))};export default {fetch(request,env){const u=new URL(request.url);if(['/','/index.html'].includes(u.pathname)&&['GET','HEAD'].includes(request.method))return new Response(request.method==='HEAD'?null:html,{headers:{'content-type':'text/html; charset=utf-8','cache-control':'no-store','x-fe-live-display':${JSON.stringify(marker)}}});return env.FE_ORIGINAL_ASSETS.fetch(request);}};`;
  const deployments=await json('/deployments');const versions=deployments.deployments?.[0]?.versions;
  if(versions?.length!==1||versions[0].percentage!==100)throw Error('FRONTEND_ACTIVE_VERSION_AMBIGUOUS');
  oldVersion=versions[0].version_id;report.rollbackVersion=oldVersion;
@@ -39,11 +40,12 @@ try{
  if(!main||!parts.some(p=>p.name===main))throw Error('FRONTEND_ENTRYPOINT_NOT_IDENTIFIED');
  const source=new TextDecoder().decode(parts.find(p=>p.name===main).body);
  const isModule=/export\s*\{[^}]*default|export\s+default/.test(source);
- const assetsOnly=source.trim()==='';
+ const ownedInactiveWrapper=parts.length===1&&parts[0].name==='fe-live-wrapper.mjs'&&source===assetScript;
+ const assetsOnly=source.trim()===''||ownedInactiveWrapper;
  report.originalHandlers=originalVersion.resources?.script?.handlers||[];
  report.assetConfigurationPresent=!!(settings.assets||originalVersion.resources?.assets||originalVersion.assets);
  if(assetsOnly&&report.originalHandlers.includes('fetch'))throw Error('EMPTY_SOURCE_WITH_EXISTING_FETCH_HANDLER');
- if(parts.some(p=>['fe-live-wrapper.mjs','fe-live-display-patch.mjs'].includes(p.name)))throw Error('FRONTEND_WRAPPER_ALREADY_PRESENT');
+ if(!ownedInactiveWrapper&&parts.some(p=>['fe-live-wrapper.mjs','fe-live-display-patch.mjs'].includes(p.name)))throw Error('FRONTEND_WRAPPER_ALREADY_PRESENT');
  report.modules=parts.map(p=>({name:p.name,bytes:p.body.byteLength}));report.entrypoint=main;
  writeFileSync('frontend-source-backup.bin',new Uint8Array(raw));
  writeFileSync('frontend-source-backup-metadata.json',JSON.stringify({contentType:type,entrypoint:main,rollbackVersion:oldVersion,baselineHash:expected},null,2));
@@ -61,15 +63,14 @@ export default {...original,async fetch(request,env,ctx){
  headers.set('cache-control','no-store');headers.set('x-fe-live-display',marker);
  return new Response(body,{status:response.status,statusText:response.statusText,headers});
 }};`;
- const bindings=(settings.bindings||[]).filter(b=>b.type!=='secret_text');
+ const bindings=(settings.bindings||[]).filter(b=>b.type!=='secret_text'&&!(ownedInactiveWrapper&&b.type==='assets'&&b.name==='FE_ORIGINAL_ASSETS'));
  const metadata={compatibility_date:settings.compatibility_date,compatibility_flags:settings.compatibility_flags||[],bindings,keep_bindings:['secret_text']};
  if(assetsOnly){
   metadata.main_module='fe-live-wrapper.mjs';metadata.keep_assets=true;
   metadata.assets={config:{...(settings.assets?.config||originalVersion.resources?.assets?.config||{}),run_worker_first:true}};
   if(bindings.some(b=>b.name==='FE_ORIGINAL_ASSETS'))throw Error('ASSET_BINDING_NAME_CONFLICT');
   bindings.push({type:'assets',name:'FE_ORIGINAL_ASSETS'});
-  const html=JSON.stringify(patchLiveDisplay(live));
-  const script=`const html=${html};export default {fetch(request,env){const u=new URL(request.url);if(['/','/index.html'].includes(u.pathname)&&['GET','HEAD'].includes(request.method))return new Response(request.method==='HEAD'?null:html,{headers:{'content-type':'text/html; charset=utf-8','cache-control':'no-store','x-fe-live-display':${JSON.stringify(marker)}}});return env.FE_ORIGINAL_ASSETS.fetch(request);}};`;
+  const script=assetScript;
   parse(script,{ecmaVersion:'latest',sourceType:'module'});
   parts=[{name:'fe-live-wrapper.mjs',type:'application/javascript+module',body:new TextEncoder().encode(script)}];
   report.checks.originalFetchHandler='PASS_ASSETS_ONLY_NO_HANDLER';report.checks.assetPreservation='KEEP_EXISTING_ASSETS_ROOT_HTML_ONLY';
