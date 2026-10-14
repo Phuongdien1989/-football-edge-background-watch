@@ -36,7 +36,7 @@ jobs:
           expected=expected.replace('  const response=await base.fetch(request,env,ctx);',"  const response=await base.fetch(request,instrumentD1Env(env,'EDGE_WORKER'),ctx);")
           assert new==expected,'production entrypoint includes unapproved non-meter changes'
           names=subprocess.check_output(['git','diff','--name-only',base,'HEAD'],text=True).splitlines()
-          approved={'worker_notify_v138_peak_window.js','d1-production-meter.mjs','tests/test-d1-production-meter.mjs','tests/test-do-free-peak-window.mjs','.github/scripts/d1-meter-readonly-preflight.mjs','.github/scripts/d1-meter-tail-probe.mjs','.github/workflows/d1-meter-readonly-preflight.yml','.github/workflows/d1-meter-diff-regression.yml','.github/scripts/d1-telemetry-auth-audit.mjs','.github/workflows/d1-telemetry-auth-audit.yml'}
+          approved={'worker_notify_v138_peak_window.js','d1-production-meter.mjs','tests/test-d1-production-meter.mjs','tests/test-do-free-peak-window.mjs','.github/scripts/d1-meter-readonly-preflight.mjs','.github/scripts/d1-meter-tail-probe.mjs','.github/workflows/d1-meter-readonly-preflight.yml','.github/workflows/d1-meter-diff-regression.yml','.github/scripts/d1-telemetry-auth-audit.mjs','.github/scripts/d1-telemetry-log-receipt.mjs','.github/workflows/d1-telemetry-auth-audit.yml'}
           assert set(names)<=approved, 'unexpected source modified: '+repr(set(names)-approved)
           cfg=pathlib.Path('wrangler.toml').read_text()
           assert 'PEAK_SCAN_ENABLED = "false"' in cfg and 'MANUAL_SCAN_MODE_ENABLED = "true"' in cfg
