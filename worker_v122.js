@@ -24,7 +24,7 @@ function fixtureStmt(env,p,now){
   return env.FOOTBALL_DB.prepare(`INSERT INTO fixtures (fixture_id,league,home,away,kickoff,status,first_seen_at,last_seen_at)
     VALUES (?,?,?,?,?,?,?,?)
     ON CONFLICT(fixture_id) DO UPDATE SET league=COALESCE(excluded.league,fixtures.league),home=COALESCE(excluded.home,fixtures.home),away=COALESCE(excluded.away,fixtures.away),kickoff=COALESCE(excluded.kickoff,fixtures.kickoff),status=COALESCE(excluded.status,fixtures.status),last_seen_at=MAX(fixtures.last_seen_at,excluded.last_seen_at)
-    WHERE fixtures.league IS NOT COALESCE(excluded.league,fixtures.league) OR fixtures.home IS NOT COALESCE(excluded.home,fixtures.home) OR fixtures.away IS NOT COALESCE(excluded.away,fixtures.away) OR fixtures.kickoff IS NOT COALESCE(excluded.kickoff,fixtures.kickoff) OR fixtures.status IS NOT COALESCE(excluded.status,fixtures.status)`)
+    WHERE fixtures.league IS NOT COALESCE(excluded.league,fixtures.league) OR fixtures.home IS NOT COALESCE(excluded.home,fixtures.home) OR fixtures.away IS NOT COALESCE(excluded.away,fixtures.away) OR fixtures.kickoff IS NOT COALESCE(excluded.kickoff,fixtures.kickoff) OR fixtures.status IS NOT COALESCE(excluded.status,fixtures.status) OR excluded.last_seen_at - fixtures.last_seen_at >= 300000`)
     .bind(fid,s(p?.league),s(p?.home),s(p?.away),n(p?.kickoff,null),s(p?.status,20),now,now);
 }
 function qsigOutcome(p){
