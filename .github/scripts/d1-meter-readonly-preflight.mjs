@@ -27,6 +27,9 @@ const t=Date.now(),query=await api('/workers/observability/telemetry/query',{met
 report.observability_query={http:query.http,success:query.success,error_codes:query.errors.map(x=>x.code),has_result:Boolean(query.data)};
 const tails=await api('/workers/scripts/'+target+'/tails');
 report.authenticated_live_tail={http:tails.http,success:tails.success,error_codes:tails.errors.map(x=>x.code)};
-report.ready_to_collect=(query.http===200&&query.success&&Boolean(query.data))||(tails.http===200&&tails.success);
+report.ready_to_collect=(query.http===200&&query.success&&Boolean(query.data));
+report.collection_transport=report.ready_to_collect?'OBSERVABILITY_QUERY_VERIFIED':'NONE_VERIFIED';
+report.authenticated_live_tail.probe_only=true; // HTTP 200 is not proof of WebSocket events.
+if(!report.ready_to_collect)report.warnings.push('WORKERS_OBSERVABILITY_QUERY_UNAVAILABLE; NO PRODUCTION DEPLOY');
 console.log('FE_D1_METER_PREFLIGHT '+JSON.stringify(report));
 if(!report.ready_to_collect)process.exitCode=2;
