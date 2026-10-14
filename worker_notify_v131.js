@@ -39,7 +39,7 @@ export class BackgroundWatcher extends ContinuousWatcher{
     await this.env.FOOTBALL_DB.prepare(`INSERT INTO validation_results
       (id,fixture_id,validation_type,created_at,result_key,payload_json)
       VALUES (?,?,?,?,?,?)
-      ON CONFLICT(id) DO UPDATE SET result_key=excluded.result_key,payload_json=excluded.payload_json`)
+      ON CONFLICT(id) DO UPDATE SET result_key=excluded.result_key,payload_json=excluded.payload_json WHERE validation_results.result_key IS NOT excluded.result_key OR validation_results.payload_json IS NOT excluded.payload_json`)
       .bind(v.id,v.fixture_id,v.validation_type,v.signal_at,v.result_key||'PENDING',safeJson(v)).run();
     return true;
   }
