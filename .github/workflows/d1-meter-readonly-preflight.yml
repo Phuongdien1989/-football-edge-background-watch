@@ -3,6 +3,7 @@ on:
   pull_request:
     paths:
       - '.github/scripts/d1-meter-readonly-preflight.mjs'
+      - '.github/scripts/d1-meter-tail-probe.mjs'
       - '.github/workflows/d1-meter-readonly-preflight.yml'
 jobs:
   audit:
@@ -25,3 +26,8 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: node .github/scripts/d1-meter-readonly-preflight.mjs
+      - name: Validate authenticated WebSocket Tail receipt with read-only health
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node --no-warnings .github/scripts/d1-meter-tail-probe.mjs
