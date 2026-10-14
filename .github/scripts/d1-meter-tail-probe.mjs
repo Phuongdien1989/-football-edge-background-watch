@@ -16,19 +16,20 @@ try{
  created=await call(root,'POST');
  if(!created?.url||!created?.id)throw Error('TAIL_SESSION_SHAPE_INVALID');
  const result=await new Promise(resolve=>{
-  let opened=false,received=false,finished=false;
+  let opened=false,received=false,finished=false,failure_code=null;
   ws=new WebSocket(created.url,{headers:{Authorization:'Bearer '+key}});
-  const finish=()=>{if(!finished){finished=true;resolve({opened,received});}};
+  const finish=()=>{if(!finished){finished=true;resolve({opened,received,failure_code});}};
   const stop=setTimeout(finish,9500);
   ws.on('open',async()=>{
    opened=true;
    try{await fetch('https://football-edge-background-watch.ngophuonghuy.workers.dev/health',{signal:AbortSignal.timeout(5000)});}catch{}
   });
   ws.on('message',()=>{received=true;clearTimeout(stop);finish()});
-  ws.on('error',()=>{clearTimeout(stop);finish()});
+  ws.on('error',err=>{failure_code=String(err?.code||'WS_ERROR').slice(0,50);clearTimeout(stop);finish()});
+  ws.on('unexpected-response',(req,res)=>{failure_code='HTTP_'+res.statusCode;clearTimeout(stop);finish()});
   ws.on('close',()=>{clearTimeout(stop);finish()});
  });
- console.log('FE_AUTH_TAIL_TRANSPORT '+JSON.stringify({api:'PASS',websocket:result.opened?'PASS':'FAIL',received_request_event:result.received,production_deploy:'NOT_ATTEMPTED'}));
+ console.log('FE_AUTH_TAIL_TRANSPORT '+JSON.stringify({api:'PASS',websocket:result.opened?'PASS':'FAIL',received_request_event:result.received,failure_code:result.failure_code,production_deploy:'NOT_ATTEMPTED'}));
  if(!result.opened||!result.received)process.exitCode=2;
 }finally{
  try{ws?.close()}catch{}
