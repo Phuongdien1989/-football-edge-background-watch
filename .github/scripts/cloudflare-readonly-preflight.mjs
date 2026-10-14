@@ -29,6 +29,7 @@ if(token&&account&&worker&&database){
     const settings=await api(path+'/settings');
     const bindings=settings.bindings||[];
     item.apiCredentialBindingNames=bindings.filter(x=>/APISPORTS|API_FOOTBALL/i.test(x.name)).map(x=>({name:x.name,type:x.type}));
+    item.d1BindingNames=bindings.filter(x=>/d1/i.test(x.type||'')||/FOOTBALL_DB/i.test(x.name||'')).map(x=>({name:x.name,type:x.type,id:x.id}));
     const schedules=await api(path+'/schedules');
     item.schedules=Array.isArray(schedules)?schedules:schedules.schedules;
    }catch(e){item.readError=e.message;}
