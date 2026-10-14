@@ -9,7 +9,7 @@ const api=async(path,options={})=>{const r=await fetch('https://api.cloudflare.c
 const deployment=await api('/workers/scripts/'+target+'/deployments');
 if(deployment.http!==200||!deployment.success)throw Error('LIVE_DEPLOYMENT_READ_FAILED');
 const top=deployment.data?.deployments?.[0]?.versions||[];
-if(top.length!==1||top[0].percentage!==100)throw Error('ACTIVE_VERSION_IS_NOT_100_PERCENT');
+if(top.length!==1||top[0].percentage!==100||top[0].version_id!=='5f33a4b1-a299-4195-8a68-4646396a9214')throw Error('ACTIVE_PRODUCTION_VERSION_DRIFT_OR_SPLIT');
 report.production_version=top[0].version_id;
 const rb=await api('/workers/scripts/'+target+'/versions/'+rollback);
 if(rb.http!==200||!rb.success)throw Error('ROLLBACK_VERSION_NOT_AVAILABLE');
@@ -23,6 +23,9 @@ report.next_alarm=health.next_alarm;
 report.scan_used=health.peak_status?.scan_budget?.used;
 report.scan_limit=health.peak_status?.scan_budget?.limit;
 report.peak_window=health.peak_window?.enabled;
+if(!health.peak_status||typeof health.peak_status.enabled!=='boolean'||!Object.prototype.hasOwnProperty.call(health,'next_alarm'))throw Error('SCAN_STATE_UNAVAILABLE');
+// Check and record the current choice without enabling, pausing, resetting or scheduling anything.
+report.scan_state_preserved_by_instrument=true;
 const t=Date.now(),query=await api('/workers/observability/telemetry/query',{method:'POST',body:JSON.stringify({queryId:'fe-pr7-capability-check',timeframe:{from:t-120000,to:t-60000},dry:true,datasets:['cloudflare-workers'],view:'calculations',calculations:[{operator:'count',alias:'requests'}],limit:1})});
 report.observability_query={http:query.http,success:query.success,error_codes:query.errors.map(x=>x.code),has_result:Boolean(query.data)};
 const tails=await api('/workers/scripts/'+target+'/tails');
