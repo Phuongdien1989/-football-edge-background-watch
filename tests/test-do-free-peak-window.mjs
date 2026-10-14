@@ -18,7 +18,7 @@ class QuotaWatcher {
 // Remove only import/export syntax, leaving the implementation under test intact.
 const moduleText=source.replace(/^import .*;\n/gm,'').replace('export function peakWindow','function peakWindow').replace('export class BackgroundWatcher','class BackgroundWatcher').split('export default')[0];
 class FixedDate extends Date{constructor(...args){super(...(args.length?args:[now]));}static now(){return now;}}
-const result=vm.runInNewContext(moduleText+';({peakWindow,BackgroundWatcher})',{QuotaWatcher,providerRateScope,Date:FixedDate,Number,String,Math,Error,Response,JSON,URL,Request,setTimeout:fn=>{fn();return 0;}});
+const result=vm.runInNewContext(moduleText+';({peakWindow,BackgroundWatcher})',{QuotaWatcher,providerRateScope,instrumentD1Env:(env)=>env,Date:FixedDate,Number,String,Math,Error,Response,JSON,URL,Request,setTimeout:fn=>{fn();return 0;}});
 const env={PEAK_SCAN_ENABLED:'true',PEAK_SCAN_START:'19:00',PEAK_SCAN_END:'05:00'};
 const at=s=>now=Date.parse(s);
 assert.equal(result.peakWindow(env).allowed,false,'18:59:59 Vietnam closed');
