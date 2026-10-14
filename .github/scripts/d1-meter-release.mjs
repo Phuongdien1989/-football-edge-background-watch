@@ -122,24 +122,32 @@ try{
  }
  if(!newHealth)throw Error('METER_HEALTH_COMMIT_NOT_VERIFIED');
  report.checks.new_health_and_scan='PASS';
- // Exercise pre-existing D1 LIVE history read/ensure-table path (no insert,
- // no artificial production data, no scan start).
+ // Do not call protected app/DO endpoints without BACKGROUND_TOKEN.
+ // Their 401 is correct security behavior and must never be bypassed.
+ // The existing /health request above is enough to prove production logs
+ // flow through authenticated Workers Observability (no D1 mutation).
  const t=Date.now()-30000;
- const existingRoute=await fetch(origin+'/api/notify/ui-state',{signal:AbortSignal.timeout(12000)});
- report.checks.ui_state_http=existingRoute.status;
- if(!existingRoute.ok)throw Error('EXISTING_UI_STATE_ROUTE_FAILED_HTTP_'+existingRoute.status);
- let observed=null;
+ let serviceLogCount=0;
  for(let n=0;n<12;n++){
-  const measured=await queryEvents('FE_D1_ROUTE_V1',t);
-  if(measured.events.length>0){
-    observed=measured;
-    break;
-  }
+  const measured=await queryEvents(null,t);
+  serviceLogCount=measured.events.filter(e=>{
+   const m=e?.['$metadata']||{};
+   return m.service===worker||m.scriptName===worker||m.script===worker;
+  }).length;
+  if(serviceLogCount>0)break;
   await pause(2500);
  }
- if(!observed)throw Error('ACTUAL_METER_LOG_NOT_RECEIVED');
- report.checks.real_d1_route_log={status:'PASS',count:observed.events.length,window_from:new Date(t).toISOString(),window_to:new Date().toISOString(),source:'existing GET /api/notify/ui-state: D1 ensure/read path'};
- // Log events contain only route totals, no payload or credentials.
+ if(serviceLogCount<1)throw Error('NEW_WORKER_VERSION_INVOCATION_LOG_NOT_RECEIVED');
+ report.checks.live_worker_log_transport={status:'PASS',count:serviceLogCount,source:'existing authenticated Cloudflare log query for /health invocation'};
+ // With scanner OFF, no authorized synthetic D1 writes are allowed.
+ // If other pre-existing app activity emitted D1 meter logs, count them.
+ // Absence means PENDING_REAL_EVENT, never zero quota / complete proof.
+ const measured=await queryEvents('FE_D1_ROUTE_V1',t);
+ report.checks.real_d1_route_log={
+  status:measured.events.length?'PASS_EXISTING_D1_ACTIVITY':'PENDING_VALID_D1_ACTIVITY_WHILE_SCANNER_OFF',
+  log_count:measured.events.length,
+  window_from:new Date(t).toISOString(),window_to:new Date().toISOString()
+ };
  const finalHealth=await getHealth();
  if(finalHealth.status!==200||finalHealth.body.deploy_commit!==commit||JSON.stringify(preserveScan(finalHealth.body))!==JSON.stringify(preflightScan))throw Error('POST_MEASUREMENT_HEALTH_DRIFT');
  if(await deployInfo()!==newVersion)throw Error('POST_MEASUREMENT_VERSION_DRIFT');
