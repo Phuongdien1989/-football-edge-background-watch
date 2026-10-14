@@ -46,3 +46,59 @@ A code-level route breakdown requires capturing the D1 binding result `meta.rows
 
 ## Release blocker
 Account-wide D1 metrics and production /health are now verified; per-source D1 meta.rows_written remains unknown, and no production Push/LIVE validation or verified 24-hour projected load is available. Therefore **HOLD DEPLOY** and **HOLD PAID UPGRADE**. No frontend changes, no scan pacing/threshold or model changes, no data clearing, no secret rotation.
+
+
+## PR #6 continuation — 2026-10-14, measured result (NO PRODUCTION DEPLOY)
+
+### UTC correction and exact Analytics query
+Timezone: UTC+07:00 (Asia/Ho_Chi_Minh). 2026-10-14 **01:00–02:00 ICT** is **2026-10-13 18:00–19:00 UTC**. The 29,333 `rowsWritten` (6,035 `writeQueries`) in that UTC hour belong to **2026-10-13's UTC daily total of 113,784**, NOT to the 2026-10-14 UTC total of 24,736. The latter comprises UTC 00:00–01:00 13,998 and UTC 01:00–02:00 10,738. Never sum those overlapping calendar buckets. Cloudflare resets Free daily quota at 00:00 UTC (07:00 ICT).
+- Dataset: `d1AnalyticsAdaptiveGroups`
+- Database: `football-edge-db`, ID `0d12a7cc-12a9-4c71-b55b-61dfd2dac4d4`.
+- GraphQL sent via `https://api.cloudflare.com/client/v4/graphql`:
+
+```graphql
+query($accountTag: string!, $start: Date, $end: Date) {
+  viewer {
+    accounts(filter: {accountTag: $accountTag}) {
+      d1AnalyticsAdaptiveGroups(limit: 10000, filter: {date_geq: $start, date_leq: $end}) {
+        sum { rowsWritten writeQueries rowsRead }
+        dimensions { datetimeHour databaseId }
+      }
+    }
+  }
+}
+```
+Filter start=2026-10-13, end=2026-10-14 **UTC**; group by `datetimeHour` and `databaseId`. Account token is passed as a masked GitHub Action secret and never copied into evidence.
+
+### Cloudflare **real D1** staging measurements by operation
+- GitHub Actions result PASS: https://github.com/Phuongdien1989/-football-edge-background-watch/actions/runs/38499901068
+- Database **staging** `7d503048-9118-4b29-b662-4e1ba6e32167`, **NOT production**.
+- Runs exact baseline and patched source statement builders against matched prefixed schemas and indexed D1 test tables, using identical **synthetic** input sequences. Separate schemas, unique run-specific prefixes; no user data, no deletes, no production code deploy.
+- Real Cloudflare D1 API response `meta.rows_written`: baseline **165**, patch **98**; saving **67 = 40.606%** **for this synthetic event mix only**. SQLite independent local result: baseline **49 rows changed**, patched **25** (different metric; NOT a D1 billing estimate).
+- By route (`meta.rows_written`, old → patched): FIXTURE_CATALOG **68→40**, Evidence/QSIG **13→7**, Validation **7→5**, app ENTRY **28→17**, app LIVE **21→13**, Smart Follow **21→13**, Notification LIVE **5→3**, ignored app event **2→0**.
+- First/new data still inserted and changed score/stats/status/settlement updated. Identical ID/payload retries after lost ACK now avoid redundant changed rows; D1 ON/OFF, restart read and tombstone covered.
+- Test also returns D1 `meta.changes` and `meta.rows_written` separately by operation; artifact `pr6-staging-d1-meter` includes only aggregate counters. **This is a controlled replay experiment, not route attribution of the actual 113,784 production writes.**
+- The one-time staging writer has been disabled in `.github/workflows/d1-pr6-staging-meter.yml` after this proof; no repeating background test writes.
+
+### Data freshness source/dependency audit
+1. `worker_v123.js`: `teams.last_seen_at` sorts team history in `/api/db/teams`, and is tie-breaker of analytics ranking `worker_v124.js`; `fixture_history.last_seen_at` is shown as `recent.fixture = MAX(last_seen_at)` in `worker_v124.js`. `team_fixture_history.updated_at` records recent confirmation.
+2. `worker.js` and `worker_v122.js`: `fixtures.last_seen_at` reflects most recent write to fixture metadata. ENTRY / outcome `updated_at` are content-change timestamps; query sorting and evidence timelines use `captured_at`, `signal_at`, `resolved_at`.
+3. `worker_notify_v137_quota50000.js`: `fe_notify_live_state.updated_at` is last changed persisted JSON; front-end freshness checks rely on `ui.captured_at`/`fresh_at` from provider-backed snapshots. Skipping an identical LIVE payload does not manufacture a new valid snapshot or reset alert dedup.
+4. `worker.js` Smart Follow: source `snap.captured_at`, `last_snapshot_at`, `last_detail_at`, fingerprint/signature and periodic heartbeat; snapshot IDs use captured time and are **unique across cycles** even when content repeats.
+5. `worker_notify_v130.js` error path: `item.lastAt=Date.now()` can change persisted JSON after provider failures. This is needed for retry priority/pacing and means the Notification LIVE payload may NOT be byte-identical on every retry. Accordingly zero-write on a literal identical object must **not** be extrapolated to every real scan.
+6. Source timestamps remain in original payloads; changed `last_seen_at` no longer refreshes on *every* identical upload. **Correction added in this continuation:** bounded 300,000 ms heartbeat to `teams`, `fixture_history`, `team_fixture_history`, `fixtures` in both DB routes even when payload unchanged; each active, confirmed feed may renew recency at least every 5 minutes. No backend scanning interval was changed. Tests: `tests/test-d1-recency-heartbeat.mjs`. If upstream stops, timestamps will age normally; old data must not be made fresh without receiving a feed.
+
+### Quota decision and projections
+- Verified 2026-10-13 **113,784** rows written vs **100,000 per UTC day** Free = **13,784 above limit**. A reduction of at least **12.114% of TOTAL account writes** on an otherwise identical workload would only reach the boundary, without safety margin.
+- At 10% *total actual* reduction: forecast **102,406/day**, still 2,406 over. At 20%: **91,027/day**, headroom 8,973. At 30%: **79,649/day**, headroom 20,351.
+- If (unsupported) all 113,784 daily writes behaved like the synthetic A/B mix (40.606% reduction), illustration **67,581/day**, headroom 32,419; **not evidence of a production forecast**.
+- Actual route frequencies and unique-ID vs identical-retry shares have not been captured from production. Existing rows cannot reconstruct discarded replay attempts. Therefore **Free sufficiency after patch remains NOT PROVEN**, retain Draft/NO DEPLOY, NO PAID UPGRADE.
+- To measure real production route-level meta, a narrowly gated per-operation accumulator (in-memory, no D1 logging, no raw payloads/tokens) would require deploying instrumentation; **not done** under this authorization. User approval for *any* production code deploy would be required.
+- Account-wide metric is available, but not attribution by route; no permission or credential blocker for read-only Analytics. Separate LIVE/PUSH end-to-end production validation of the patched code remains outstanding.
+
+### Scanner OFF — permitted D1 writers
+- Pausing notification scanning disables the alarm path; it **does not disable** authenticated `/api/db/sync` invoked by app, independent Smart Follow operations, validation/evidence ingestion, or admin-side D1 queries. These must continue accepting valid events and maintaining history. No new OFF-all-DB-writes assumption introduced.
+- Unknown/invalid app sync events must not write fixture metadata; patched.
+- Staging A/B replay measures duplicate-row index-aware write savings, but cannot identify which of these paths accounted for the prior production 29,333-row spike.
+
+**RELEASE GATE: HOLD.** CI PASS is necessary but does not certify 24h real load, live provider acceptance or client delivery. Preserve backend production `6b7accb869cf64598b7ca39d5326d6b4080313e1`, rollback `60781a4e-70cb-4c02-a036-2528c3048ed5`, frontend and TOP/EDGE.
