@@ -34,7 +34,7 @@ const context={Number,String,Math,Date,JSON,Set,Error,Response,URL,Request,Map,c
 function getFn(version,file,start,end,expression){
  const s=source(version,file),a=s.indexOf(start),b=s.indexOf(end,a);
  assert.ok(a>=0&&b>a,'source boundary missing '+file);
- return vm.runInNewContext(s.slice(a,b)+'\n'+expression,context);
+ return vm.runInNewContext(s.slice(a,b)+'\n'+expression,{...context});
 }
 const event=(type,payload)=>({type,payload});
 const catalog={fixture_id:987654321,home_team_id:9811,away_team_id:9812,home:'Synthetic Home',away:'Synthetic Away',league_id:90,league:'Synthetic League',season:2026,status:'1H',minute:21,score_home:0,score_away:0};
