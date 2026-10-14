@@ -22,6 +22,13 @@ on:
       - 'tests/test-do-free-entrypoint.mjs'
       - 'tests/test-do-free-quota-runtime.mjs'
       - 'tests/test-do-free-d1-live-state.mjs'
+      - 'tests/test-d1-quota-idempotency-sql.mjs'
+      - 'tests/test-d1-recency-heartbeat.mjs'
+      - 'tests/test-d1-route-meter.mjs'
+      - 'd1-route-meter.mjs'
+      - 'worker_v122.js'
+      - 'worker_v123.js'
+      - 'worker_notify_v131.js'
       - 'wrangler.toml'
       - 'worker_notify_v137_quota50000.js'
       - 'worker_notify_v138_peak_window.js'
@@ -83,6 +90,12 @@ jobs:
         run: node tests/test-do-free-status-throttle.mjs
       - name: Verify D1 LIVE state migration and dedup regression
         run: node tests/test-do-free-d1-live-state.mjs
+      - name: SQL replay and mutation regression (actual local SQLite, no Cloudflare credentials)
+        run: node --no-warnings tests/test-d1-quota-idempotency-sql.mjs
+      - name: Verify last-confirmation freshness heartbeat without write churn
+        run: node --no-warnings tests/test-d1-recency-heartbeat.mjs
+      - name: Verify optional route metering has no extra DB writes
+        run: node tests/test-d1-route-meter.mjs
       - name: Enforce official DO and D1 Workers Free write limits
         env:
           REQUIRE_DO_FREE_SAFE: '1'
@@ -93,7 +106,7 @@ jobs:
         run: node tests/test-do-free-write-floor.mjs
 
   cloudflare-readonly-preflight:
-    if: github.event_name == 'pull_request' && github.event.pull_request.number == 5 && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref == 'fix/do-free-isolated-20261010'
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && ((github.event.pull_request.number == 5 && github.event.pull_request.head.ref == 'fix/do-free-isolated-20261010') || (github.event.pull_request.number == 6 && github.event.pull_request.head.ref == 'fix/d1-quota-idempotent-20261014'))
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:

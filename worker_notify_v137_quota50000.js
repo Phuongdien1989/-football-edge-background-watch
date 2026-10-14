@@ -63,7 +63,7 @@ export class BackgroundWatcher extends HotPriorityWatcher{
     if(!this.d1LiveEnabled())return this.ctx.storage.put('notify:match:'+id,item);
     await this.ensureLiveTable();
     await this.env.FOOTBALL_DB.prepare(
-      'INSERT INTO fe_notify_live_state(fixture_id,payload,updated_at) VALUES(?,?,?) ON CONFLICT(fixture_id) DO UPDATE SET payload=excluded.payload,updated_at=excluded.updated_at'
+      'INSERT INTO fe_notify_live_state(fixture_id,payload,updated_at) VALUES(?,?,?) ON CONFLICT(fixture_id) DO UPDATE SET payload=excluded.payload,updated_at=excluded.updated_at WHERE fe_notify_live_state.payload IS NOT excluded.payload'
     ).bind(Number(id),JSON.stringify(item),Date.now()).run();
     this._liveStateCache?.set(Number(id),JSON.parse(JSON.stringify(item)));
   }
@@ -73,7 +73,7 @@ export class BackgroundWatcher extends HotPriorityWatcher{
     // Tombstone in D1 instead of deleting the legacy DO row. This prevents
     // resurrection on restart while keeping original data for rollback.
     await this.env.FOOTBALL_DB.prepare(
-      'INSERT INTO fe_notify_live_state(fixture_id,payload,updated_at) VALUES(?,?,?) ON CONFLICT(fixture_id) DO UPDATE SET payload=excluded.payload,updated_at=excluded.updated_at'
+      'INSERT INTO fe_notify_live_state(fixture_id,payload,updated_at) VALUES(?,?,?) ON CONFLICT(fixture_id) DO UPDATE SET payload=excluded.payload,updated_at=excluded.updated_at WHERE fe_notify_live_state.payload IS NOT excluded.payload'
     ).bind(Number(id),JSON.stringify({__fe_deleted:true}),Date.now()).run();
     this._liveStateCache?.delete(Number(id));
   }

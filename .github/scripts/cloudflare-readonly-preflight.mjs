@@ -29,6 +29,7 @@ if(token&&account&&worker&&database){
     const settings=await api(path+'/settings');
     const bindings=settings.bindings||[];
     item.apiCredentialBindingNames=bindings.filter(x=>/APISPORTS|API_FOOTBALL/i.test(x.name)).map(x=>({name:x.name,type:x.type}));
+    item.d1BindingNames=bindings.filter(x=>/d1/i.test(x.type||'')||/FOOTBALL_DB/i.test(x.name||'')).map(x=>({name:x.name,type:x.type,id:x.id}));
     const schedules=await api(path+'/schedules');
     item.schedules=Array.isArray(schedules)?schedules:schedules.schedules;
    }catch(e){item.readError=e.message;}
@@ -128,6 +129,11 @@ if(token&&account){
    const query=`query($accountTag:string!,$start:Date,$end:Date){viewer{accounts(filter:{accountTag:$accountTag}){${dataset}(limit:10000,filter:{date_geq:$start,date_leq:$end}){sum{${names.join(' ')}} dimensions{date}}}}}`;
    const data=await gql(query,{accountTag:account,start:yesterday,end:today});
    report.analytics[dataset].daily=(data.viewer?.accounts||[]).flatMap(x=>x[dataset]||[]);
+   // Read-only hourly D1 usage: attribute time spikes without inserting log rows.
+   if(dataset==='d1AnalyticsAdaptiveGroups'&&dimensionNames.includes('datetimeHour')&&dimensionNames.includes('databaseId')){
+    const hourly=await gql(`query($accountTag:string!,$start:Date,$end:Date){viewer{accounts(filter:{accountTag:$accountTag}){d1AnalyticsAdaptiveGroups(limit:10000,filter:{date_geq:$start,date_leq:$end}){sum{rowsWritten writeQueries rowsRead} dimensions{datetimeHour databaseId}}}}}`,{accountTag:account,start:yesterday,end:today});
+    report.analytics[dataset].hourly=(hourly.viewer?.accounts||[]).flatMap(x=>x.d1AnalyticsAdaptiveGroups||[]);
+   }
    const group=dimensionNames.find(x=>x==='scriptName')||dimensionNames.find(x=>x==='namespaceId')||(dataset==='d1AnalyticsAdaptiveGroups'?dimensionNames.find(x=>x==='databaseId'):null);
    if(group){
     const grouped=await gql(`query($accountTag:string!,$start:Date,$end:Date){viewer{accounts(filter:{accountTag:$accountTag}){${dataset}(limit:10000,filter:{date_geq:$start,date_leq:$end}){sum{${names.join(' ')}} dimensions{date ${group}}}}}}`,{accountTag:account,start:yesterday,end:today});

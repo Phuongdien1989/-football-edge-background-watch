@@ -51,7 +51,8 @@ function dbFixtureStmt(env,p,now){
     VALUES (?,?,?,?,?,?,?,?)
     ON CONFLICT(fixture_id) DO UPDATE SET
       league=COALESCE(excluded.league,fixtures.league),home=COALESCE(excluded.home,fixtures.home),away=COALESCE(excluded.away,fixtures.away),
-      kickoff=COALESCE(excluded.kickoff,fixtures.kickoff),status=COALESCE(excluded.status,fixtures.status),last_seen_at=MAX(fixtures.last_seen_at,excluded.last_seen_at)`)
+      kickoff=COALESCE(excluded.kickoff,fixtures.kickoff),status=COALESCE(excluded.status,fixtures.status),last_seen_at=MAX(fixtures.last_seen_at,excluded.last_seen_at)
+    WHERE fixtures.league IS NOT COALESCE(excluded.league,fixtures.league) OR fixtures.home IS NOT COALESCE(excluded.home,fixtures.home) OR fixtures.away IS NOT COALESCE(excluded.away,fixtures.away) OR fixtures.kickoff IS NOT COALESCE(excluded.kickoff,fixtures.kickoff) OR fixtures.status IS NOT COALESCE(excluded.status,fixtures.status) OR excluded.last_seen_at - fixtures.last_seen_at >= 300000`)
     .bind(fid,cleanStr(p?.league),cleanStr(p?.home),cleanStr(p?.away),n(p?.kickoff,null),cleanStr(p?.status,20),now,now);
 }
 function dbEntryStmt(env,p,now){
@@ -65,21 +66,21 @@ function dbEntryStmt(env,p,now){
       signal_state=excluded.signal_state,data_level=excluded.data_level,market_level=excluded.market_level,edge_level=excluded.edge_level,model_prob=excluded.model_prob,
       break_even=excluded.break_even,market_prob=excluded.market_prob,edge=excluded.edge,model_ev=excluded.model_ev,candidate_supported=excluded.candidate_supported,
       auto_settle_supported=excluded.auto_settle_supported,resolution=excluded.resolution,outcome=excluded.outcome,unit_pl=excluded.unit_pl,resolved_at=excluded.resolved_at,
-      payload_json=excluded.payload_json,updated_at=excluded.updated_at`)
+      payload_json=excluded.payload_json,updated_at=excluded.updated_at WHERE entry_decisions.payload_json IS NOT excluded.payload_json`)
     .bind(cleanStr(p?.id,160),n(p?.fixture_id),cleanStr(p?.engine,20),cleanStr(p?.policy_status,40),cleanStr(p?.policy_reason,500),n(p?.captured_at,now),n(p?.minute,null),n(score?.home,null),n(score?.away,null),cleanStr(p?.market_type,40),cleanStr(p?.selection,40),n(p?.line,null),n(p?.price,null),cleanStr(p?.odds_format,20),cleanStr(p?.price_zone,40),cleanStr(p?.behavior_state,50),cleanStr(p?.signal_state,80),cleanStr(p?.data_level,80),cleanStr(p?.market_level,80),cleanStr(p?.edge_level,80),n(p?.model_prob,null),n(p?.break_even,null),n(p?.market_prob,null),n(p?.edge,null),n(p?.model_ev,null),p?.candidate_supported?1:0,p?.auto_settle_supported?1:0,cleanStr(p?.resolution,40),cleanStr(p?.outcome,40),n(p?.unit_pl,null),n(p?.resolved_at,null),dbJson(p),now);
 }
 function dbEntryOutcomeStmt(env,p,now){
   if(String(p?.resolution||'')!=='RESOLVED'||!p?.id)return null;const final=p?.final_score||{};
   return env.FOOTBALL_DB.prepare(`INSERT INTO entry_outcomes (decision_id,fixture_id,engine,outcome,unit_pl,final_score_home,final_score_away,resolved_at,payload_json,updated_at)
     VALUES (?,?,?,?,?,?,?,?,?,?)
-    ON CONFLICT(decision_id) DO UPDATE SET outcome=excluded.outcome,unit_pl=excluded.unit_pl,final_score_home=excluded.final_score_home,final_score_away=excluded.final_score_away,resolved_at=excluded.resolved_at,payload_json=excluded.payload_json,updated_at=excluded.updated_at`)
+    ON CONFLICT(decision_id) DO UPDATE SET outcome=excluded.outcome,unit_pl=excluded.unit_pl,final_score_home=excluded.final_score_home,final_score_away=excluded.final_score_away,resolved_at=excluded.resolved_at,payload_json=excluded.payload_json,updated_at=excluded.updated_at WHERE entry_outcomes.payload_json IS NOT excluded.payload_json`)
     .bind(cleanStr(p.id,160),n(p.fixture_id),cleanStr(p.engine,20),cleanStr(p.outcome,40),n(p.unit_pl,null),n(final?.home,null),n(final?.away,null),n(p.resolved_at,now),dbJson(p),now);
 }
 function dbLiveStmt(env,p,now){
   return env.FOOTBALL_DB.prepare(`INSERT INTO live_snapshots
     (id,fixture_id,source,engine,snapshot_kind,persistence_reason,captured_at,minute,status,score_home,score_away,top_rank,signal_state,signal_score,dq,policy_status,behavior_state,market_type,selection,line,price,fingerprint,payload_json)
     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-    ON CONFLICT(id) DO UPDATE SET persistence_reason=excluded.persistence_reason,minute=excluded.minute,status=excluded.status,score_home=excluded.score_home,score_away=excluded.score_away,top_rank=excluded.top_rank,signal_state=excluded.signal_state,signal_score=excluded.signal_score,dq=excluded.dq,policy_status=excluded.policy_status,behavior_state=excluded.behavior_state,market_type=excluded.market_type,selection=excluded.selection,line=excluded.line,price=excluded.price,fingerprint=excluded.fingerprint,payload_json=excluded.payload_json`)
+    ON CONFLICT(id) DO UPDATE SET persistence_reason=excluded.persistence_reason,minute=excluded.minute,status=excluded.status,score_home=excluded.score_home,score_away=excluded.score_away,top_rank=excluded.top_rank,signal_state=excluded.signal_state,signal_score=excluded.signal_score,dq=excluded.dq,policy_status=excluded.policy_status,behavior_state=excluded.behavior_state,market_type=excluded.market_type,selection=excluded.selection,line=excluded.line,price=excluded.price,fingerprint=excluded.fingerprint,payload_json=excluded.payload_json WHERE live_snapshots.payload_json IS NOT excluded.payload_json`)
     .bind(cleanStr(p?.id,180),n(p?.fixture_id),cleanStr(p?.source,40),cleanStr(p?.engine,30),cleanStr(p?.snapshot_kind,40),cleanStr(p?.persistence_reason,80),n(p?.captured_at,now),n(p?.minute,null),cleanStr(p?.status,20),n(p?.score_home,null),n(p?.score_away,null),n(p?.top_rank,null),cleanStr(p?.signal_state,80),n(p?.signal_score,null),n(p?.dq,null),cleanStr(p?.policy_status,40),cleanStr(p?.behavior_state,50),cleanStr(p?.market_type,50),cleanStr(p?.selection,40),n(p?.line,null),n(p?.price,null),cleanStr(p?.fingerprint,500),dbJson(p?.payload??p));
 }
 async function dbWriteEvents(env,events){
@@ -87,9 +88,10 @@ async function dbWriteEvents(env,events){
   const rows=(Array.isArray(events)?events:[]).slice(0,80),now=Date.now();let accepted=0,ignored=0;
   for(let i=0;i<rows.length;i+=20){
     const stmts=[],chunk=rows.slice(i,i+20);
-    for(const evt of chunk){const p=evt?.payload||{},type=String(evt?.type||'');const fs=dbFixtureStmt(env,p,now);if(fs)stmts.push(fs);
-      if(type==='ENTRY_DECISION'){if(p?.id&&Number.isFinite(n(p?.fixture_id))){stmts.push(dbEntryStmt(env,p,now));const os=dbEntryOutcomeStmt(env,p,now);if(os)stmts.push(os);accepted++}else ignored++}
-      else if(type==='LIVE_SNAPSHOT'){if(p?.id&&Number.isFinite(n(p?.fixture_id))){stmts.push(dbLiveStmt(env,p,now));accepted++}else ignored++}
+    for(const evt of chunk){const p=evt?.payload||{},type=String(evt?.type||'');
+      // Ignored/invalid events must never mutate fixture timestamps or D1 indexes.
+      if(type==='ENTRY_DECISION'&&p?.id&&Number.isFinite(n(p?.fixture_id))){const fs=dbFixtureStmt(env,p,now);if(fs)stmts.push(fs);stmts.push(dbEntryStmt(env,p,now));const os=dbEntryOutcomeStmt(env,p,now);if(os)stmts.push(os);accepted++}
+      else if(type==='LIVE_SNAPSHOT'&&p?.id&&Number.isFinite(n(p?.fixture_id))){const fs=dbFixtureStmt(env,p,now);if(fs)stmts.push(fs);stmts.push(dbLiveStmt(env,p,now));accepted++}
       else ignored++;
     }
     if(stmts.length)await env.FOOTBALL_DB.batch(stmts);
