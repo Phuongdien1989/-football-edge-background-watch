@@ -23,7 +23,8 @@ function fixtureStmt(env,p,now){
   const fid=n(p?.fixture_id);if(!Number.isFinite(fid))return null;
   return env.FOOTBALL_DB.prepare(`INSERT INTO fixtures (fixture_id,league,home,away,kickoff,status,first_seen_at,last_seen_at)
     VALUES (?,?,?,?,?,?,?,?)
-    ON CONFLICT(fixture_id) DO UPDATE SET league=COALESCE(excluded.league,fixtures.league),home=COALESCE(excluded.home,fixtures.home),away=COALESCE(excluded.away,fixtures.away),kickoff=COALESCE(excluded.kickoff,fixtures.kickoff),status=COALESCE(excluded.status,fixtures.status),last_seen_at=MAX(fixtures.last_seen_at,excluded.last_seen_at)`)
+    ON CONFLICT(fixture_id) DO UPDATE SET league=COALESCE(excluded.league,fixtures.league),home=COALESCE(excluded.home,fixtures.home),away=COALESCE(excluded.away,fixtures.away),kickoff=COALESCE(excluded.kickoff,fixtures.kickoff),status=COALESCE(excluded.status,fixtures.status),last_seen_at=MAX(fixtures.last_seen_at,excluded.last_seen_at)
+    WHERE fixtures.league IS NOT COALESCE(excluded.league,fixtures.league) OR fixtures.home IS NOT COALESCE(excluded.home,fixtures.home) OR fixtures.away IS NOT COALESCE(excluded.away,fixtures.away) OR fixtures.kickoff IS NOT COALESCE(excluded.kickoff,fixtures.kickoff) OR fixtures.status IS NOT COALESCE(excluded.status,fixtures.status)`)
     .bind(fid,s(p?.league),s(p?.home),s(p?.away),n(p?.kickoff,null),s(p?.status,20),now,now);
 }
 function qsigOutcome(p){
@@ -35,14 +36,14 @@ function qsigOutcome(p){
 function qsigStmt(env,p,now){
   return env.FOOTBALL_DB.prepare(`INSERT INTO qsig_results (id,fixture_id,engine,signal_at,resolved_at,outcome,payload_json)
     VALUES (?,?,?,?,?,?,?)
-    ON CONFLICT(id) DO UPDATE SET engine=excluded.engine,signal_at=excluded.signal_at,resolved_at=excluded.resolved_at,outcome=excluded.outcome,payload_json=excluded.payload_json`)
+    ON CONFLICT(id) DO UPDATE SET engine=excluded.engine,signal_at=excluded.signal_at,resolved_at=excluded.resolved_at,outcome=excluded.outcome,payload_json=excluded.payload_json WHERE qsig_results.payload_json IS NOT excluded.payload_json`)
     .bind(s(p?.id),n(p?.fixture_id),s(p?.engine,20),n(p?.t0??p?.signal_at??p?.captured_at,now),n(p?.resolved_at??p?.closed_at,null),qsigOutcome(p),payload(p));
 }
 function validationStmt(env,p,now){
   const result=p?.outcome!=null?p.outcome:(typeof p?.hit==='boolean'?(p.hit?'HIT':'MISS'):(p?.resolution||null));
   return env.FOOTBALL_DB.prepare(`INSERT INTO validation_results (id,fixture_id,validation_type,created_at,result_key,payload_json)
     VALUES (?,?,?,?,?,?)
-    ON CONFLICT(id) DO UPDATE SET fixture_id=excluded.fixture_id,validation_type=excluded.validation_type,created_at=excluded.created_at,result_key=excluded.result_key,payload_json=excluded.payload_json`)
+    ON CONFLICT(id) DO UPDATE SET fixture_id=excluded.fixture_id,validation_type=excluded.validation_type,created_at=excluded.created_at,result_key=excluded.result_key,payload_json=excluded.payload_json WHERE validation_results.payload_json IS NOT excluded.payload_json`)
     .bind(s(p?.id),n(p?.fixture_id,null),s(p?.source||p?.sample_type||p?.engine||'VALIDATION',60),n(p?.captured_at??p?.created_at,now),s(result,80),payload(p));
 }
 async function writeEvidence(env,events){
