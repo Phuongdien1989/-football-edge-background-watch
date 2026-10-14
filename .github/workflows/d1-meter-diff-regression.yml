@@ -32,11 +32,11 @@ jobs:
           old=subprocess.check_output(['git','show',base+':'+path],text=True)
           new=pathlib.Path(path).read_text()
           expected=old.replace("import {providerRateScope} from './provider_errors.mjs';","import {providerRateScope} from './provider_errors.mjs';\nimport {instrumentD1Env} from './d1-production-meter.mjs';")
-          expected=expected.replace('    super(ctx,env);',"    super(ctx,instrumentD1Env(env,'DURABLE_OBJECT'));")
-          expected=expected.replace('  const response=await base.fetch(request,env,ctx);',"  const response=await base.fetch(request,instrumentD1Env(env,'EDGE_WORKER'),ctx);")
+          expected=expected.replace('    super(ctx,env);',\"    super(ctx,instrumentD1Env(env,'DURABLE_OBJECT'));\")
+          expected=expected.replace('  const response=await base.fetch(request,env,ctx);',\"  const response=await base.fetch(request,instrumentD1Env(env,'EDGE_WORKER'),ctx);\")
           assert new==expected,'production entrypoint includes unapproved non-meter changes'
           names=subprocess.check_output(['git','diff','--name-only',base,'HEAD'],text=True).splitlines()
-          approved={'worker_notify_v138_peak_window.js','d1-production-meter.mjs','tests/test-d1-production-meter.mjs','.github/scripts/d1-meter-readonly-preflight.mjs','.github/workflows/d1-meter-readonly-preflight.yml','.github/workflows/d1-meter-diff-regression.yml'}
+          approved={'worker_notify_v138_peak_window.js','d1-production-meter.mjs','tests/test-d1-production-meter.mjs','tests/test-do-free-peak-window.mjs','.github/scripts/d1-meter-readonly-preflight.mjs','.github/workflows/d1-meter-readonly-preflight.yml','.github/workflows/d1-meter-diff-regression.yml'}
           assert set(names)<=approved, 'unexpected source modified: '+repr(set(names)-approved)
           cfg=pathlib.Path('wrangler.toml').read_text()
           assert 'PEAK_SCAN_ENABLED = "false"' in cfg and 'MANUAL_SCAN_MODE_ENABLED = "true"' in cfg
