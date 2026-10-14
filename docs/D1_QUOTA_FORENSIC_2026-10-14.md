@@ -102,3 +102,9 @@ Filter start=2026-10-13, end=2026-10-14 **UTC**; group by `datetimeHour` and `da
 - Staging A/B replay measures duplicate-row index-aware write savings, but cannot identify which of these paths accounted for the prior production 29,333-row spike.
 
 **RELEASE GATE: HOLD.** CI PASS is necessary but does not certify 24h real load, live provider acceptance or client delivery. Preserve backend production `6b7accb869cf64598b7ca39d5326d6b4080313e1`, rollback `60781a4e-70cb-4c02-a036-2528c3048ed5`, frontend and TOP/EDGE.
+
+
+### Prepared minimal route instrumentation — NOT IN PRODUCTION
+Module `d1-route-meter.mjs` and test `tests/test-d1-route-meter.mjs` are present on Draft PR #6 but **not imported in any Worker entrypoint**. The wrapper observes `meta.rows_written` from `D1PreparedStatement.run()` and per-statement `D1Database.batch()`, accumulates numeric counters in memory, and exposes a summary with only a fixed route label/count. It creates **no telemetry database**, does not issue any extra queries, and never includes SQL text, query parameters, tokens, IPs, fixture payloads, or device IDs in a summary. Unit test asserts no instrumentation writes.
+
+To obtain real production per-route counts, a **separate, explicitly approved code rollout** would still be required to wire one isolated meter per route/request and output one aggregate via restricted diagnostics after request completion: `NOTIFY_LIVE`, `SMART_FOLLOW`, `QSIG`, `VALIDATION`, `SYNC_ENTRY`, `SYNC_LIVE`, `SYNC_CATALOG`. A first-vs-retry distinction requires reliable caller metadata or a carefully costed existence check; mere `meta.rows_written` does not classify retry. This integration is **NOT currently applied or authorized**, and results from staging must not be described as live route attribution.
