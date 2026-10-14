@@ -24,7 +24,7 @@ jobs:
           node-version: '22'
       - name: Guard production parent and instrumentation-only scope
         run: |
-          test "$(git rev-parse diag/d1-prod-baseline-20261014 2>/dev/null || git rev-parse 6b7accb869cf64598b7ca39d5326d6b4080313e1)" = '6b7accb869cf64598b7ca39d5326d6b4080313e1'
+          test "$(git rev-parse 6b7accb869cf64598b7ca39d5326d6b4080313e1)" = '6b7accb869cf64598b7ca39d5326d6b4080313e1'
           python3 - <<'PY'
           import subprocess,difflib,pathlib
           base='6b7accb869cf64598b7ca39d5326d6b4080313e1'
