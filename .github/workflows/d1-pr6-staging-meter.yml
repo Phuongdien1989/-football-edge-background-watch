@@ -1,0 +1,41 @@
+name: PR6 staging D1 measured A-B
+on:
+  pull_request:
+    paths:
+      - 'tests/test-d1-staging-meter.mjs'
+      - '.github/workflows/d1-pr6-staging-meter.yml'
+  workflow_dispatch:
+jobs:
+  staging-d1-meter:
+    if: github.event_name == 'pull_request' && github.event.pull_request.number == 6 && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref == 'fix/d1-quota-idempotent-20261014'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    environment: football-edge-production
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Guard staging target and confirm baseline git object
+        run: |
+          test "$(git rev-parse 1d72fe95245a0ae58f43e6a007c315e2bf6f6635)" = "1d72fe95245a0ae58f43e6a007c315e2bf6f6635"
+          node --check tests/test-d1-staging-meter.mjs
+      - name: Measure actual D1 meta rows written with synthetic events in staging only
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+        run: node --no-warnings tests/test-d1-staging-meter.mjs
+      - name: Store aggregate-only measured evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pr6-staging-d1-meter
+          path: d1-staging-meter-results.json
+          if-no-files-found: ignore
