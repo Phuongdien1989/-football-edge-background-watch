@@ -33,6 +33,12 @@ All guards use SQLite `ON CONFLICT ... DO UPDATE ... WHERE` with NULL-safe `IS N
 - This establishes that meaningful D1 writes can occur when the main scan is currently stopped, but does not attribute 24,736 rows to phone sync without per-source evidence. Temporal association is not a causality proof.
 - Account contains several Workers; none had a listed cron schedule at time of the read-only inventory. Other event-triggered callers cannot yet be excluded.
 
+### Hourly attribution and D1-binding inventory
+Read-only Analytics run https://github.com/Phuongdien1989/-football-edge-background-watch/actions/runs/38497893954 showed:
+- 2026-10-13 18:00–19:00 UTC (2026-10-14 01:00–02:00 in Vietnam): **29,333 D1 rows written**, 6,035 write queries, while the last retained notification LIVE state was 2026-10-13 20:30 ICT. This makes the paused main notification scan an insufficient explanation for all D1 writes.
+- The hour is a calendar UTC grouping from GraphQL, not a complete per-route trace.
+Read-only Worker-settings inventory on https://github.com/Phuongdien1989/-football-edge-background-watch/actions/runs/38498088884 identified 11 Workers. Among those, only `football-edge-background-watch` has a D1 binding to database `0d12a7cc-12a9-4c71-b55b-61dfd2dac4d4`. Staging/shadow/raw-capture Workers that have D1 bindings reference **other** database IDs. No listed Worker had a cron schedule. This narrows the relevant deployed Worker to one, but direct Cloudflare D1 API writes, HTTP routes and app-triggered sync remain un-attributed without per-statement instrumentation.
+
 ## Required per-route evidence (still missing)
 Owner must provide **D1 -> database -> Metrics -> Row Metrics -> 2026-10-13**, visible database name and **Rows written**. Check every D1 database on the **same Cloudflare account**, and Workers / DO usage separately if relevant. A global account ceiling is not attributed by only one database.
 
