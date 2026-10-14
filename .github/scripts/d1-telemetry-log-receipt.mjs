@@ -18,12 +18,13 @@ const res=await fetch('https://api.cloudflare.com/client/v4/accounts/'+encodeURI
 });
 const json=await res.json().catch(()=>({}));
 const result=json.result||{};
-const entries=Array.isArray(result.events)?result.events:[];
+const entries=Array.isArray(result.events?.events)?result.events.events:[]; // Cloudflare returns events: {count,events,fields,series}
 const report={
  schema:'FE_PR7_LOG_RECEIPT_V1',production_deploy:'NOT_ATTEMPTED',
  http:res.status,success:json.success===true,
  result_keys:Object.keys(result).sort().filter(x=>/^(run|events|statistics|calculations|pagination|traces|invocations)$/i.test(x)),
  event_count:entries.length,
+ total_matched:Number.isInteger(result.events?.count)?result.events.count:null,
  query_status:result?.run?.status||null,
  health_http:h.status,
  captured_utc_start:new Date(since).toISOString(),captured_utc_end:new Date().toISOString()
