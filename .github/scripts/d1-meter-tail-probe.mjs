@@ -3,7 +3,7 @@
 import {spawn} from 'node:child_process';
 const env={...process.env,CI:'true',WRANGLER_SEND_METRICS:'false'};
 if(!env.CLOUDFLARE_API_TOKEN||!env.CLOUDFLARE_ACCOUNT_ID)throw Error('TAIL_CREDENTIALS_MISSING');
-const cp=spawn('npx',['--no-install','wrangler','tail','football-edge-background-watch','--format','json'],{env,stdio:['ignore','pipe','pipe']});
+const cp=spawn('./node_modules/.bin/wrangler',['tail','football-edge-background-watch','--format','json'],{env,stdio:['ignore','pipe','pipe']});
 let out='',err='',exit=null,healthSent=0;
 cp.stdout.on('data',b=>{out=(out+b.toString()).slice(-64000)});
 cp.stderr.on('data',b=>{err=(err+b.toString()).slice(-8000)});
@@ -14,7 +14,7 @@ for(let i=0;i<3;i++){
  await new Promise(r=>setTimeout(r,700));
 }
 await new Promise(r=>setTimeout(r,4500));
-cp.kill('SIGTERM');
+cp.kill('SIGKILL');cp.stdout.destroy();cp.stderr.destroy();
 await new Promise(r=>setTimeout(r,500));
 const lines=out.split('\n').map(x=>x.trim()).filter(x=>x.startsWith('{'));
 const received=lines.filter(x=>{try{return !!JSON.parse(x).event}catch{return false}}).length;
