@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 jobs:
   staging-d1-meter:
-    if: github.event_name == 'pull_request' && github.event.pull_request.number == 6 && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref == 'fix/d1-quota-idempotent-20261014'
+    if: false # One-time staging A/B proof completed in run 38499901068; prevent further staging writes.
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
