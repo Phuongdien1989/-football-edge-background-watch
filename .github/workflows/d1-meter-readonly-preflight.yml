@@ -1,0 +1,46 @@
+name: D1 production meter - read-only prerelease
+on:
+  pull_request:
+    paths:
+      - '.github/scripts/d1-meter-readonly-preflight.mjs'
+      - '.github/scripts/d1-meter-tail-probe.mjs'
+      - '.github/scripts/d1-telemetry-log-receipt.mjs'
+      - '.github/workflows/d1-meter-readonly-preflight.yml'
+jobs:
+  audit:
+    if: github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref == 'diag/d1-production-meter-only-20261014'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: football-edge-production
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify read-only token scope, prod commit, rollback, ON/OFF, logs query
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node .github/scripts/d1-meter-readonly-preflight.mjs
+      - name: Confirm stored production request log is retrievable without leaking payload
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node .github/scripts/d1-telemetry-log-receipt.mjs
+      # Tail API session creation returned 200, but no authenticated log events were
+      # received (direct WS HTTP 406, Wrangler fallback no receipt). Keep this
+      # diagnostic disabled rather than rerun a known failure on every PR change.
+      - name: Install temporary Tail WebSocket client
+        if: false
+        run: npm install --no-save wrangler@4
+      - name: Validate authenticated WebSocket Tail receipt with read-only health
+        if: false
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node --no-warnings .github/scripts/d1-meter-tail-probe.mjs

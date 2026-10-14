@@ -1,0 +1,27 @@
+name: PR7 Cloudflare telemetry auth + logging storage audit
+on:
+  pull_request:
+    paths:
+      - '.github/scripts/d1-telemetry-auth-audit.mjs'
+      - '.github/workflows/d1-telemetry-auth-audit.yml'
+jobs:
+  audit:
+    if: github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref == 'diag/d1-production-meter-only-20261014'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    environment: football-edge-production
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check actual Cloudflare account token and deployed log settings
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node .github/scripts/d1-telemetry-auth-audit.mjs

@@ -1,5 +1,6 @@
 import base,{BackgroundWatcher as QuotaWatcher} from './worker_notify_v137_quota50000.js';
 import {providerRateScope} from './provider_errors.mjs';
+import {instrumentD1Env} from './d1-production-meter.mjs';
 
 // Account-local daily scan window. Engines, thresholds and in-window cadence
 // remain inherited. Manual PAUSE remains stronger than the daily schedule.
@@ -26,7 +27,7 @@ export function peakWindow(env,now=Date.now()){
 
 export class BackgroundWatcher extends QuotaWatcher{
   constructor(ctx,env){
-    super(ctx,env);
+    super(ctx,instrumentD1Env(env,'DURABLE_OBJECT'));
     if(String(env?.MANUAL_SCAN_MODE_ENABLED)==='true')ctx.blockConcurrencyWhile(async()=>{
       const key='notify:manual-mode:v1';
       if(await ctx.storage.get(key))return;
@@ -197,7 +198,7 @@ export class BackgroundWatcher extends QuotaWatcher{
 }
 
 export default {...base,async fetch(request,env,ctx){
-  const response=await base.fetch(request,env,ctx);
+  const response=await base.fetch(request,instrumentD1Env(env,'EDGE_WORKER'),ctx);
   if(new URL(request.url).pathname==='/health'&&response.ok){
     const health=await response.json();
     const id=env.BACKGROUND_WATCHER.idFromName('football-edge-global');
