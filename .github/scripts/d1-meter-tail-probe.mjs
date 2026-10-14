@@ -1,37 +1,23 @@
-import WebSocket from 'ws';
-// Transport preflight: opens ephemeral authenticated Cloudflare Workers tail,
-// sends read-only /health, never prints tail event bodies or credentials.
-const key=process.env.CLOUDFLARE_API_TOKEN,account=process.env.CLOUDFLARE_ACCOUNT_ID;
-if(!key||!account)throw Error('AUTH_MISSING');
-const name='football-edge-background-watch';
-const root='https://api.cloudflare.com/client/v4/accounts/'+account+'/workers/scripts/'+name+'/tails';
-const call=async(url,method)=>{
- const r=await fetch(url,{method,headers:{authorization:'Bearer '+key},signal:AbortSignal.timeout(15000)});
- const data=await r.json().catch(()=>({}));
- if(!r.ok||data.success===false)throw Error('TAIL_'+method+'_HTTP_'+r.status+'_CODES_'+(data.errors||[]).map(x=>x.code).join(','));
- return data.result;
-};
-let created,ws;
-try{
- created=await call(root,'POST');
- if(!created?.url||!created?.id)throw Error('TAIL_SESSION_SHAPE_INVALID');
- const result=await new Promise(resolve=>{
-  let opened=false,received=false,finished=false,failure_code=null;
-  ws=new WebSocket(created.url,{headers:{Authorization:'Bearer '+key}});
-  const finish=()=>{if(!finished){finished=true;resolve({opened,received,failure_code});}};
-  const stop=setTimeout(finish,9500);
-  ws.on('open',async()=>{
-   opened=true;
-   try{await fetch('https://football-edge-background-watch.ngophuonghuy.workers.dev/health',{signal:AbortSignal.timeout(5000)});}catch{}
-  });
-  ws.on('message',()=>{received=true;clearTimeout(stop);finish()});
-  ws.on('error',err=>{failure_code=String(err?.code||'WS_ERROR').slice(0,50);clearTimeout(stop);finish()});
-  ws.on('unexpected-response',(req,res)=>{failure_code='HTTP_'+res.statusCode;clearTimeout(stop);finish()});
-  ws.on('close',()=>{clearTimeout(stop);finish()});
- });
- console.log('FE_AUTH_TAIL_TRANSPORT '+JSON.stringify({api:'PASS',websocket:result.opened?'PASS':'FAIL',received_request_event:result.received,failure_code:result.failure_code,production_deploy:'NOT_ATTEMPTED'}));
- if(!result.opened||!result.received)process.exitCode=2;
-}finally{
- try{ws?.close()}catch{}
- if(created?.id)try{await call(root+'/'+encodeURIComponent(created.id),'DELETE')}catch{}
+// Authenticated, read-only Tail transport test using Wrangler's supported
+// WebSocket handshake. Capture event counts only; never print event contents.
+import {spawn} from 'node:child_process';
+const env={...process.env,CI:'true',WRANGLER_SEND_METRICS:'false'};
+if(!env.CLOUDFLARE_API_TOKEN||!env.CLOUDFLARE_ACCOUNT_ID)throw Error('TAIL_CREDENTIALS_MISSING');
+const cp=spawn('npx',['--no-install','wrangler','tail','football-edge-background-watch','--format','json'],{env,stdio:['ignore','pipe','pipe']});
+let out='',err='',exit=null,healthSent=0;
+cp.stdout.on('data',b=>{out=(out+b.toString()).slice(-64000)});
+cp.stderr.on('data',b=>{err=(err+b.toString()).slice(-8000)});
+cp.on('exit',code=>{exit=code});
+await new Promise(r=>setTimeout(r,3800));
+for(let i=0;i<3;i++){
+ try{const x=await fetch('https://football-edge-background-watch.ngophuonghuy.workers.dev/health',{signal:AbortSignal.timeout(5000)});if(x.status===200)healthSent++}catch{}
+ await new Promise(r=>setTimeout(r,700));
 }
+await new Promise(r=>setTimeout(r,4500));
+cp.kill('SIGTERM');
+await new Promise(r=>setTimeout(r,500));
+const lines=out.split('\n').map(x=>x.trim()).filter(x=>x.startsWith('{'));
+const received=lines.filter(x=>{try{return !!JSON.parse(x).event}catch{return false}}).length;
+const connected=/Successfully created tail|Connected to|tail session/i.test(out+err)||received>0;
+console.log('FE_AUTH_TAIL_TRANSPORT '+JSON.stringify({api:'WRANGLER_CLI',connected,received_request_event:received>0,health_requests_sent:healthSent,exit_code:exit,production_deploy:'NOT_ATTEMPTED'}));
+if(!connected||!received)process.exitCode=2;
