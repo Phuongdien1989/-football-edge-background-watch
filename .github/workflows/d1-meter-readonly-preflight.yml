@@ -27,7 +27,7 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: node .github/scripts/d1-meter-readonly-preflight.mjs
       - name: Install temporary Tail WebSocket client
-        run: npm install --no-save ws@8
+        run: npm install --no-save wrangler@4
       - name: Validate authenticated WebSocket Tail receipt with read-only health
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
