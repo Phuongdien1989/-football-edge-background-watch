@@ -26,7 +26,7 @@ report.peak_window=health.peak_window?.enabled;
 if(!health.peak_status||typeof health.peak_status.enabled!=='boolean'||!Object.prototype.hasOwnProperty.call(health,'next_alarm'))throw Error('SCAN_STATE_UNAVAILABLE');
 // Check and record the current choice without enabling, pausing, resetting or scheduling anything.
 report.scan_state_preserved_by_instrument=true;
-const t=Date.now(),query=await api('/workers/observability/telemetry/query',{method:'POST',body:JSON.stringify({queryId:'fe-pr7-capability-check',timeframe:{from:t-120000,to:t-60000},dry:true,datasets:['cloudflare-workers'],view:'calculations',calculations:[{operator:'count',alias:'requests'}],limit:1})});
+const t=Date.now(),query=await api('/workers/observability/telemetry/query',{method:'POST',body:JSON.stringify({queryId:'fe-pr7-capability-check',timeframe:{from:t-120000,to:t-60000},dry:true,view:'calculations',parameters:{datasets:[],calculations:[{operator:'count',alias:'requests'}]},limit:1})});
 report.observability_query={http:query.http,success:query.success,error_codes:query.errors.map(x=>x.code),has_result:Boolean(query.data)};
 const tails=await api('/workers/scripts/'+target+'/tails');
 report.authenticated_live_tail={http:tails.http,success:tails.success,error_codes:tails.errors.map(x=>x.code)};
