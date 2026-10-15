@@ -1,0 +1,26 @@
+name: Desktop B2 Worker HTTP asset diagnosis (READ ONLY)
+on:
+  push:
+    branches: [feature/football-edge-desktop-b2-preview-20261015]
+    paths: ['.github/workflows/desktop-b2-http-diagnose.yml']
+jobs:
+  http-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    permissions: {contents: read}
+    steps:
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Report sanitized HTTP response evidence, no changes
+        run: |
+          node --input-type=module <<'JS'
+          import {createHash} from 'node:crypto';
+          const base='https://football-edge-desktop-b2-test.ngophuonghuy.workers.dev';
+          for(const path of ['/','/?diag=unique20261015', '/index.html','/index.html?diag=unique20261015','/baseline.html','/desktop-b2/desktop.js','/desktop-b2/desktop.css','/__b2/health']){
+            try{
+              const r=await fetch(base+path,{headers:{'Cache-Control':'no-cache','Pragma':'no-cache'},signal:AbortSignal.timeout(15000)});
+              const b=Buffer.from(await r.arrayBuffer()),s=b.toString('utf8');
+              console.log('FE_B2_READONLY_HTTP '+JSON.stringify({path,http:r.status,bytes:b.length,sha256:createHash('sha256').update(b).digest('hex'),ctype:r.headers.get('content-type'),etag:r.headers.get('etag'),cache:r.headers.get('cf-cache-status'),containsInlineJS:s.includes('id="FE_B2_DESKTOP_JS"'),containsInlineCSS:s.includes('id="FE_B2_DESKTOP_CSS"'),containsBridge:s.includes('FE_B2_NATIVE'),containsOldExternalJS:s.includes('src="/desktop-b2/desktop.js"'),startsWith:s.slice(0,36).replace(/\s+/g,' ')}))
+            }catch(e){console.log('FE_B2_READONLY_HTTP '+JSON.stringify({path,error:String(e?.message||e).slice(0,100)}))}
+          }
+          JS
