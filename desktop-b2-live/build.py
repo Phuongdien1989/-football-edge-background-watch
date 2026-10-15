@@ -37,8 +37,14 @@ html=html.replace(fixture_marker, fixture_marker+"window.__FE_B2_FIXTURE_RENDERE
 assert html.count(scroll)==1,'native scroll scope anchor drift'
 html=html.replace(scroll,"if(!(window.innerWidth>=1200 && document.body.classList.contains('fe-b2-enabled'))) "+scroll)
 assert html.count('</head>')==1 and html.count('</body>')==1
-html=html.replace('</head>','<link rel="stylesheet" href="/desktop-b2/desktop.css">\n</head>')
-html=html.replace('</body>','<script src="/desktop-b2/desktop.js" defer></script>\n</body>')
+# Inline Desktop-only CSS/JS into HTML like the verified phone frontend does.
+# This removes any dependency on serving nested asset URLs on Workers.dev.
+assets=ROOT/'source'
+css=(assets/'desktop.css').read_text(encoding='utf-8')
+js=(assets/'desktop.js').read_text(encoding='utf-8')
+assert '</style>' not in css.lower() and '</script>' not in js.lower(), 'inline breakout tag in B2 assets'
+html=html.replace('</head>','<style id="FE_B2_DESKTOP_CSS">\n'+css+'\n</style>\n</head>')
+html=html.replace('</body>','<script id="FE_B2_DESKTOP_JS">\n'+js+'\n</script>\n</body>')
 (dst/'index.html').write_text(html,encoding='utf8')
 (dst/'baseline.html').write_bytes(raw)
 # Assets from isolated B2 branch only; no demo data, no offline interception.
