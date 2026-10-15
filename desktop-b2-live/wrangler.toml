@@ -1,0 +1,9 @@
+name = "football-edge-desktop-b2-test"
+main = "worker.mjs"
+compatibility_date = "2026-10-15"
+workers_dev = true
+
+[assets]
+directory = "./dist"
+binding = "ASSETS"
+not_found_handling = "none"
