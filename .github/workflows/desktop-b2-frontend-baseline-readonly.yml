@@ -1,0 +1,43 @@
+name: Desktop B2 read-only frontend baseline probe
+on:
+  push:
+    branches:
+      - feature/football-edge-desktop-b2-preview-20261015
+    paths:
+      - '.github/workflows/desktop-b2-frontend-baseline-readonly.yml'
+  workflow_dispatch:
+jobs:
+  verify-production-baseline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: football-edge-production
+    permissions:
+      contents: read
+    steps:
+      - name: Read Worker version and compare PUBLIC frontend HTML SHA-256 (NO DEPLOY)
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          node --input-type=module <<'JS'
+          import {createHash} from 'node:crypto';
+          const worker='shiny-silence-d892', expected='aa4f0f6318cd52c14ff62b195c5ea04c5267107455924da44c9aa78169fe7f28';
+          const token=process.env.CLOUDFLARE_API_TOKEN, account=process.env.CLOUDFLARE_ACCOUNT_ID;
+          if(!token||!account)throw Error('Cloudflare account/token secret unavailable');
+          const endpoint='https://api.cloudflare.com/client/v4/accounts/'+encodeURIComponent(account)+'/workers/scripts/'+worker+'/deployments';
+          const res=await fetch(endpoint,{headers:{Authorization:'Bearer '+token},signal:AbortSignal.timeout(12000)});
+          const j=await res.json().catch(()=>({}));
+          const versions=j?.result?.deployments?.[0]?.versions||[];
+          const report={worker,api_http:res.status,active_versions:versions.map(v=>({version_id:v.version_id,percentage:v.percentage})),baseline_sha256:expected};
+          try{
+            const h=await fetch('https://'+worker+'.ngophuonghuy.workers.dev/?b2_verify=20261015',{headers:{'Cache-Control':'no-cache'},signal:AbortSignal.timeout(18000)});
+            const body=Buffer.from(await h.arrayBuffer());
+            report.public_http=h.status;
+            report.public_content_type=h.headers.get('content-type');
+            report.public_bytes=body.length;
+            report.public_sha256=createHash('sha256').update(body).digest('hex');
+            report.matches_snapshot=report.public_sha256===expected;
+          }catch(err){report.public_error=String(err?.name||'network_error').slice(0,80);}
+          console.log('FE_B2_FRONTEND_READONLY_BASELINE '+JSON.stringify(report));
+          if(!res.ok||!j.success)process.exitCode=2;
+          JS
