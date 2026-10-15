@@ -31,7 +31,7 @@ const shell=mk('div','fe-b2-shell',`
    <div class="fe-b2-sidebarfoot"><strong>DESKTOP • CHUNG BACKEND</strong><br/>Scan Control là trạng thái dùng chung giữa Desktop và điện thoại.<br/>Mọi thao tác thật chỉ diễn ra khi ông chủ động bấm.</div>
  </aside>
  <main class="fe-b2-main" id="b2Main">
-   <header class="fe-b2-header"><div><div class="fe-b2-eyebrow">FOOTBALL EDGE • WORKSPACE</div><h1 id="b2Title">Tổng quan</h1></div><div class="fe-b2-badges"><span class="fe-b2-pill">Kết nối: <b id="b2Connection">CHƯA CẤU HÌNH</b></span><span class="fe-b2-pill">Dữ liệu mới nhất: <b id="b2Fresh">—</b></span><span class="fe-b2-pill">Quét dùng chung: <b id="b2SharedScan">CHƯA XÁC MINH</b></span></div></header>
+   <header class="fe-b2-header"><div><div class="fe-b2-eyebrow">FOOTBALL EDGE • WORKSPACE</div><h1 id="b2Title">Tổng quan</h1></div><div class="fe-b2-badges"><span class="fe-b2-pill">Kết nối: <b id="b2Connection">CHƯA CẤU HÌNH</b></span><span class="fe-b2-pill">Lần quét LIVE: <b id="b2Fresh">—</b></span><span class="fe-b2-pill">Quét dùng chung: <b id="b2SharedScan">CHƯA XÁC MINH</b></span></div></header>
    <div class="fe-b2-shared-warn">⚠ ON/OFF điều khiển chung backend: thao tác trên máy tính cũng ảnh hưởng điện thoại. App Desktop không tự bật quét.</div>
    <div id="b2Overview">
     <section class="fe-b2-kpis" aria-label="Chỉ số tổng quan">
@@ -124,11 +124,12 @@ const shell=mk('div','fe-b2-shell',`
   if(state.sort==='league')all.sort((x,y)=>x.league.localeCompare(y.league,'vi'));
   if(state.sort==='match')all.sort((x,y)=>x.home.localeCompare(y.home,'vi'));
   const totals=rows.length;
-  $('b2Total').textContent=String(totals);
-  $('b2Live').textContent=String(rows.filter(x=>x.phase==='LIVE').length);
-  $('b2Pre').textContent=String(rows.filter(x=>x.phase==='PRE').length);
+  const fixtureDataKnown=Boolean(b?.fixtureDataLoaded?.())||state.rankCache.length>0;
+  $('b2Total').textContent=fixtureDataKnown?String(totals):'—';
+  $('b2Live').textContent=fixtureDataKnown?String(rows.filter(x=>x.phase==='LIVE').length):'—';
+  $('b2Pre').textContent=fixtureDataKnown?String(rows.filter(x=>x.phase==='PRE').length):'—';
   const top=state.rankCache.find(x=>Number(x.__rank?.top)===1);
-  $('b2TopFlag').textContent=String(state.rankCache.filter(x=>x.__rank?.top!=null).length);
+  $('b2TopFlag').textContent=state.rankCache.length?String(state.rankCache.filter(x=>x.__rank?.top!=null).length):'—';
   const spotlight=$('b2TopText');spotlight.textContent='';
   if(top){const head=document.createElement('strong');head.textContent=`#1 • ${top.home||'—'} vs ${top.away||'—'} • Fixture #${top.id}`;spotlight.append(head);const d=document.createElement('span');d.className='fe-b2-meta';d.textContent=`${val(top.__addon?.rankWhy)} • ENTRY: ${val(top.__addon?.entry?.status)} • TOP ≠ cho phép vào kèo`;spotlight.append(d)}
   else spotlight.textContent='Chưa có TOP 1 đủ điều kiện từ engine. Không tự đẩy một trận lên cho đủ.';
@@ -179,7 +180,7 @@ const shell=mk('div','fe-b2-shell',`
  shell.querySelectorAll('[data-b2-filter]').forEach(x=>x.addEventListener('click',()=>{state.filter=x.dataset.b2Filter;shell.querySelectorAll('[data-b2-filter]').forEach(t=>t.setAttribute('aria-pressed',String(t===x)));refresh()}));
  $('b2Search').addEventListener('input',e=>{state.search=e.target.value.trim().toLocaleLowerCase('vi');refresh()});$('b2Sort').addEventListener('change',e=>{state.sort=e.target.value;refresh()});
  $('b2Refresh').addEventListener('click',()=>refresh());$('b2OpenTop').addEventListener('click',()=>goto('top'));
- $('b2ScanLive').addEventListener('click',()=>nativeClick('feP1ScanBtn'));
+ $('b2ScanLive').addEventListener('click',()=>{const x=document.querySelector('#scanButtons [data-h="live"]');if(x&&!x.disabled)x.click()});
  $('b2ScanPre').addEventListener('click',()=>{const x=document.querySelector('#scanButtons [data-h="1"]');if(x&&!x.disabled)x.click()});
  $('b2ScanUnified').addEventListener('click',()=>nativeClick('startUnifiedLiveBtn'));
  $('b2ScanControl').addEventListener('click',()=>{if($('b2ScanControl').disabled)return;const requested=window.confirm('Điều khiển ON/OFF là CHUNG với điện thoại và mọi thiết bị. Ông xác nhận thay đổi trạng thái quét của backend?');if(requested)nativeClick('feScanControlBtn')});
