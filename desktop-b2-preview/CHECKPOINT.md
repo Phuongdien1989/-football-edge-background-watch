@@ -1,6 +1,6 @@
 # FOOTBALL EDGE — DESKTOP B2 ISOLATED PROTOTYPE CHECKPOINT
 
-Date: 2026-10-15. **No production deployment.** This branch is strictly a baseline verification/checkpoint branch; prototype frontend sources and full offline preview are delivered in the ChatGPT ZIP artifact `FOOTBALL_EDGE_DESKTOP_B2_OFFLINE_PREVIEW_20261015.zip` (not pushed to GitHub by this checkpoint). Do **not** treat this branch as a production-ready code release.
+Date: 2026-10-15. **No production deployment.** This branch holds the independent read-only verification workflow **and the four B2 source assets** under `desktop-b2-preview/source/`. The complete original frontend HTML, synthesized prototype and visual-test bundle are delivered in `FOOTBALL_EDGE_DESKTOP_B2_OFFLINE_PREVIEW_20261015.zip` as conversation artifacts. Do **not** treat this branch as production-ready.
 
 ## Production frontend baseline independently confirmed
 - Cloudflare script `shiny-silence-d892`
@@ -30,4 +30,4 @@ PR6 remains `79cd4ddfa4191fa5a6e620683947d77e6ecbf31c`; PR7 remains `d73d4b19a06
 Backend production version at checkpoint `02d56762-ba08-4a8d-8654-bc9d522fc29a`; no changes to backend, frontend production, scanner, D1 or Cloudflare plan.
 
 ## Next
-Review the delivered B2 ZIP on desktop. Only after approval, decide whether to commit the entire reviewed frontend source into this branch; no deployment or merge is authorized.
+Review the delivered B2 ZIP on desktop. The four B2 source files are version-controlled in this branch; the exact production HTML baseline is preserved with SHA-256 and shipped in the ZIP. Do not merge or deploy without explicit approval and real-data regression.
