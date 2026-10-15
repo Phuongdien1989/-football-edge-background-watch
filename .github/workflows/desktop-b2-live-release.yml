@@ -1,0 +1,109 @@
+name: Football Edge Desktop B2 — ISOLATED TEST WORKER DEPLOY
+on:
+  push:
+    branches:
+      - feature/football-edge-desktop-b2-preview-20261015
+    paths:
+      - '.github/workflows/desktop-b2-live-release.yml'
+jobs:
+  release-test-worker-only:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    environment: football-edge-production
+    concurrency:
+      group: fe-b2-isolated-test-worker
+      cancel-in-progress: false
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Release guard — source exactly matches latest PASS QA
+        run: |
+          set -euo pipefail
+          QA_SHA=57126c0c0b1f674f756b9e8aad78ff0bcf683a77
+          git cat-file -e "${QA_SHA}^{commit}"
+          changed="$(git diff --name-only "$QA_SHA" HEAD)"
+          test "$changed" = '.github/workflows/desktop-b2-live-release.yml'
+          test "$(git rev-parse --abbrev-ref HEAD)" = 'feature/football-edge-desktop-b2-preview-20261015' || test "${{ github.ref }}" = 'refs/heads/feature/football-edge-desktop-b2-preview-20261015'
+          grep -q 'name = "football-edge-desktop-b2-test"' desktop-b2-live/wrangler.toml
+          grep -q 'ASSETS.fetch(request)' desktop-b2-live/worker.mjs
+          echo 'FE_B2_RELEASE_SOURCE_SAME_AS_QA PASS'
+      - name: Verify source frontend version and test Worker isolation via authenticated Cloudflare API
+        working-directory: desktop-b2-live
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          node --input-type=module <<'JS'
+          import {createHash} from 'node:crypto';
+          import {writeFileSync} from 'node:fs';
+          const account=process.env.CLOUDFLARE_ACCOUNT_ID,token=process.env.CLOUDFLARE_API_TOKEN;
+          if(!account||!token)throw Error('CLOUDFLARE_DEPLOY_SECRET_MISSING');
+          const target='https://api.cloudflare.com/client/v4/accounts/'+encodeURIComponent(account)+'/workers/scripts/';
+          const h={Authorization:'Bearer '+token};
+          const r=await fetch(target+'shiny-silence-d892/deployments',{headers:h,signal:AbortSignal.timeout(15000)});
+          const j=await r.json().catch(()=>({}));
+          const versions=j?.result?.deployments?.[0]?.versions||[];
+          const expected='03c1d55d-358a-448b-96f3-f356704831df';
+          if(!r.ok||!j.success||versions.length!==1||versions[0].version_id!==expected||versions[0].percentage!==100)
+            throw Error('PHONE_WORKER_VERSION_CHANGED_OR_UNKNOWN_STOP_'+r.status);
+          const trial=await fetch(target+'football-edge-desktop-b2-test/settings',{headers:h,signal:AbortSignal.timeout(15000)});
+          if(trial.status!==404)throw Error('TRIAL_WORKER_ALREADY_EXISTS_OR_PERMISSION_DENIED_'+trial.status);
+          const html=await fetch('https://shiny-silence-d892.ngophuonghuy.workers.dev/?b2_release=20261015',{headers:{'Cache-Control':'no-cache'},signal:AbortSignal.timeout(20000)});
+          if(!html.ok)throw Error('PHONE_HTML_UNAVAILABLE_'+html.status);
+          const bytes=Buffer.from(await html.arrayBuffer()),sha=createHash('sha256').update(bytes).digest('hex');
+          if(sha!=='aa4f0f6318cd52c14ff62b195c5ea04c5267107455924da44c9aa78169fe7f28')throw Error('PHONE_SHA_CHANGED_STOP');
+          writeFileSync('baseline.html',bytes);
+          console.log('FE_B2_RELEASE_PREFLIGHT',JSON.stringify({phone_version:expected,phone_sha:sha,separate_worker_status:trial.status,phone_unchanged:true,production_deploy_attempted:false}));
+          JS
+      - name: Build exact verified B2 frontend, not the DEMO
+        working-directory: desktop-b2-live
+        run: |
+          python3 build.py
+          node --check source/desktop.js
+          test ! -e source/demo-data.js
+          test ! -e source/preview-guard.js
+      - name: Deploy ONLY isolated desktop test Worker
+        working-directory: desktop-b2-live
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          WRANGLER_SEND_METRICS: 'false'
+        run: |
+          npm install --no-save wrangler@4
+          npx wrangler deploy
+      - name: Verify isolated test URL and unchanged phone URL/version
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          node --input-type=module <<'JS'
+          import {createHash} from 'node:crypto';
+          const target='https://football-edge-desktop-b2-test.ngophuonghuy.workers.dev';
+          let health=null,html=null;
+          for(let i=0;i<10;i++){
+            try{
+              const h=await fetch(target+'/__b2/health',{signal:AbortSignal.timeout(15000)});
+              if(h.ok){health=await h.json();if(health.service==='football-edge-desktop-b2-test')break}
+            }catch{}
+            await new Promise(resolve=>setTimeout(resolve,1800));
+          }
+          if(!health?.ok||health.scope!=='FRONTEND_ONLY'||health.production_replaced!==false)throw Error('ISOLATED_TEST_HEALTH_NOT_VERIFIED');
+          const response=await fetch(target+'/',{signal:AbortSignal.timeout(20000)});
+          if(!response.ok)throw Error('TRIAL_HTML_NOT_SERVING_'+response.status);
+          const body=await response.text();
+          if(!body.includes('/desktop-b2/desktop.js')||!body.includes('FE_B2_NATIVE'))throw Error('TRIAL_INTEGRATION_HTML_MISMATCH');
+          const a=await fetch(target+'/desktop-b2/desktop.js',{signal:AbortSignal.timeout(15000)});
+          if(!a.ok)throw Error('TRIAL_JS_ASSET_MISSING_'+a.status);
+          const account=process.env.CLOUDFLARE_ACCOUNT_ID,token=process.env.CLOUDFLARE_API_TOKEN;
+          const r=await fetch('https://api.cloudflare.com/client/v4/accounts/'+encodeURIComponent(account)+'/workers/scripts/shiny-silence-d892/deployments',{headers:{Authorization:'Bearer '+token}});
+          const d=await r.json();const v=d?.result?.deployments?.[0]?.versions||[];
+          if(!r.ok||v.length!==1||v[0].version_id!=='03c1d55d-358a-448b-96f3-f356704831df'||v[0].percentage!==100)throw Error('PHONE_VERSION_DRIFT_AFTER_TEST_DEPLOY');
+          console.log('FE_B2_ISOLATED_TEST_DEPLOY_VERIFIED '+JSON.stringify({test_url:target,trial_health:health.ok,trial_html_http:response.status,trial_js_http:a.status,phone_active_version:v[0].version_id,phone_unchanged:true,backend_deployed:false,scanner_touched:false}));
+          JS
