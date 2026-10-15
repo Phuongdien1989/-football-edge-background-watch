@@ -1,0 +1,64 @@
+name: Desktop B2 HTTPS browser acceptance (READ ONLY)
+on:
+  push:
+    branches: [feature/football-edge-desktop-b2-preview-20261015]
+    paths: ['.github/workflows/desktop-b2-https-acceptance.yml']
+jobs:
+  accept:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    permissions: {contents: read}
+    environment: football-edge-production
+    steps:
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Install isolated Chromium QA dependencies
+        run: |
+          npm install --no-save playwright@1.56.1
+          npx playwright install --with-deps chromium
+      - name: Test real HTTPS B2 frontend execution without credentials/actions
+        run: |
+          node --input-type=module <<'JS'
+          import {chromium} from 'playwright';
+          const browser=await chromium.launch({headless:true});
+          const base='https://football-edge-desktop-b2-test.ngophuonghuy.workers.dev/';
+          const results=[];
+          try{
+            for(const width of [390,1440]){
+              const page=await browser.newPage({viewport:{width,height:860}});
+              const errors=[],requests=[];
+              page.on('pageerror',e=>errors.push(String(e.message||e)));
+              page.on('request',r=>{if(r.url().includes('/api/'))requests.push(new URL(r.url()).pathname)});
+              const r=await page.goto(base,{waitUntil:'domcontentloaded',timeout:30000});
+              await page.waitForFunction(()=>window.__FE_B2_DIAGNOSTICS__?.read().hasNativeBridge===true,{timeout:15000});
+              const v=await page.evaluate(()=>({
+                desktop:document.body.classList.contains('fe-b2-enabled'),
+                width:document.documentElement.scrollWidth,
+                inner:innerWidth,
+                bridge:typeof window.FEAddonBridge?.masterRows==='function'&&typeof window.FE_B2_NATIVE?.fixtures==='function',
+                nativeCount:document.querySelectorAll('#analysisCard').length,
+                banner:document.querySelector('.fe-b2-shared-warn')?.textContent||'',
+                disabled:document.getElementById('b2ScanControl')?.disabled,
+                storage:(()=>{const k='B2_HTTPS_QA_TEMP';localStorage.setItem(k,'ok');const v=localStorage.getItem(k);localStorage.removeItem(k);return v})()
+              }));
+              if(!r?.ok()||v.desktop!==(width>=1200)||v.width>v.inner||!v.bridge||v.nativeCount!==1||v.storage!=='ok'||!v.disabled||errors.length||requests.length)throw Error('B2_HTTPS_QA_FAILED '+JSON.stringify({http:r?.status(),width,v,errors,requests}));
+              results.push({width,http:r.status(),desktop:v.desktop,storage:v.storage,scrollWidth:v.width,apiRequests:requests.length,errors:errors.length});
+              await page.close();
+            }
+            console.log('FE_B2_HTTPS_BROWSER_PASS '+JSON.stringify(results));
+          }finally{await browser.close()}
+          JS
+      - name: Confirm production phone and isolated test Worker deployment versions unchanged
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          node --input-type=module <<'JS'
+          const a=process.env.CLOUDFLARE_ACCOUNT_ID,t=process.env.CLOUDFLARE_API_TOKEN;
+          if(!a||!t)throw Error('AUTH_INPUT_MISSING');
+          const root='https://api.cloudflare.com/client/v4/accounts/'+encodeURIComponent(a)+'/workers/scripts/';
+          async function current(n){const r=await fetch(root+n+'/deployments',{headers:{Authorization:'Bearer '+t},signal:AbortSignal.timeout(15000)});const j=await r.json();if(!r.ok||!j.success)throw Error('API_'+n+'_'+r.status);const v=j.result?.deployments?.[0]?.versions;if(v?.length!==1||v[0].percentage!==100)throw Error('ACTIVE_VERSION_DRIFT_'+n);return v[0].version_id}
+          const phone=await current('shiny-silence-d892'),trial=await current('football-edge-desktop-b2-test');
+          if(phone!=='03c1d55d-358a-448b-96f3-f356704831df'||trial!=='a332ee39-abb2-422d-a021-db78ef19cc10')throw Error('PHONE_OR_TEST_VERSION_CHANGED');
+          console.log('FE_B2_FINAL_VERSION_PASS '+JSON.stringify({phoneVersion:phone,isolatedTestVersion:trial,noBackendChange:true}));
+          JS
