@@ -1,0 +1,96 @@
+name: Football Edge B2 TEST Worker repair (INLINE CSS JS ONLY)
+on:
+  push:
+    branches: [feature/football-edge-desktop-b2-preview-20261015]
+    paths: ['.github/workflows/desktop-b2-inline-repair.yml']
+jobs:
+  isolated-repair:
+    if: github.ref == 'refs/heads/feature/football-edge-desktop-b2-preview-20261015'
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    environment: football-edge-production
+    concurrency:
+      group: fe-b2-isolated-test-worker
+      cancel-in-progress: false
+    permissions: {contents: read}
+    steps:
+      - uses: actions/checkout@v4
+        with: {fetch-depth: 0, persist-credentials: false}
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Guard QA source and separate test worker only
+        run: |
+          set -euo pipefail
+          QA_SHA=75440cfd461e53e3abbffa071467cf0561a98b5c
+          git cat-file -e "$QA_SHA^{commit}"
+          test "$(git diff --name-only "$QA_SHA" HEAD)" = '.github/workflows/desktop-b2-inline-repair.yml'
+          grep -q 'name = "football-edge-desktop-b2-test"' desktop-b2-live/wrangler.toml
+          grep -q 'id="FE_B2_DESKTOP_JS"' desktop-b2-live/build.py
+          echo FE_B2_SOURCE_IS_IDENTICAL_TO_INLINE_QA_PASS
+      - name: Read-only verify production phone and existing trial version
+        working-directory: desktop-b2-live
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          node --input-type=module <<'JS'
+          import {createHash} from 'node:crypto';import {writeFileSync} from 'node:fs';
+          const t=process.env.CLOUDFLARE_API_TOKEN,a=process.env.CLOUDFLARE_ACCOUNT_ID;
+          if(!t||!a)throw Error('AUTH_MISSING');
+          const base='https://api.cloudflare.com/client/v4/accounts/'+encodeURIComponent(a)+'/workers/scripts/';
+          async function version(name){const r=await fetch(base+name+'/deployments',{headers:{Authorization:'Bearer '+t},signal:AbortSignal.timeout(15000)});const j=await r.json();if(!r.ok||!j.success)throw Error('VERSION_QUERY_FAILED_'+name+'_'+r.status);const v=j.result?.deployments?.[0]?.versions;if(v?.length!==1||v[0].percentage!==100)throw Error('NONUNIFORM_VERSION_'+name);return v[0].version_id}
+          const phone=await version('shiny-silence-d892'),trial=await version('football-edge-desktop-b2-test');
+          if(phone!=='03c1d55d-358a-448b-96f3-f356704831df')throw Error('PHONE_VERSION_CHANGED_STOP');
+          if(trial!=='f08a55ac-2003-461b-9ea5-236bf4f71aac')throw Error('TRIAL_VERSION_DRIFT_STOP');
+          const r=await fetch('https://shiny-silence-d892.ngophuonghuy.workers.dev/?b2_inline_repair=20261015',{headers:{'Cache-Control':'no-cache'},signal:AbortSignal.timeout(20000)});
+          if(!r.ok)throw Error('PHONE_HTML_HTTP_'+r.status);
+          const b=Buffer.from(await r.arrayBuffer()),hash=createHash('sha256').update(b).digest('hex');
+          if(hash!=='aa4f0f6318cd52c14ff62b195c5ea04c5267107455924da44c9aa78169fe7f28')throw Error('PHONE_SOURCE_DRIFT_STOP');
+          writeFileSync('baseline.html',b);
+          console.log('FE_B2_INLINE_PREFLIGHT_PASS '+JSON.stringify({phoneVersion:phone,trialPreviousVersion:trial,baselineSha256:hash,productionChanged:false}));
+          JS
+      - name: Build inline B2 and verify no external B2 script dependency
+        working-directory: desktop-b2-live
+        run: |
+          python3 build.py
+          node --check source/desktop.js
+          python3 - <<'PY'
+          from pathlib import Path
+          s=Path('dist/index.html').read_text()
+          assert 'id="FE_B2_DESKTOP_JS"' in s
+          assert 'id="FE_B2_DESKTOP_CSS"' in s
+          assert 'src="/desktop-b2/desktop.js"' not in s
+          assert 'href="/desktop-b2/desktop.css"' not in s
+          print('FE_B2_INLINE_BUNDLE_VERIFIED',len(s.encode()))
+          PY
+      - name: Update ONLY the separate B2 test Worker
+        working-directory: desktop-b2-live
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          WRANGLER_SEND_METRICS: 'false'
+        run: |
+          npm install --no-save wrangler@4
+          npx wrangler deploy
+      - name: HTTPS smoke and confirm phone unchanged
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          node --input-type=module <<'JS'
+          import {createHash} from 'node:crypto';
+          const base='https://football-edge-desktop-b2-test.ngophuonghuy.workers.dev';
+          async function check(path){const r=await fetch(base+path,{signal:AbortSignal.timeout(20000)});if(!r.ok)throw Error('B2_TEST_URL_'+path+'_'+r.status);return r}
+          const health=await (await check('/__b2/health')).json();
+          if(health.service!=='football-edge-desktop-b2-test'||health.scope!=='FRONTEND_ONLY')throw Error('WRONG_WORKER');
+          const response=await check('/');
+          const content=await response.text();
+          if(!content.includes('id="FE_B2_DESKTOP_JS"')||!content.includes('id="FE_B2_DESKTOP_CSS"')||!content.includes('FE_B2_NATIVE'))throw Error('B2_INLINE_ASSETS_MISSING');
+          if(content.includes('src="/desktop-b2/desktop.js"'))throw Error('B2_EXTERNAL_JS_STILL_REQUIRED');
+          const t=process.env.CLOUDFLARE_API_TOKEN,a=process.env.CLOUDFLARE_ACCOUNT_ID;
+          const prefix='https://api.cloudflare.com/client/v4/accounts/'+encodeURIComponent(a)+'/workers/scripts/';
+          async function version(name){const r=await fetch(prefix+name+'/deployments',{headers:{Authorization:'Bearer '+t}}),j=await r.json();if(!r.ok)throw Error('CLOUDFLARE_'+r.status);const v=j.result?.deployments?.[0]?.versions;return v?.length===1&&v[0].percentage===100?v[0].version_id:null}
+          const [phone,trial]=await Promise.all([version('shiny-silence-d892'),version('football-edge-desktop-b2-test')]);
+          if(phone!=='03c1d55d-358a-448b-96f3-f356704831df'||!trial||trial==='f08a55ac-2003-461b-9ea5-236bf4f71aac')throw Error('VERSION_CHECK_FAILED');
+          console.log('FE_B2_INLINE_DEPLOY_VERIFIED '+JSON.stringify({url:base,testVersion:trial,phoneVersion:phone,trialHtmlHttp:response.status,containsIntegratedJs:true,backendChanged:false,scannerChanged:false}));
+          JS
