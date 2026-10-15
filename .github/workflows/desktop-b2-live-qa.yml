@@ -19,20 +19,21 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Verify phone production frontend unchanged, then download exact snapshot
+      - name: Verify production frontend and download exact snapshot by Node fetch
         working-directory: desktop-b2-live
         run: |
-          python3 - <<'PY'
-          import hashlib,urllib.request
-          url='https://shiny-silence-d892.ngophuonghuy.workers.dev/'
-          req=urllib.request.Request(url,headers={'Cache-Control':'no-cache'})
-          b=urllib.request.urlopen(req,timeout=25).read()
-          actual=hashlib.sha256(b).hexdigest()
-          expected='aa4f0f6318cd52c14ff62b195c5ea04c5267107455924da44c9aa78169fe7f28'
-          print('FE_B2_PHONE_BASELINE_SHA',actual,'SIZE',len(b))
-          assert actual==expected, 'PHONE_PRODUCTION_BASELINE_CHANGED; STOP'
-          open('baseline.html','wb').write(b)
-          PY
+          node --input-type=module <<'JS'
+          import {createHash} from 'node:crypto';
+          import {writeFileSync} from 'node:fs';
+          const url='https://shiny-silence-d892.ngophuonghuy.workers.dev/?b2_verify=20261015';
+          const r=await fetch(url,{headers:{'Cache-Control':'no-cache'},signal:AbortSignal.timeout(25000)});
+          if(!r.ok)throw Error('PHONE_FRONTEND_HTTP_'+r.status);
+          const buf=Buffer.from(await r.arrayBuffer()),sha=createHash('sha256').update(buf).digest('hex');
+          const expected='aa4f0f6318cd52c14ff62b195c5ea04c5267107455924da44c9aa78169fe7f28';
+          console.log('FE_B2_PHONE_BASELINE',JSON.stringify({status:r.status,bytes:buf.length,sha256:sha,matches:sha===expected}));
+          if(sha!==expected)throw Error('FRONTEND_VERSION_DRIFT_STOP');
+          writeFileSync('baseline.html',buf);
+          JS
       - name: Build isolated B2 frontend
         working-directory: desktop-b2-live
         run: |
