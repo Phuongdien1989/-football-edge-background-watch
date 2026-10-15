@@ -22,13 +22,18 @@ bridge='''  // B2 only: keyed projection of native fixture state. No fetch or pe
     }))),
     selectedFixtureId:()=>state.selected?.fixture?.id??null,
     selectFixtureById:id=>{const idx=(state.fixtures||[]).findIndex(f=>String(f?.fixture?.id)===String(id));if(idx<0)return false;selectFixture(idx);return true},
-    packetReady:()=>Boolean(state.lastPacket),scanning:()=>Boolean(state.scanning)
+    packetReady:()=>Boolean(state.lastPacket),scanning:()=>Boolean(state.scanning),
+    fixtureDataLoaded:()=>Boolean(window.__FE_B2_FIXTURE_RENDERED__)
   }),writable:false,configurable:false});
 '''
 marker='  // FE_ADDON_BRIDGE_END'
 assert html.count(marker)==1,'native bridge anchor drift'
 html=html.replace(marker,bridge+'\n'+marker)
 scroll="$('analysisCard').scrollIntoView({behavior:'smooth',block:'start'})"
+# Record whether native renderFixtures actually finished, without changing its data or network.
+fixture_marker="function renderFixtures(fixtures){\n    state.fixtures=Array.isArray(fixtures)?fixtures:[];"
+assert html.count(fixture_marker)==1,'native fixture render anchor drift'
+html=html.replace(fixture_marker, fixture_marker+"window.__FE_B2_FIXTURE_RENDERED__=true;")
 assert html.count(scroll)==1,'native scroll scope anchor drift'
 html=html.replace(scroll,"if(!(window.innerWidth>=1200 && document.body.classList.contains('fe-b2-enabled'))) "+scroll)
 assert html.count('</head>')==1 and html.count('</body>')==1
