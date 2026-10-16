@@ -94,5 +94,78 @@
  body.fe-sp-enabled #feSportsPremium[hidden]{display:none!important}
  body.fe-sp-enabled .sp-only-desktop{display:none}
 }
+
+/* SPORTS PREMIUM V2: a coherent skin on ALL five native tabs.
+   Only display/layout rules; native actions, route classes and state remain owned
+   by the original app. No duplicate fixtures, polling or DB writes. */
+@media(max-width:767px){
+ body.fe-sp-enabled .topbar{border-bottom:1px solid #e5ecf5!important;padding-bottom:13px!important}
+ body.fe-sp-enabled .topbar .brand h1{font-size:clamp(23px,5.9vw,29px)!important;letter-spacing:-.85px!important;color:#142d4e!important;text-transform:uppercase!important;font-style:normal!important}
+ body.fe-sp-enabled .topbar .brand .sub{font-size:11px!important;color:#647f9d!important;letter-spacing:.01em!important}
+ body.fe-sp-enabled .topbar .brand::after{content:'SPORTS PREMIUM  ·  XEM THỬ';display:block;width:max-content;max-width:100%;margin-top:4px;padding:3px 7px;border-radius:5px;background:#e7f0ff;color:#2478ed;font-size:9px;font-weight:850;letter-spacing:.05em}
+ body.fe-sp-enabled .sp-mode{border-radius:14px;background:#e8f1ff!important;box-shadow:0 4px 12px rgba(36,120,237,.045)}
+ body.fe-sp-enabled #feSportsPremium .sp-top{border-left:0!important;overflow:hidden;padding:0!important;border:1px solid #bfe8d6!important;box-shadow:0 6px 24px rgba(7,140,97,.075)!important}
+ body.fe-sp-enabled #feSportsPremium .sp-top-head{border-radius:0!important;padding:14px 13px!important;background:linear-gradient(105deg,#e2f9ee,#f1faf6)!important;border-bottom:1px solid #d3eee1}
+ body.fe-sp-enabled #feSportsPremium .sp-top-inner{padding:18px 13px 16px!important}
+ body.fe-sp-enabled #feSportsPremium .sp-score-main{font-size:clamp(30px,9vw,41px)!important;letter-spacing:-1px!important}
+ body.fe-sp-enabled #feSportsPremium .sp-crest{font-size:38px!important}
+ body.fe-sp-enabled #feSportsPremium .sp-team{font-size:15px!important}
+ body.fe-sp-enabled #feSportsPremium .sp-league{font-size:12px!important}
+ body.fe-sp-enabled #feSportsPremium .sp-metric{background:#f2f7ff!important;border-color:#e0ebf6!important;padding:13px!important}
+ body.fe-sp-enabled #feSportsPremium .sp-metric b{font-size:24px!important}
+ body.fe-sp-enabled #feSportsPremium .sp-cta{background:linear-gradient(100deg,#2478ed,#126bea)!important;box-shadow:0 6px 14px rgba(36,120,237,.17)!important}
+ body.fe-sp-enabled #feSportsPremium .sp-row{min-height:83px!important;border-radius:15px!important;box-shadow:0 5px 14px #18345d0b!important}
+ body.fe-sp-enabled #feSportsPremium .sp-teams{font-size:14.5px!important}
+ body.fe-sp-enabled #feSportsPremium .sp-row-score{font-size:21px!important}
+ body.fe-sp-enabled #feSportsPremium .sp-row-score small{font-size:11px!important}
+ body.fe-sp-enabled .bottom-nav{border-radius:20px 20px 0 0!important}
+ body.fe-sp-enabled .bottom-nav .bottom-item.active{color:#2478ed!important}
+ /* Settings and Tracker previously hidden by homepage-only exclusions.
+    Expose *only* the selected native card, with no cloned elements. */
+ body.fe-sp-enabled.sp-view-tracking:not(.fe-route-matches):not(.fe-route-analysis) #feSportsPremium,
+ body.fe-sp-enabled.sp-view-settings:not(.fe-route-matches):not(.fe-route-analysis) #feSportsPremium{display:none!important}
+ body.fe-sp-enabled.sp-view-tracking:not(.fe-route-matches):not(.fe-route-analysis) #betTrackerCard,
+ body.fe-sp-enabled.sp-view-settings:not(.fe-route-matches):not(.fe-route-analysis) #connectCard{display:block!important;visibility:visible!important;position:relative!important;background:#fff!important;color:#142d4e!important;border:1px solid #dfe9f4!important;border-radius:17px!important;box-shadow:0 8px 24px #17385c0b!important;min-height:calc(100vh - 215px);padding:15px!important;margin:12px 0!important}
+ body.fe-sp-enabled.sp-view-tracking:not(.fe-route-matches):not(.fe-route-analysis) #betTrackerCard:before,
+ body.fe-sp-enabled.sp-view-settings:not(.fe-route-matches):not(.fe-route-analysis) #connectCard:before{display:block;font-size:11px;letter-spacing:.09em;font-weight:850;color:#2478ed;margin:0 0 13px;border-bottom:1px solid #e9eef6;padding:0 0 11px}
+ body.fe-sp-enabled.sp-view-tracking #betTrackerCard:before{content:'THEO DÕI  ·  SPORTS PREMIUM'}
+ body.fe-sp-enabled.sp-view-settings #connectCard:before{content:'CÀI ĐẶT  ·  SPORTS PREMIUM'}
+ body.fe-sp-enabled.sp-view-tracking:not(.fe-route-matches):not(.fe-route-analysis) #scanCard,
+ body.fe-sp-enabled.sp-view-settings:not(.fe-route-matches):not(.fe-route-analysis) #scanCard{display:none!important}
+ /* Match Center and Analysis keep the native handler and single DOM card.
+    Only style/typography is adjusted to match the Premium language. */
+ body.fe-sp-enabled.fe-route-matches #scanCard,
+ body.fe-sp-enabled.fe-route-analysis #analysisCard{border-radius:17px!important;background:#fff!important;padding:14px!important;box-shadow:0 8px 24px #17385c10!important}
+ body.fe-sp-enabled .fe-p3-title h2,
+ body.fe-sp-enabled .fe-p4-title h2{font-size:clamp(20px,5.1vw,23px)!important;letter-spacing:-.04em!important;color:#142d4e!important}
+ body.fe-sp-enabled .fe-p3-title span,
+ body.fe-sp-enabled .fe-p4-title span{font-size:10px!important;color:#2478ed!important}
+ body.fe-sp-enabled .fe-p3-title p,
+ body.fe-sp-enabled .fe-p4-title p{font-size:12px!important;line-height:1.45!important;color:#697f9d!important}
+ body.fe-sp-enabled #scanCard .fe-p3-stat span{font-size:9px!important}
+ body.fe-sp-enabled #scanCard .fe-p3-stat b{font-size:21px!important}
+ body.fe-sp-enabled #scanCard .fe-p3-actions button{font-size:12px!important;min-height:46px!important}
+ body.fe-sp-enabled #scanCard .fe-p3-filter-row button{font-size:10.5px!important;min-height:37px!important}
+ body.fe-sp-enabled #scanCard .fe-p3-route-note{font-size:11px!important}
+ body.fe-sp-enabled #scanCard .fe-p3-live-badge{font-size:10px!important}
+ body.fe-sp-enabled #analysisCard .fe-p4-team b{font-size:12px!important;line-height:1.3!important;white-space:normal!important;overflow-wrap:anywhere}
+ body.fe-sp-enabled #analysisCard .fe-p4-score strong{font-size:30px!important}
+ body.fe-sp-enabled #analysisCard .fe-p4-quality .fe-p4-q span{font-size:9px!important}
+ body.fe-sp-enabled #analysisCard .fe-p4-quality .fe-p4-q b{font-size:14px!important}
+ body.fe-sp-enabled #analysisCard .fe-p4-decision-main span,
+ body.fe-sp-enabled #analysisCard .fe-p4-market span{font-size:10px!important}
+ body.fe-sp-enabled #analysisCard .fe-p4-decision-main b{font-size:14px!important}
+ body.fe-sp-enabled #analysisCard .fe-p4-note{font-size:11px!important}
+ body.fe-sp-enabled #analysisCard .fe-p4-actions button{font-size:11px!important;min-height:44px!important}
+ body.fe-sp-enabled #analysisCard .fe-p4-secondary-actions button{font-size:10.5px!important}
+ body.fe-sp-enabled #analysisCard .fe-p4-reason span,
+ body.fe-sp-enabled #analysisCard .fe-p4-reason b{font-size:11px!important}
+ body.fe-sp-enabled #betTrackerCard :is(.section-head,.bet-kpis,.bet-tabs),
+ body.fe-sp-enabled #connectCard :is(.connect-accordion,summary){color:#142d4e!important}
+ body.fe-sp-enabled #betTrackerCard button,
+ body.fe-sp-enabled #connectCard button{border-radius:11px!important;min-height:40px}
+ body.fe-sp-enabled #connectCard .connect-accordion{padding:10px!important;border-radius:13px!important;background:#f7faff!important;border-color:#dce8f2!important}
+}
+
 @media (min-width:768px){#feSportsPremium{display:none!important}}
 @media (prefers-reduced-motion:reduce){.sp-switch::after{transition:none!important}}
