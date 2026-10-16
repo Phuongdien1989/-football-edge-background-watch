@@ -1,4 +1,4 @@
-name: Mobile Sports Premium PREVIEW Worker CSP repair and HTTPS browser acceptance
+name: Mobile Sports Premium V2 five-tab preview release and HTTPS browser acceptance
 on:
   push:
     branches: [feature/mobile-sports-premium-preview-20261016]
@@ -27,14 +27,14 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          QA=c4cce42048576ff9053e118c5a7b420d87765421
+          QA=88dd1de4774d3c7beb97b5cb5497306a122257ba
           git cat-file -e "$QA^{commit}"
           test "$(git diff --name-only "$QA" HEAD)" = '.github/workflows/mobile-sp-preview-csp-repair.yml'
           grep -q 'run_worker_first = true' mobile-sports-premium/wrangler.toml
           node --input-type=module <<'JS'
-          const r=await fetch('https://api.github.com/repos/'+process.env.GITHUB_REPOSITORY+'/actions/runs/38864938168',{headers:{Authorization:'Bearer '+process.env.GITHUB_TOKEN,Accept:'application/vnd.github+json'},signal:AbortSignal.timeout(15000)});
+          const r=await fetch('https://api.github.com/repos/'+process.env.GITHUB_REPOSITORY+'/actions/runs/38867373267',{headers:{Authorization:'Bearer '+process.env.GITHUB_TOKEN,Accept:'application/vnd.github+json'},signal:AbortSignal.timeout(15000)});
           const j=await r.json();
-          if(!r.ok||j.conclusion!=='success'||j.head_sha!=='c4cce42048576ff9053e118c5a7b420d87765421')throw Error('EXACT_QA_NOT_PASS');
+          if(!r.ok||j.conclusion!=='success'||j.head_sha!=='88dd1de4774d3c7beb97b5cb5497306a122257ba')throw Error('EXACT_QA_NOT_PASS');
           console.log('FE_SP_ROUTING_FIX_EXACT_QA_PASS');
           JS
       - name: Read-only verify Mobile, Desktop, backend and current preview version
@@ -47,7 +47,7 @@ jobs:
           const a=process.env.CLOUDFLARE_ACCOUNT_ID,t=process.env.CLOUDFLARE_API_TOKEN;
           if(!a||!t)throw Error('AUTH_MISSING');
           const root='https://api.cloudflare.com/client/v4/accounts/'+encodeURIComponent(a)+'/workers/scripts/';
-          const expected=[['shiny-silence-d892','03c1d55d-358a-448b-96f3-f356704831df'],['football-edge-desktop-b2-test','a332ee39-abb2-422d-a021-db78ef19cc10'],['football-edge-background-watch','2be01a61-cc5d-43c7-9c6d-13e581296453'],['football-edge-mobile-sports-premium-preview','74d24fe8-ab28-4a44-b48b-c78cc3e5fbf1']];
+          const expected=[['shiny-silence-d892','03c1d55d-358a-448b-96f3-f356704831df'],['football-edge-desktop-b2-test','a332ee39-abb2-422d-a021-db78ef19cc10'],['football-edge-background-watch','2be01a61-cc5d-43c7-9c6d-13e581296453'],['football-edge-mobile-sports-premium-preview','651d2447-618e-4bf4-ac16-3006086ca244']];
           for(const [name,want] of expected){
             const r=await fetch(root+name+'/deployments',{headers:{Authorization:'Bearer '+t},signal:AbortSignal.timeout(16000)}),j=await r.json(),v=j?.result?.deployments?.[0]?.versions||[];
             if(!r.ok||!j.success||v.length!==1||v[0].version_id!==want||v[0].percentage!==100)throw Error('VERSION_DRIFT_'+name);
@@ -57,7 +57,7 @@ jobs:
           const b=Buffer.from(await res.arrayBuffer()),sha=createHash('sha256').update(b).digest('hex');
           if(sha!=='aa4f0f6318cd52c14ff62b195c5ea04c5267107455924da44c9aa78169fe7f28')throw Error('BASELINE_HTML_SHA_DRIFT');
           writeFileSync('mobile-sports-premium/baseline.html',b);
-          console.log('FE_SP_CSP_REPAIR_PREFLIGHT_PASS '+JSON.stringify({phone:'unchanged',desktop:'unchanged',backend:'unchanged',preview_before:'74d24fe8-ab28-4a44-b48b-c78cc3e5fbf1',sha256:sha}));
+          console.log('FE_SP_CSP_REPAIR_PREFLIGHT_PASS '+JSON.stringify({phone:'unchanged',desktop:'unchanged',backend:'unchanged',preview_before:'651d2447-618e-4bf4-ac16-3006086ca244',sha256:sha}));
           JS
       - name: Build same app HTML; assets routing only changed
         run: |
@@ -65,7 +65,7 @@ jobs:
           node --input-type=module <<'JS'
           import {createHash} from 'node:crypto';import {readFileSync} from 'node:fs';
           const b=readFileSync('mobile-sports-premium/site/index.html');
-          if(createHash('sha256').update(b).digest('hex')!=='dd21bbc0dba2e42ae7ecbae159018a5d8383f924cea686e302b7ea7f4bbe1bd0')throw Error('APP_HTML_CHANGED_FROM_QA');
+          if(createHash('sha256').update(b).digest('hex')!=='42e54e9eb777d89b67b53b64bbec5b8aec1baa82659f2fda53b08c8c490cd72a')throw Error('APP_HTML_CHANGED_FROM_QA');
           console.log('FE_SP_HTML_UNCHANGED_FROM_QA');
           JS
       - name: Deploy ONLY existing Sports Premium Preview Worker
@@ -83,7 +83,7 @@ jobs:
           node --input-type=module <<'JS'
           import {createHash} from 'node:crypto';
           const base='https://football-edge-mobile-sports-premium-preview.ngophuonghuy.workers.dev';
-          const expected='dd21bbc0dba2e42ae7ecbae159018a5d8383f924cea686e302b7ea7f4bbe1bd0';
+          const expected='42e54e9eb777d89b67b53b64bbec5b8aec1baa82659f2fda53b08c8c490cd72a';
           let result=null;
           for(let n=0;n<14;n++){
            try{
@@ -136,6 +136,6 @@ jobs:
             if(!r.ok||!j.success||v.length!==1||v[0].percentage!==100||(want&&v[0].version_id!==want))throw Error('PRODUCTION_OR_PREVIEW_DRIFT_'+name);
             out[name]=v[0].version_id;
           }
-          if(out['football-edge-mobile-sports-premium-preview']==='74d24fe8-ab28-4a44-b48b-c78cc3e5fbf1')throw Error('CSP_REPAIR_NOT_ACTIVATED');
+          if(out['football-edge-mobile-sports-premium-preview']==='651d2447-618e-4bf4-ac16-3006086ca244')throw Error('CSP_REPAIR_NOT_ACTIVATED');
           console.log('FE_SP_FINAL_PREVIEW_ONLY_DEPLOY_PASS '+JSON.stringify({preview_url:'https://football-edge-mobile-sports-premium-preview.ngophuonghuy.workers.dev',versions:out,production_modified:false,d1_writes_from_preview:0,push_test_sent:false,scanner_changed:false}));
           JS
