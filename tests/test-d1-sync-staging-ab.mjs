@@ -109,15 +109,23 @@ async function bench(version){
  await step('notify_tombstone_retry',()=>watcher(true).deleteNotifyMatch(catalog.fixture_id));
  const final={};for(const t of ['fixtures','teams','fixture_history','team_fixture_history','qsig_results','validation_results','entry_decisions','entry_outcomes','live_snapshots','fe_notify_live_state']){const r=await query('SELECT COUNT(*) AS n FROM '+prefix+t);final[t]=Number(r.results?.[0]?.n||0)}
  assert.equal(final.fixture_history,1);
+ assert.equal(final.teams,2,'both historical teams retained');
+ assert.equal(final.team_fixture_history,2,'two sides retained');
+ const historyCheck=(await query("SELECT minute,status,score_home,score_away,terminal FROM "+prefix+"fixture_history WHERE fixture_id=?",[catalog.fixture_id])).results[0];
+ assert.equal(historyCheck.minute,22);assert.equal(historyCheck.score_home,1);assert.equal(historyCheck.score_away,0);assert.equal(historyCheck.terminal,0);
+ const homeCheck=(await query("SELECT goals_for,goals_against FROM "+prefix+"team_fixture_history WHERE team_id=?",[catalog.home_team_id])).results[0];
+ assert.equal(homeCheck.goals_for,1);assert.equal(homeCheck.goals_against,0);
  const entryCheck=(await query("SELECT policy_status,resolution,outcome,minute,score_home,score_away,captured_at FROM "+prefix+"entry_decisions WHERE id='SYN-E'")).results[0];
  assert.equal(entryCheck.resolution,'RESOLVED');assert.equal(entryCheck.outcome,'HIT');assert.equal(entryCheck.captured_at,3000);assert.equal(entryCheck.minute,0);assert.equal(entryCheck.score_home,0);assert.equal(entryCheck.score_away,0);
  const o=(await query("SELECT outcome,resolved_at FROM "+prefix+"entry_outcomes WHERE decision_id='SYN-E'")).results[0];
  assert.equal(o.outcome,'HIT');assert.equal(o.resolved_at,4000);
- output.variants[version]={steps,final,entry_integrity:entryCheck,outcome_integrity:o};
+ output.variants[version]={steps,final,entry_integrity:entryCheck,outcome_integrity:o,history_integrity:historyCheck,team_history_integrity:homeCheck};
 }
 await bench('base');await bench('patch');
 assert.deepEqual(output.variants.base.entry_integrity,output.variants.patch.entry_integrity,'ENTRY logical integrity differs');
 assert.deepEqual(output.variants.base.outcome_integrity,output.variants.patch.outcome_integrity,'OUTCOME logical integrity differs');
+assert.deepEqual(output.variants.base.history_integrity,output.variants.patch.history_integrity,'fixture history changed');
+assert.deepEqual(output.variants.base.team_history_integrity,output.variants.patch.team_history_integrity,'team history changed');
 const a=output.variants.base.steps,b=output.variants.patch.steps;
 output.comparison=Object.keys({...a,...b}).map(k=>({source:k,first_or_retry:/retry/.test(k)?'RETRY':'FIRST_OR_CHANGED',baseline_sqlite_changes:a[k]?.sqlite_changes||0,patched_sqlite_changes:b[k]?.sqlite_changes||0,baseline_d1_rows_written:a[k]?.d1_rows_written||0,patched_d1_rows_written:b[k]?.d1_rows_written||0}));
 output.totals=output.comparison.reduce((o,r)=>({baseline_sqlite_changes:o.baseline_sqlite_changes+r.baseline_sqlite_changes,patched_sqlite_changes:o.patched_sqlite_changes+r.patched_sqlite_changes,baseline_d1_rows_written:o.baseline_d1_rows_written+r.baseline_d1_rows_written,patched_d1_rows_written:o.patched_d1_rows_written+r.patched_d1_rows_written}),{baseline_sqlite_changes:0,patched_sqlite_changes:0,baseline_d1_rows_written:0,patched_d1_rows_written:0});
