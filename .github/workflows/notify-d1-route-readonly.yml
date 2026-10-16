@@ -1,0 +1,28 @@
+name: Oct15 D1 write source logs READ ONLY
+on:
+  push:
+    branches:
+      - diag/notify-free-exhaustion-readonly-20261016
+    paths:
+      - '.github/scripts/notify-d1-route-20261015-readonly.mjs'
+      - '.github/workflows/notify-d1-route-readonly.yml'
+jobs:
+  read:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    environment: football-edge-production
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Sample stored D1 source logs, no D1/Worker/scan mutations
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node .github/scripts/notify-d1-route-20261015-readonly.mjs
