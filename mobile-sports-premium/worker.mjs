@@ -5,7 +5,7 @@ export default {
    if(request.method!=='GET'&&request.method!=='HEAD')return new Response('Method Not Allowed',{status:405,headers:{'Cache-Control':'no-store'}});
    if(url.pathname==='/__sports/health')return Response.json({ok:true,service:'football-edge-mobile-sports-premium-preview',scope:'FRONTEND_ONLY',preview:true,production_replaced:false,backend_deployed:false,auto_scan:false,push_registration:false,base_sha256:'aa4f0f6318cd52c14ff62b195c5ea04c5267107455924da44c9aa78169fe7f28'}, {headers:{'Cache-Control':'no-store'}});
    if(url.pathname!=='/'&&url.pathname!=='/index.html')return new Response('Not Found',{status:404,headers:{'Cache-Control':'no-store'}});
-   const base=await env.ASSETS.fetch(new Request(new URL('/index.html',url),request));
+   const base=await env.ASSETS.fetch(new Request(new URL('/',url),request));
    if(!base.ok)return new Response('Preview site unavailable',{status:503,headers:{'Cache-Control':'no-store'}});
    const h=new Headers(base.headers);
    h.set('Cache-Control','no-store, max-age=0');
