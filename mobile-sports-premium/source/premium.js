@@ -17,8 +17,8 @@
  const isLive=s=>['1H','HT','2H','ET','BT','P','INT','LIVE'].includes(String(s||''));
  const isPre=s=>['NS','TBD'].includes(String(s||''));
  const demoRows=[
-   {id:910011,league:'Giải minh họa',home:'North City',away:'Riverside',short:'2H',minute:67,scoreHome:1,scoreAway:0,dq:86,top:1,why:'Dữ liệu minh họa, không phải nhận định',entry:'WATCH',market:null,edge:null},
-   {id:910012,league:'Giải minh họa',home:'Harbor United',away:'East Town',short:'2H',minute:54,scoreHome:0,scoreAway:0,dq:82,top:null},
+   {manual:true,id:910011,league:'Giải minh họa',home:'North City',away:'Riverside',short:'2H',minute:67,scoreHome:1,scoreAway:0,dq:86,top:1,why:'Dữ liệu minh họa, không phải nhận định',entry:'WATCH',market:null,edge:null},
+   {manual:true,id:910012,league:'Giải minh họa',home:'Harbor United',away:'East Town',short:'2H',minute:54,scoreHome:0,scoreAway:0,dq:82,top:null},
    {id:910013,league:'Giải minh họa',home:'Central FC',away:'West Athletic',short:'2H',minute:72,scoreHome:1,scoreAway:1,dq:91,top:null},
    {id:910014,league:'Giải minh họa',home:'Upcoming FC',away:'Future Club',short:'NS',minute:null,scoreHome:null,scoreAway:null,dq:null,top:null}
  ];
@@ -57,7 +57,7 @@
      const id=number(x?.id);if(id===null)continue;
      const rank=x.__rank||{},p=rank.primary||{},s=(x.latest||x.h1||x.ft||x.hc)?.latest||{};
      const row=map.get(id)||{id,league:val(x.league),home:val(x.home),away:val(x.away),short:s.status??null,minute:number(s.minute),scoreHome:number(s?.goals?.home),scoreAway:number(s?.goals?.away),loaded:false};
-     row.top=number(rank.top);
+     row.top=number(rank.top);row.manual=x.__addon?.manual===true;
      row.dq=number(p?.dq);row.edge=p?.edge??null;row.entry=x.__addon?.entry?.status||null;row.why=x.__addon?.rankWhy||null;row.market=p?.marketLabel||null;
      row.updatedAt=number(s.captured_at??s.fresh_at);
      map.set(id,row);
@@ -112,7 +112,7 @@
    state.rows=liveMode?fixtureRows():demoRows.map(x=>({...x,loaded:false,updatedAt:null}));
    const ranked=state.rows;
    renderTop(ranked);
-   const list=state.group==='LIVE'?ranked.filter(x=>isLive(x.short)):state.group==='PRE'?ranked.filter(x=>isPre(x.short)):ranked.filter(x=>x.top!==null&&x.top!==undefined);
+   const list=state.group==='LIVE'?ranked.filter(x=>isLive(x.short)):state.group==='PRE'?ranked.filter(x=>isPre(x.short)):ranked.filter(x=>x.manual===true);
    const visible=list.slice(0,3);
    const titles={LIVE:'Trận LIVE đang có',PRE:'Trận sắp diễn ra',WATCH:'Trận trong TOP / EDGE'};
    $('spListTitle').textContent=titles[state.group]+(list.length?' ('+list.length+')':'');
@@ -129,12 +129,17 @@
  });
  function notice(txt){const e=$('spInlineError');e.hidden=false;e.textContent=txt}
  function nativeSelect(id){
-   const all=nativeRows();const index=all.findIndex(x=>Number(x?.fixture?.id)===Number(id));
-   if(index<0){notice('Fixture không tồn tại trong state hiện tại. Hãy quét trận bằng Match Center trước.');return false}
-   // Match Center's existing .match handler executes selectFixture(index).
-   const node=$('matches')?.querySelector('.match[data-i="'+index+'"]');
-   if(!node){notice('Handler chọn trận gốc chưa sẵn sàng; mở Match Center để chọn.');openNative('matches');return false}
-   node.click();openNative('analysis');return true;
+   const bridge=window.FE_SP_NATIVE;
+   if(typeof bridge?.selectById!=='function'){
+     notice('Cầu nối chọn fixture theo ID chưa sẵn sàng. Mở Match Center để chọn.');return false;
+   }
+   // Select exactly one native fixture through the original selectFixture(index).
+   // Do not scrape DOM text or assume a filtered-list index matches native state.
+   if(!bridge.selectById(Number(id))){
+     notice('Fixture không tồn tại trong state hiện tại. Hãy quét bằng Match Center trước.');return false;
+   }
+   state.selectedId=Number(id);
+   openNative('analysis');return true;
  }
  $('feSportsPremium').addEventListener('click',e=>{
    const btn=e.target.closest('button');if(!btn)return;
@@ -161,6 +166,6 @@
  if(!liveMode){$('spModeAction').textContent='THỬ KẾT NỐI ›'}
  else{$('spModeName').textContent='PREVIEW KẾT NỐI · DỮ LIỆU THẬT';$('spModeSub').textContent='Tự cấu hình riêng; quét/Push/ON-OFF chỉ theo thao tác người dùng.';$('spModeAction').textContent='VỀ DEMO';}
  // One listener only; selecting/route changes will not introduce a second listener.
- window.__FE_SP_DIAGNOSTICS__=Object.freeze({read:()=>({mode,width:innerWidth,renderCount:state.renderCount,rows:state.rows.length,top:state.rows.find(x=>x.top===1)?.id??null,selected:state.selectedId,hasNativeReader:typeof window.FEUIReadBridge?.read==='function',hasEngineReader:typeof window.FEAddonBridge?.masterRows==='function',observerCount:1,addedNetworkRequests:0})});
+ window.__FE_SP_DIAGNOSTICS__=Object.freeze({read:()=>({mode,width:innerWidth,renderCount:state.renderCount,rows:state.rows.length,top:state.rows.find(x=>x.top===1)?.id??null,selected:state.selectedId,hasNativeSelect:typeof window.FE_SP_NATIVE?.selectById==='function',hasNativeReader:typeof window.FEUIReadBridge?.read==='function',hasEngineReader:typeof window.FEAddonBridge?.masterRows==='function',observerCount:1,addedNetworkRequests:0})});
  render();
 })();
