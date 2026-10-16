@@ -1,0 +1,72 @@
+name: Sports Premium Mobile preview QA — NO PRODUCTION DEPLOY
+on:
+  push:
+    branches: [feature/mobile-sports-premium-preview-20261016]
+    paths:
+      - 'mobile-sports-premium/**'
+      - '.github/workflows/mobile-sports-premium-qa.yml'
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 14
+    environment: football-edge-production
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Read-only verify Mobile production version/sha and preserve exact HTML baseline
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          node --input-type=module <<'JS'
+          import {createHash} from 'node:crypto';
+          import {writeFileSync} from 'node:fs';
+          const account=process.env.CLOUDFLARE_ACCOUNT_ID,token=process.env.CLOUDFLARE_API_TOKEN;
+          if(!account||!token)throw Error('REQUIRED_AUTH_NOT_AVAILABLE');
+          const endpoint='https://api.cloudflare.com/client/v4/accounts/'+encodeURIComponent(account)+'/workers/scripts/';
+          const expected={mobile:'03c1d55d-358a-448b-96f3-f356704831df',desktop:'a332ee39-abb2-422d-a021-db78ef19cc10'};
+          for(const [name,want] of [['shiny-silence-d892',expected.mobile],['football-edge-desktop-b2-test',expected.desktop]]){
+           const r=await fetch(endpoint+name+'/deployments',{headers:{Authorization:'Bearer '+token},signal:AbortSignal.timeout(15000)});
+           const j=await r.json();const versions=j.result?.deployments?.[0]?.versions||[];
+           if(!r.ok||!j.success||versions.length!==1||versions[0].version_id!==want||versions[0].percentage!==100)throw Error('FRONTEND_PRODUCTION_VERSION_DRIFT_'+name);
+          }
+          const url='https://shiny-silence-d892.ngophuonghuy.workers.dev/?premium_baseline=20261016';
+          const r=await fetch(url,{headers:{'Cache-Control':'no-cache'},signal:AbortSignal.timeout(25000)});
+          if(!r.ok)throw Error('BASELINE_HTTP_'+r.status);
+          const b=Buffer.from(await r.arrayBuffer()),sha=createHash('sha256').update(b).digest('hex'),want='aa4f0f6318cd52c14ff62b195c5ea04c5267107455924da44c9aa78169fe7f28';
+          if(sha!==want)throw Error('MOBILE_BASELINE_SHA_DRIFT_'+sha);
+          writeFileSync('mobile-sports-premium/baseline.html',b);
+          console.log('FE_SP_BASELINE_ACTUAL_PRODUCTION_VERIFIED '+JSON.stringify({sha256:sha,bytes:b.length,mobile_version:expected.mobile,desktop_version:expected.desktop}));
+          JS
+      - name: Build isolated preview HTML and check source boundaries
+        run: |
+          python3 mobile-sports-premium/build.py mobile-sports-premium/baseline.html
+          node --check mobile-sports-premium/source/premium.js
+          node --check mobile-sports-premium/worker.mjs
+          node --check mobile-sports-premium/tests/browser_ci.mjs
+          test -f mobile-sports-premium/site/index.html
+      - name: Chromium localhost 375/390/430 / Desktop / filters / safe DEMO
+        run: |
+          npm install --no-save playwright@1.56.1
+          npx playwright install --with-deps chromium
+          node mobile-sports-premium/tests/browser_ci.mjs
+      - name: Wrangler package dry run only
+        working-directory: mobile-sports-premium
+        run: |
+          npm install --no-save wrangler@4
+          npx wrangler deploy --dry-run --outdir /tmp/fe-sp-mobile-preview
+      - name: Preserve screenshots and browser QA as review evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fe-mobile-sports-premium-review-images
+          path: |
+            mobile-sports-premium/screenshots/
+            mobile-sports-premium/qa-results.json
+          if-no-files-found: ignore
