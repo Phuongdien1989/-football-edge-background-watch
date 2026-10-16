@@ -27,12 +27,13 @@
 
 ## Independent staging evidence (same input, REAL Cloudflare D1 rows_written)
 
-[Staging A/B indexed from **actual production** SQLite schema](https://github.com/Phuongdien1989/-football-edge-background-watch/actions/runs/38839380050).
+[Staging A/B indexed from **actual production** SQLite schema](https://github.com/Phuongdien1989/-football-edge-background-watch/actions/runs/38840273757).
 
 - Dedicated isolated test tables in **STAGING** D1 `7d503048-9118-4b29-b662-4e1ba6e32167`, generated from actual production `sqlite_master` DDL (11 tables / 16 indexes checked).
 - Production database `0d12a7cc-12a9-4c71-b55b-61dfd2dac4d4` was **read-only** for schema/index and aggregates, not modified.
-- Same synthetic event sequence: original production source **114** D1 rows written; proposed patch **82**; **32 fewer (28.07%)**. Not a production savings forecast.
-- By selected operations: catalog first `7→7`, ACK-lost retry `5→0`, actual score change `5→3`; ENTRY first `10→8`, ACK-lost retry `7→0`, valid RESOLVED change `11→9`; ignored event `2→0`.
+- Same synthetic event sequence: original production source **119** D1 rows written; proposed patch **82**; **37 fewer (31.09%)**. Not a production savings forecast.
+- By selected operations: catalog first `7→7`, ACK-lost retry `5→0`, old replay after one hour `5→0` (no provider freshness refresh), actual score change `5→3`; ENTRY first `10→8`, ACK-lost retry `7→0`, valid RESOLVED change `11→9`; ignored event `2→0`.
+- Breakdown under SAME indexed synthetic load: CATALOG 22→10; ENTRY 28→17; app LIVE 21→17; Smart Follow 21→17; Evidence 13→9; Validation 7→7; Notification 5→5; invalid event 2→0. These are grouped *test operations* rather than inferred percentages of real production routes.
 - Other unaffected or partly affected groups continue to write and are explicitly accounted for in the workflow artifact.
 - ENTRY / outcome preserved: `RESOLVED`, `HIT`, `resolved_at=4000`, `captured_at=3000`, legitimate minute/score **0** all verified under both variants.
 - Extrapolation caveat: true production write costs depend on volume of genuinely new ENTRY records, other applications sharing D1 quota, and log collection coverage.
