@@ -1,4 +1,4 @@
-import {chromium} from 'playwright';
+import {chromium,webkit} from 'playwright';
 import {readFileSync,writeFileSync,mkdirSync} from 'node:fs';
 import http from 'node:http';
 const root='mobile-sports-premium', html=readFileSync(root+'/site/index.html');
@@ -11,7 +11,8 @@ const server=http.createServer((req,res)=>{
 });
 await new Promise(res=>server.listen(0,'127.0.0.1',res));
 const origin=`http://127.0.0.1:${server.address().port}`;
-const browser=await chromium.launch({headless:true});
+const engine=process.env.FE_SP_ENGINE==='webkit'?'webkit':'chromium';
+const browser=await (engine==='webkit'?webkit:chromium).launch({headless:true});
 const out=[];mkdirSync(root+'/screenshots', {recursive:true});
 try{
  for(const width of [375,390,430]){
@@ -35,7 +36,7 @@ try{
    catch(e){const d=await page.evaluate(({selector})=>({classes:document.body.className,display:getComputedStyle(document.querySelector(selector)).display,rect:document.querySelector(selector).getBoundingClientRect().toJSON()}),{selector});throw Error('PREMIUM_NAV_VISIBILITY_'+width+'_'+view+'_'+JSON.stringify(d))}
    const measure=await page.evaluate(()=>({doc:document.documentElement.scrollWidth,width:innerWidth}));
    if(measure.doc>measure.width+1)throw Error('PREMIUM_NAV_OVERFLOW_'+width+'_'+view+'_'+JSON.stringify(measure));
-   if(width===390)await page.screenshot({path:root+'/screenshots/premium_v2_'+view+'_390.png',fullPage:false,animations:'disabled'});
+   if(width===390)await page.screenshot({path:root+'/screenshots/premium_v2_'+view+'_390_'+engine+'.png',fullPage:false,animations:'disabled'});
   }
   const mobile=await page.evaluate(()=>({premiumVisible:getComputedStyle(document.querySelector('#feSportsPremium')).display!=='none',premiumBrand:getComputedStyle(document.querySelector('.topbar .brand'),'::after').content,sourceVersion:document.querySelector('#feSportsPremium')?.dataset.uiVersion,ids:[...document.querySelectorAll('[id]')].map(x=>x.id)}));
   if(mobile.ids.length!==new Set(mobile.ids).size)throw Error('DUPLICATE_DOM_IDS');
@@ -50,6 +51,6 @@ try{
  const desktop=await page.evaluate(()=>({bodyEnabled:document.body.classList.contains('fe-sp-enabled'),prem:getComputedStyle(document.querySelector('#feSportsPremium')).display}));
  if(desktop.bodyEnabled||desktop.prem!=='none')throw Error('DESKTOP_REGRESSION_'+JSON.stringify(desktop));
  await context.close();
- writeFileSync(root+'/premium-routes-v2-results.json',JSON.stringify({schema:'PREMIUM_NAV_V2',out,desktop_preserved:true,production_modified:false,network_test:'isolated-mock-no-real-provider'},null,2));
- console.log('FE_SP_PREMIUM_V2_ROUTE_QA_PASS '+JSON.stringify({sizes:out.map(x=>x.width),allFiveNativeDestinations:true,desktopPreserved:true,apiRequests:0}));
+ writeFileSync(root+'/premium-routes-v2-results.json',JSON.stringify({schema:'PREMIUM_NAV_V2',engine,out,desktop_preserved:true,production_modified:false,network_test:'isolated-mock-no-real-provider'},null,2));
+ console.log('FE_SP_PREMIUM_V2_ROUTE_QA_PASS '+JSON.stringify({engine,sizes:out.map(x=>x.width),allFiveNativeDestinations:true,desktopPreserved:true,apiRequests:0}));
 }finally{await browser.close();await new Promise(res=>server.close(res))}
