@@ -32,11 +32,11 @@ try{
  await page.setViewportSize({width:390,height:844});
  await page.waitForFunction(()=>document.querySelectorAll('#spRows button').length===3);
  assert.equal(await page.locator('#feSportsPremium').isVisible(),true);
- // Browser navigation back/forward must keep native card reachable.
+ // Native Home uses preventDefault (no history entry); test explicit hash navigation separately.
  await page.locator('.bottom-item[href="#connectCard"]').click();
  assert.equal(await page.locator('#connectCard').isVisible(),true);
  await page.locator('.bottom-item[href="#appTop"]').click();
- await page.goBack();
+ await page.evaluate(()=>{location.hash='#connectCard'});
  await page.waitForFunction(()=>document.body.classList.contains('sp-view-settings'));
  assert.equal(await page.locator('#connectCard').isVisible(),true);
  assert.equal(requests.length,0,JSON.stringify(requests));assert.equal(errors.length,0,JSON.stringify(errors));
@@ -52,7 +52,7 @@ try{
  await p.evaluate(()=>{document.querySelector('#feSportsPremium')?.remove();delete window.__FE_SPORTS_PREMIUM__;});
  await p.evaluate(({fixture})=>{
    window.SP_TEST_READER={read:()=>({state:{fixtures:[fixture]}})};
-   window.SP_TEST_ENGINE={masterRows:()=>[{id:1234,latest:{latest:{fresh_at:Date.now()-180000,minute:0,status:'2H',goals:{home:0,away:0},metrics:{home:{shots:0,sot:0},away:{shots:0,sot:0}},stats_presence:{shots:true,sot:false}}},__rank:{top:1,primary:{dq:4,engine:'FT'}},__addon:{entry:{status:'WATCH'}}}],unified:()=>({})};
+   window.SP_TEST_ENGINE={masterRows:()=>[{id:1234,latest:{latest:{fresh_at:Date.now()-180000,minute:0,status:'2H',goals:{home:0,away:0},metrics:{home:{shots:0,sot:0},away:{shots:0,sot:0}},stats_presence:{shots:true,sot:false,side_count:2}}},__rank:{top:1,primary:{dq:4,engine:'FT'}},__addon:{entry:{status:'WATCH'}}}],unified:()=>({})};
  },{fixture});
  await p.addScriptTag({content:adapter});
  assert.match(await p.locator('#spTopContent').innerText(),/DỮ LIỆU CŨ/);

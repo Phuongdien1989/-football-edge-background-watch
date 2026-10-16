@@ -123,7 +123,7 @@
    const m=chosen.metrics||{};
    const defs=[['Số cú sút','shots'],['Sút trúng đích','sot'],['Kiểm soát bóng','possession']];
    el.innerHTML=`<h2>Thống kê trận đã chọn</h2><p class="sp-stat-note">${escape(chosen.home)} · ${escape(chosen.away)}${!liveMode?' · Minh họa':' · '+escape(ageLabel(chosen.statsUpdatedAt??chosen.updatedAt))}</p>`+defs.map(([label,key])=>{
-     const permitted=!chosen.statsPresence||chosen.statsPresence[key]!==false;
+     const permitted=!chosen.statsPresence||(chosen.statsPresence[key]!==false&&chosen.statsPresence.side_count===2);
      const h=permitted?number(m.home?.[key]):null,a=permitted?number(m.away?.[key]):null,has=h!==null&&a!==null;
      const unit=key==='possession'?'%':'';
      return `<div class="sp-stat"><span>${label}</span><strong>${h===null?'—':h+unit}</strong><div class="sp-stat-bar" aria-hidden="true">${has&&h>=0&&a>=0&&h+a>0?`<i style="width:${Math.max(0,Math.min(100,h/(h+a)*100))}%"></i>`:''}</div><strong>${a===null?'—':a+unit}</strong></div>`;
@@ -133,7 +133,7 @@
    const found=rows.find(x=>x.top===1)||null;
    const gate=$('spTopGate'),el=$('spTopContent');
    if(!found){gate.textContent='CHỜ DỮ LIỆU';el.innerHTML='<div class="sp-empty">Chưa có TOP 1 do engine xếp hạng. Hãy quét và kiểm tra dữ liệu trước khi phân tích.</div><button type="button" class="sp-cta" id="spOpenMatches">MỞ DANH SÁCH TRẬN ›</button>';return}
-   gate.textContent=({WATCH:'ĐANG THEO DÕI',NO_ENTRY:'CHƯA VÀO',WAIT:'CHỜ XÁC NHẬN',SUITABLE:'PHÙ HỢP',CAUTION:'CẦN THẬN TRỌNG',AVOID:'NÊN TRÁNH'})[found.entry]||found.entry||'CHỜ XÁC NHẬN';
+   gate.textContent=({WATCH:'ĐANG THEO DÕI',NO_ENTRY:'CHƯA VÀO',WAIT:'CHỜ XÁC NHẬN',WAIT_PRICE:'CHỜ GIÁ',WAIT_CONFIRM:'CHỜ XÁC NHẬN',PASS:'BỎ QUA',SUITABLE:'PHÙ HỢP',CAUTION:'CẦN THẬN TRỌNG',AVOID:'NÊN TRÁNH'})[found.entry]||found.entry||'CHỜ XÁC NHẬN';
    const dq=found.dq===null||found.dq===undefined?'—':val(found.dq)+(found.dqScale?' / '+found.dqScale:'');
    const freshness=liveMode?stateAge(found):'demo';const freshnessText=freshness==='stale'?'DỮ LIỆU CŨ':freshness==='unknown'?'CHƯA XÁC MINH ĐỘ MỚI':!liveMode?'DỮ LIỆU MINH HỌA':ageLabel(found.updatedAt);
    const edge=found.edge===null||found.edge===undefined?'—':String(found.edge); // Do not invent % units.
