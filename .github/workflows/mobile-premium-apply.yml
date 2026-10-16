@@ -1,0 +1,96 @@
+name: Apply approved Mobile Sports Premium UI with verified rollback
+on:
+  push:
+    branches: [feature/mobile-sports-premium-preview-20261016]
+    paths: ['.github/workflows/mobile-premium-apply.yml']
+jobs:
+  apply-mobile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 16
+    environment: football-edge-production
+    concurrency:
+      group: football-edge-mobile-premium-release
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      actions: read
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      WRANGLER_SEND_METRICS: 'false'
+    steps:
+      - uses: actions/checkout@v4
+        with: {fetch-depth: 0, persist-credentials: false}
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Verify exact approved QA source and release-only diff
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          node --input-type=module <<'JS'
+          import {execFileSync} from 'node:child_process';
+          const qa='e9172c117e298156f5d5ea8f0679aa867ab31c1a',id='38878542447';
+          const r=await fetch('https://api.github.com/repos/'+process.env.GITHUB_REPOSITORY+'/actions/runs/'+id,{headers:{Authorization:'Bearer '+process.env.GITHUB_TOKEN},signal:AbortSignal.timeout(20000)}),j=await r.json();
+          if(!r.ok||j.head_sha!==qa||j.conclusion!=='success')throw Error('Exact QA not PASS');
+          const files=execFileSync('git',['diff','--name-only',qa,'HEAD'],{encoding:'utf8'}).trim().split('\n');
+          const allowed=['.github/workflows/mobile-premium-apply.yml','.github/scripts/mobile-premium-release.mjs','mobile-sports-premium/wrangler-production.toml'];
+          if(files.some(p=>!allowed.includes(p)))throw Error('Runtime changed after QA');
+          console.log('EXACT_QA_VERIFIED',qa,id);
+          JS
+      - name: Read-only baseline and rollback preflight; backup original static resources
+        run: node .github/scripts/mobile-premium-release.mjs preflight
+      - name: Build exact tested preview and production bundles
+        run: |
+          python3 mobile-sports-premium/recover_baseline.py mobile-sports-premium/release-backup/index.html
+          python3 mobile-sports-premium/build.py
+          python3 mobile-sports-premium/build_production.py
+          node --input-type=module <<'JS'
+          import {readFileSync} from 'node:fs';import {createHash} from 'node:crypto';
+          for(const [p,h] of [['site','829ebc72667cda0b3e594fa6b9e24fe719dcf8d0c4a44a63cebcbc4ed6908b3b'],['production-site','a9b82cdb5fb6c4742ba8ba1e960fa5f60406204d8bd8ec0f7f62f2d709c6ce7b']])if(createHash('sha256').update(readFileSync('mobile-sports-premium/'+p+'/index.html')).digest('hex')!==h)throw Error('Bundle not exact tested source '+p);
+          JS
+          npm install --no-save wrangler@4 playwright@1.56.1
+          npx wrangler deploy --dry-run --config mobile-sports-premium/wrangler-production.toml
+      - name: Update separate preview first
+        run: npx wrangler deploy --config mobile-sports-premium/wrangler.toml
+      - name: Apply UI to original Mobile origin; preserve same-origin storage and Push resources
+        run: |
+          touch mobile-sports-premium/deployment-attempted
+          npx wrangler deploy --config mobile-sports-premium/wrangler-production.toml
+      - name: Verify active version original Push resources HTML and unrelated Workers
+        run: node .github/scripts/mobile-premium-release.mjs verify
+      - name: Browser acceptance on actual HTTPS origin without activating scan
+        run: |
+          npx playwright install --with-deps chromium
+          node --input-type=module <<'JS'
+          import {chromium} from 'playwright';import {mkdirSync} from 'node:fs';
+          const browser=await chromium.launch({headless:true});mkdirSync('mobile-sports-premium/screenshots',{recursive:true});
+          try{
+           for(const width of [390,1440]){
+            const c=await browser.newContext({viewport:{width,height:844},serviceWorkers:'block'}),p=await c.newPage(),errors=[],api=[];
+            p.on('pageerror',e=>errors.push(e.message));p.on('request',r=>{if(/\/api\/|api-sports|api-football/.test(r.url()))api.push(r.url().split('?')[0])});
+            const r=await p.goto('https://shiny-silence-d892.ngophuonghuy.workers.dev/',{waitUntil:'domcontentloaded'});
+            await p.waitForFunction(()=>window.__FE_SP_DIAGNOSTICS__);
+            const d=await p.evaluate(()=>({mode:window.__FE_SP_DIAGNOSTICS__.read().mode,overflow:document.documentElement.scrollWidth>innerWidth+1,shown:getComputedStyle(document.querySelector('#feSportsPremium')).display!=='none'}));
+            if(!r.ok()||d.mode!=='production'||d.overflow||d.shown!==(width<768))throw Error('Live presentation failed '+JSON.stringify(d));
+            if(width<768){if(await p.locator('#spRankRows > *').count()!==5)throw Error('TOP-five standings missing');for(const [hash,selector] of [['#scanCard','#scanCard'],['#analysisCard','#analysisCard'],['#betTrackerCard','#betTrackerCard'],['#connectCard','#connectCard'],['#appTop','#feSportsPremium']]){await p.locator('.bottom-item[href="'+hash+'"]').click();if(!await p.locator(selector).isVisible())throw Error('Live native route hidden '+hash)}}
+            if(errors.length||api.length)throw Error('Live empty-config side effects '+JSON.stringify({errors,api}));
+            await p.screenshot({path:'mobile-sports-premium/screenshots/applied-'+width+'.png',fullPage:true});
+            console.log('LIVE_MOBILE_UI_PASS',JSON.stringify({width,mode:d.mode,apiRequests:api.length,consoleErrors:errors.length}));await c.close();
+           }
+          }finally{await browser.close()}
+          JS
+      - name: Restore original Mobile if release verification fails
+        if: failure()
+        run: node .github/scripts/mobile-premium-release.mjs rollback
+      - name: Preserve release backup versions and acceptance evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mobile-premium-applied-and-rollback
+          path: |
+            mobile-sports-premium/release-backup/
+            mobile-sports-premium/release-state.json
+            mobile-sports-premium/release-result.json
+            mobile-sports-premium/production-build.json
+            mobile-sports-premium/screenshots/
+          if-no-files-found: warn

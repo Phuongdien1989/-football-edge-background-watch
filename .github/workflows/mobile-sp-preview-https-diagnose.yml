@@ -1,0 +1,26 @@
+name: Mobile Sports Premium preview HTTPS diagnosis READ ONLY
+on:
+  push:
+    branches: [feature/mobile-sports-premium-preview-20261016]
+    paths: ['.github/workflows/mobile-sp-preview-https-diagnose.yml']
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    permissions: {contents: read}
+    steps:
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Inspect sanitized HTTP response and CACHE from isolated Worker
+        run: |
+          node --input-type=module <<'JS'
+          import {createHash} from 'node:crypto';
+          const base='https://football-edge-mobile-sports-premium-preview.ngophuonghuy.workers.dev';
+          for(const path of ['/','/?diagnose=20261016','/index.html','/index.html?diag=123','/?mode=connected','/__sports/health','/baseline.html']){
+           try{
+            const r=await fetch(base+path,{headers:{'Cache-Control':'no-cache','Pragma':'no-cache'},signal:AbortSignal.timeout(15000)});
+            const b=Buffer.from(await r.arrayBuffer()),s=b.toString('utf8');
+            console.log('FE_SP_HTTP_PROBE '+JSON.stringify({path,http:r.status,bytes:b.length,sha256:createHash('sha256').update(b).digest('hex'),ctype:r.headers.get('content-type'),cache:r.headers.get('cf-cache-status'),etag:r.headers.get('etag'),csp:r.headers.get('content-security-policy')?.slice(0,350)||null,premium:s.includes('FE_SP_PREMIUM_JS'),nativeBridge:s.includes('SPORTS_PREMIUM_PREVIEW_NATIVE_SELECTION_BRIDGE'),prefix:s.slice(0,65).replace(/\s+/g,' ')}));
+           }catch(e){console.log('FE_SP_HTTP_PROBE '+JSON.stringify({path,error:String(e?.message||e).slice(0,140)}))}
+          }
+          JS

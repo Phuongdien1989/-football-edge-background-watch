@@ -1,0 +1,287 @@
+/* Football Edge Sports Premium — isolated Mobile-only presentation, no business logic */
+@media (max-width:767px) {
+ body.fe-sp-enabled{--sp-bg:#f3f6fa;--sp-surface:#fff;--sp-navy:#142d4e;--sp-blue:#2478ed;--sp-mint:#10b981;--sp-muted:#7186a5;--sp-line:#e2eaf4;--sp-amber:#d88815;background:var(--sp-bg)!important;color:var(--sp-navy)!important;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif!important;font-size:15px!important;overflow-x:hidden}
+ body.fe-sp-enabled .app{width:100%!important;max-width:100%!important;margin:0 auto!important;padding:10px 12px calc(95px + env(safe-area-inset-bottom))!important;background:var(--sp-bg)!important;overflow:visible!important}
+ body.fe-sp-enabled .topbar{padding:12px 3px 14px!important;margin:0 0 8px!important;border:0!important;background:transparent!important;box-shadow:none!important;min-height:67px!important}
+ body.fe-sp-enabled .topbar .brand h1{font-size:clamp(20px,5.2vw,27px)!important;line-height:1.13!important;color:var(--sp-navy)!important;font-weight:850!important;letter-spacing:-.5px!important;text-transform:uppercase}
+ body.fe-sp-enabled .topbar .brand h1::first-letter{color:var(--sp-blue)}
+ body.fe-sp-enabled .topbar .brand .sub{color:var(--sp-muted)!important;font-size:11px!important;line-height:1.4!important;letter-spacing:.01em!important}
+ body.fe-sp-enabled .topbar .top-actions{display:flex!important;align-items:center;gap:4px}
+ body.fe-sp-enabled .topbar .top-actions .header-tool{border:0!important;background:transparent!important;color:var(--sp-navy)!important;box-shadow:none!important}
+ body.fe-sp-enabled .topbar .top-actions .header-tool::after{display:none}
+ body.fe-sp-enabled:not(.fe-route-matches):not(.fe-route-analysis) .app>nav.hero-panel,
+ body.fe-sp-enabled:not(.fe-route-matches):not(.fe-route-analysis) #feP1LiveCommandCenter,
+ body.fe-sp-enabled:not(.fe-route-matches):not(.fe-route-analysis) #feProLiveShell,
+ body.fe-sp-enabled:not(.fe-route-matches):not(.fe-route-analysis) #feCommandCenter,
+ body.fe-sp-enabled:not(.fe-route-matches):not(.fe-route-analysis) #feFocusHint,
+ body.fe-sp-enabled:not(.fe-route-matches):not(.fe-route-analysis) #scanCard,
+ body.fe-sp-enabled:not(.fe-route-matches):not(.fe-route-analysis) #unifiedLiveCard,
+ body.fe-sp-enabled:not(.fe-route-matches):not(.fe-route-analysis) #h1WatchCard,
+ body.fe-sp-enabled:not(.fe-route-matches):not(.fe-route-analysis) #liveWatchCard,
+ body.fe-sp-enabled:not(.fe-route-matches):not(.fe-route-analysis) #handicapWatchCard,
+ body.fe-sp-enabled:not(.fe-route-matches):not(.fe-route-analysis) #analysisCard,
+ body.fe-sp-enabled:not(.fe-route-matches):not(.fe-route-analysis) #betTrackerCard,
+ body.fe-sp-enabled:not(.fe-route-matches):not(.fe-route-analysis) #connectCard,
+ body.fe-sp-enabled:not(.fe-route-matches):not(.fe-route-analysis) #technicalCard,
+ body.fe-sp-enabled:not(.fe-route-matches):not(.fe-route-analysis) .app>.footer{display:none!important}
+ body.fe-sp-enabled #feSportsPremium{display:block!important}
+ body.fe-sp-enabled.fe-route-matches #feSportsPremium,body.fe-sp-enabled.fe-route-analysis #feSportsPremium{display:none!important}
+ body.fe-sp-enabled .bottom-nav{background:rgba(255,255,255,.98)!important;border:1px solid #e1e9f3!important;border-radius:20px 20px 0 0!important;padding:9px 3px calc(7px + env(safe-area-inset-bottom))!important;box-shadow:0 -9px 28px rgba(26,51,91,.08)!important;z-index:1100!important;min-height:69px!important}
+ body.fe-sp-enabled .bottom-nav .bottom-item{font-size:10px!important;color:#657c9c!important;min-width:0!important;padding:6px 0!important;min-height:50px!important;gap:3px!important}
+ body.fe-sp-enabled .bottom-nav .bottom-item b{font-size:10px!important;white-space:nowrap!important;color:inherit!important;font-weight:600!important}
+ body.fe-sp-enabled .bottom-nav .bottom-item.active{color:var(--sp-blue)!important}
+ body.fe-sp-enabled .bottom-nav .bottom-icon{font-size:21px!important}
+ body.fe-sp-enabled .bottom-nav .bottom-center .center-plus{width:56px!important;height:56px!important;border-radius:50%!important;display:grid!important;place-items:center!important;background:#10b981!important;box-shadow:0 6px 18px #10b98133!important;font-size:34px!important;color:white!important;position:relative!important;top:-14px!important}
+ body.fe-sp-enabled.fe-route-matches #scanCard,body.fe-sp-enabled.fe-route-analysis #analysisCard{background:#fff!important;color:var(--sp-navy)!important;border:1px solid var(--sp-line)!important;border-radius:15px!important;box-shadow:0 4px 17px rgba(20,45,78,.06)!important;padding:12px!important}
+ body.fe-sp-enabled.fe-route-matches #scanCard .matches .match{border-radius:12px!important}
+ body.fe-sp-enabled #feSportsPremium *{box-sizing:border-box}
+ body.fe-sp-enabled #feSportsPremium button{font-family:inherit;cursor:pointer;-webkit-tap-highlight-color:transparent}
+ body.fe-sp-enabled #feSportsPremium button:focus-visible,body.fe-sp-enabled #feSportsPremium a:focus-visible{outline:3px solid var(--sp-blue);outline-offset:2px}
+ body.fe-sp-enabled #feSportsPremium button:disabled{cursor:not-allowed;opacity:.56}
+ body.fe-sp-enabled .sp-card{background:#fff;border:1px solid var(--sp-line);border-radius:16px;box-shadow:0 4px 18px #19345b0b;margin-bottom:13px}
+ body.fe-sp-enabled .sp-mode{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:12px;background:#eaf2ff;border:1px solid #c8dcff;border-radius:12px;padding:9px 11px;color:#28548c;font-size:12px;line-height:1.4}
+ body.fe-sp-enabled .sp-mode strong{color:#195cba}
+ body.fe-sp-enabled .sp-mode button{border:0;background:#2478ed;color:white;border-radius:9px;padding:8px 10px;font-size:11px;font-weight:700;flex-shrink:0;min-height:38px}
+ body.fe-sp-enabled .sp-system{padding:13px 12px;display:flex;gap:12px;align-items:center;justify-content:space-between}
+ body.fe-sp-enabled .sp-system-info{min-width:0;display:flex;align-items:center;gap:10px}
+ body.fe-sp-enabled .sp-dot{display:block;flex:0 0 31px;width:31px;height:31px;border-radius:50%;background:#e2ebf5;position:relative}
+ body.fe-sp-enabled .sp-dot::after{content:'';position:absolute;inset:10px;background:#90a4c1;border-radius:50%}
+ body.fe-sp-enabled .sp-dot.ok{background:#ddf7eb}body.fe-sp-enabled .sp-dot.ok::after{background:#10b981}body.fe-sp-enabled .sp-dot.warn{background:#fff1d3}body.fe-sp-enabled .sp-dot.warn::after{background:#efaf3f}body.fe-sp-enabled .sp-dot.err{background:#ffe2e4}body.fe-sp-enabled .sp-dot.err::after{background:#d24d58}
+ body.fe-sp-enabled .sp-system strong{font-size:15px;line-height:1.4;display:block;color:#146645}
+ body.fe-sp-enabled .sp-system strong.warn{color:#a66b11}body.fe-sp-enabled .sp-system strong.err{color:#bc3b49}
+ body.fe-sp-enabled .sp-system small{display:block;font-size:11px;color:var(--sp-muted);line-height:1.35;max-width:165px;white-space:normal}
+ body.fe-sp-enabled .sp-scan-btn{border:1px solid #cbdfff;background:#e5efff;color:#155fc7;min-height:44px;min-width:112px;border-radius:12px;display:flex;align-items:center;gap:6px;justify-content:center;padding:7px 10px;font-size:13px;font-weight:800}
+ body.fe-sp-enabled .sp-scan-btn .sp-switch{display:inline-block;height:19px;width:32px;border-radius:30px;background:#a2b2c7;position:relative;flex-shrink:0}
+ body.fe-sp-enabled .sp-switch::after{content:'';position:absolute;left:3px;top:3px;height:13px;width:13px;border-radius:50%;background:white;transition:transform .15s}
+ body.fe-sp-enabled .sp-scan-btn[data-on="true"] .sp-switch{background:#2478ed}body.fe-sp-enabled .sp-scan-btn[data-on="true"] .sp-switch::after{transform:translateX(13px)}
+ body.fe-sp-enabled .sp-tabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:3px;padding:5px}
+ body.fe-sp-enabled .sp-tabs button{border:0;background:transparent;color:#526988;font-weight:750;font-size:13px;padding:12px 3px;border-radius:11px;min-height:44px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+ body.fe-sp-enabled .sp-tabs button.active{background:var(--sp-blue);color:white;box-shadow:0 3px 9px #2478ed31}
+ body.fe-sp-enabled .sp-top{padding:9px 9px 10px;border-left:4px solid #abebd2}
+ body.fe-sp-enabled .sp-top-head{background:#eaf8f2;display:flex;align-items:center;gap:6px;border-radius:11px 11px 0 0;padding:10px;font-size:12px;color:#1e7656}
+ body.fe-sp-enabled .sp-top-head strong{font-size:16px;color:#06764b;white-space:nowrap}
+ body.fe-sp-enabled .sp-top-head span{flex:1;min-width:0;color:#547e76;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+ body.fe-sp-enabled .sp-pill{padding:7px 9px;border-radius:10px;background:#fff4db;border:1px solid #ffd88a;color:#9b610c;font-size:10px;font-weight:800;white-space:nowrap}
+ body.fe-sp-enabled .sp-top-inner{text-align:center;padding:18px 7px 8px}
+ body.fe-sp-enabled .sp-league{font-size:11px;line-height:1.3;color:#6986a7;margin-bottom:9px}
+ body.fe-sp-enabled .sp-top-match{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);align-items:center;gap:8px;margin-bottom:12px}
+ body.fe-sp-enabled .sp-team{font-size:14px;font-weight:800;line-height:1.35;overflow-wrap:anywhere;color:#112d56}
+ body.fe-sp-enabled .sp-team .sp-crest{display:block;font-size:31px;line-height:1.2;margin-bottom:6px;color:#255a9d}
+ body.fe-sp-enabled .sp-score-main{font-size:28px;line-height:1.05;color:#102a52;font-weight:900;letter-spacing:0;white-space:nowrap}
+ body.fe-sp-enabled .sp-minute{font-size:11px;display:inline-block;border-radius:30px;background:#e4f8ee;color:#06965d;font-weight:800;padding:5px 9px;margin-bottom:9px;white-space:nowrap}
+ body.fe-sp-enabled .sp-metrics{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;text-align:left;margin:8px 0 12px}
+ body.fe-sp-enabled .sp-metric{border:1px solid #e8edf5;background:#f8fbff;border-radius:11px;padding:10px 12px;min-width:0}
+ body.fe-sp-enabled .sp-metric small{color:#657b98;font-size:11px;display:block;margin-bottom:3px}
+ body.fe-sp-enabled .sp-metric b{font-size:21px;line-height:1.3;color:#142d4e;font-variant-numeric:tabular-nums}
+ body.fe-sp-enabled .sp-metric.edge b{color:#047d54}
+ body.fe-sp-enabled .sp-why{text-align:left;color:#5a7190;font-size:11px;line-height:1.45;margin:8px 3px 12px;white-space:normal}
+ body.fe-sp-enabled .sp-cta{width:100%;border:0;border-radius:12px;min-height:51px;background:var(--sp-blue);color:white;font-size:16px;font-weight:800;display:flex;align-items:center;justify-content:center;gap:8px;box-shadow:0 4px 13px #2478ed21}
+ body.fe-sp-enabled .sp-empty{font-size:13px;color:#657f9c;line-height:1.6;margin:8px auto 12px;padding:12px 5px}
+ body.fe-sp-enabled .sp-section-line{display:flex;gap:8px;justify-content:space-between;align-items:center;margin:19px 1px 10px}
+ body.fe-sp-enabled .sp-section-line h2{font-size:17px!important;line-height:1.25!important;margin:0!important;color:#152d50!important;font-weight:800!important}
+ body.fe-sp-enabled .sp-section-line button{font-weight:750;font-size:12px;min-height:38px;border:0;background:none;color:#2478ed;white-space:nowrap}
+ body.fe-sp-enabled .sp-list{display:flex;flex-direction:column;gap:8px;margin-bottom:15px}
+ body.fe-sp-enabled .sp-row{width:100%;display:grid;grid-template-columns:45px minmax(0,1fr) 70px 20px;align-items:center;gap:7px;padding:11px 10px;border-radius:13px;border:1px solid #e3eaf4;background:white;text-align:left;min-height:75px;box-shadow:0 3px 10px #19345b0a}
+ body.fe-sp-enabled .sp-row .sp-live{font-size:10px;font-weight:800;color:white;background:#10b981;border-radius:7px;padding:5px 4px;text-align:center}
+ body.fe-sp-enabled .sp-row .sp-live.stale{background:#a2aec0}body.fe-sp-enabled .sp-row .sp-live.pre{background:#e6eefc;color:#365f9b}
+ body.fe-sp-enabled .sp-teams{min-width:0;font-size:13.5px;line-height:1.45;color:#153154;font-weight:750;overflow-wrap:anywhere}
+ body.fe-sp-enabled .sp-teams small{font-size:11px;font-weight:500;color:#7186a3;display:block}
+ body.fe-sp-enabled .sp-row-score{font-size:18px;font-weight:900;text-align:center;font-variant-numeric:tabular-nums;color:#122b55;white-space:nowrap}
+ body.fe-sp-enabled .sp-row-score small{display:block;font-size:10px;color:#138e65;font-weight:650}
+ body.fe-sp-enabled .sp-row-arrow{font-size:22px;color:#93a6be}
+ body.fe-sp-enabled .sp-inline-blank{background:white;border:1px dashed #ccd7e8;color:#7186a0;border-radius:13px;padding:15px;line-height:1.5;font-size:12px}
+ body.fe-sp-enabled .sp-footer-note{font-size:11px;line-height:1.5;color:#7589a3;padding:4px 4px 20px}
+ body.fe-sp-enabled #feSportsPremium[hidden]{display:none!important}
+ body.fe-sp-enabled .sp-only-desktop{display:none}
+}
+
+/* SPORTS PREMIUM V2: a coherent skin on ALL five native tabs.
+   Only display/layout rules; native actions, route classes and state remain owned
+   by the original app. No duplicate fixtures, polling or DB writes. */
+@media(max-width:767px){
+ body.fe-sp-enabled .topbar{border-bottom:1px solid #e5ecf5!important;padding-bottom:13px!important}
+ body.fe-sp-enabled .topbar .brand h1{font-size:clamp(23px,5.9vw,29px)!important;letter-spacing:-.85px!important;color:#142d4e!important;text-transform:uppercase!important;font-style:normal!important}
+ body.fe-sp-enabled .topbar .brand .sub{font-size:11px!important;color:#647f9d!important;letter-spacing:.01em!important}
+ body.fe-sp-enabled .topbar .brand::after{content:'SPORTS PREMIUM  ·  XEM THỬ';display:block;width:max-content;max-width:100%;margin-top:4px;padding:3px 7px;border-radius:5px;background:#e7f0ff;color:#2478ed;font-size:9px;font-weight:850;letter-spacing:.05em}
+ body.fe-sp-enabled .sp-mode{border-radius:14px;background:#e8f1ff!important;box-shadow:0 4px 12px rgba(36,120,237,.045)}
+ body.fe-sp-enabled #feSportsPremium .sp-top{border-left:0!important;overflow:hidden;padding:0!important;border:1px solid #bfe8d6!important;box-shadow:0 6px 24px rgba(7,140,97,.075)!important}
+ body.fe-sp-enabled #feSportsPremium .sp-top-head{border-radius:0!important;padding:14px 13px!important;background:linear-gradient(105deg,#e2f9ee,#f1faf6)!important;border-bottom:1px solid #d3eee1}
+ body.fe-sp-enabled #feSportsPremium .sp-top-inner{padding:18px 13px 16px!important}
+ body.fe-sp-enabled #feSportsPremium .sp-score-main{font-size:clamp(30px,9vw,41px)!important;letter-spacing:-1px!important}
+ body.fe-sp-enabled #feSportsPremium .sp-crest{font-size:38px!important}
+ body.fe-sp-enabled #feSportsPremium .sp-team{font-size:15px!important}
+ body.fe-sp-enabled #feSportsPremium .sp-league{font-size:12px!important}
+ body.fe-sp-enabled #feSportsPremium .sp-metric{background:#f2f7ff!important;border-color:#e0ebf6!important;padding:13px!important}
+ body.fe-sp-enabled #feSportsPremium .sp-metric b{font-size:24px!important}
+ body.fe-sp-enabled #feSportsPremium .sp-cta{background:linear-gradient(100deg,#2478ed,#126bea)!important;box-shadow:0 6px 14px rgba(36,120,237,.17)!important}
+ body.fe-sp-enabled #feSportsPremium .sp-row{min-height:83px!important;border-radius:15px!important;box-shadow:0 5px 14px #18345d0b!important}
+ body.fe-sp-enabled #feSportsPremium .sp-teams{font-size:14.5px!important}
+ body.fe-sp-enabled #feSportsPremium .sp-row-score{font-size:21px!important}
+ body.fe-sp-enabled #feSportsPremium .sp-row-score small{font-size:11px!important}
+ body.fe-sp-enabled .bottom-nav{border-radius:20px 20px 0 0!important}
+ body.fe-sp-enabled .bottom-nav .bottom-item.active{color:#2478ed!important}
+ /* Settings and Tracker previously hidden by homepage-only exclusions.
+    Expose *only* the selected native card, with no cloned elements. */
+ body.fe-sp-enabled.sp-view-tracking:not(.fe-route-matches):not(.fe-route-analysis) #feSportsPremium,
+ body.fe-sp-enabled.sp-view-settings:not(.fe-route-matches):not(.fe-route-analysis) #feSportsPremium{display:none!important}
+ body.fe-sp-enabled.sp-view-tracking:not(.fe-route-matches):not(.fe-route-analysis) #betTrackerCard,
+ body.fe-sp-enabled.sp-view-settings:not(.fe-route-matches):not(.fe-route-analysis) #connectCard{display:block!important;visibility:visible!important;position:relative!important;background:#fff!important;color:#142d4e!important;border:1px solid #dfe9f4!important;border-radius:17px!important;box-shadow:0 8px 24px #17385c0b!important;min-height:calc(100vh - 215px);padding:15px!important;margin:12px 0!important}
+ body.fe-sp-enabled.sp-view-tracking:not(.fe-route-matches):not(.fe-route-analysis) #betTrackerCard:before,
+ body.fe-sp-enabled.sp-view-settings:not(.fe-route-matches):not(.fe-route-analysis) #connectCard:before{display:block;font-size:11px;letter-spacing:.09em;font-weight:850;color:#2478ed;margin:0 0 13px;border-bottom:1px solid #e9eef6;padding:0 0 11px}
+ body.fe-sp-enabled.sp-view-tracking #betTrackerCard:before{content:'THEO DÕI  ·  SPORTS PREMIUM'}
+ body.fe-sp-enabled.sp-view-settings #connectCard:before{content:'CÀI ĐẶT  ·  SPORTS PREMIUM'}
+ body.fe-sp-enabled.sp-view-tracking:not(.fe-route-matches):not(.fe-route-analysis) #scanCard,
+ body.fe-sp-enabled.sp-view-settings:not(.fe-route-matches):not(.fe-route-analysis) #scanCard{display:none!important}
+ /* Match Center and Analysis keep the native handler and single DOM card.
+    Only style/typography is adjusted to match the Premium language. */
+ body.fe-sp-enabled.fe-route-matches #scanCard,
+ body.fe-sp-enabled.fe-route-analysis #analysisCard{border-radius:17px!important;background:#fff!important;padding:14px!important;box-shadow:0 8px 24px #17385c10!important}
+ body.fe-sp-enabled .fe-p3-title h2,
+ body.fe-sp-enabled .fe-p4-title h2{font-size:clamp(20px,5.1vw,23px)!important;letter-spacing:-.04em!important;color:#142d4e!important}
+ body.fe-sp-enabled .fe-p3-title span,
+ body.fe-sp-enabled .fe-p4-title span{font-size:10px!important;color:#2478ed!important}
+ body.fe-sp-enabled .fe-p3-title p,
+ body.fe-sp-enabled .fe-p4-title p{font-size:12px!important;line-height:1.45!important;color:#697f9d!important}
+ body.fe-sp-enabled #scanCard .fe-p3-stat span{font-size:9px!important}
+ body.fe-sp-enabled #scanCard .fe-p3-stat b{font-size:21px!important}
+ body.fe-sp-enabled #scanCard .fe-p3-actions button{font-size:12px!important;min-height:46px!important}
+ body.fe-sp-enabled #scanCard .fe-p3-filter-row button{font-size:10.5px!important;min-height:37px!important}
+ body.fe-sp-enabled #scanCard .fe-p3-route-note{font-size:11px!important}
+ body.fe-sp-enabled #scanCard .fe-p3-live-badge{font-size:10px!important}
+ body.fe-sp-enabled #analysisCard .fe-p4-team b{font-size:12px!important;line-height:1.3!important;white-space:normal!important;overflow-wrap:anywhere}
+ body.fe-sp-enabled #analysisCard .fe-p4-score strong{font-size:30px!important}
+ body.fe-sp-enabled #analysisCard .fe-p4-quality .fe-p4-q span{font-size:9px!important}
+ body.fe-sp-enabled #analysisCard .fe-p4-quality .fe-p4-q b{font-size:14px!important}
+ body.fe-sp-enabled #analysisCard .fe-p4-decision-main span,
+ body.fe-sp-enabled #analysisCard .fe-p4-market span{font-size:10px!important}
+ body.fe-sp-enabled #analysisCard .fe-p4-decision-main b{font-size:14px!important}
+ body.fe-sp-enabled #analysisCard .fe-p4-note{font-size:11px!important}
+ body.fe-sp-enabled #analysisCard .fe-p4-actions button{font-size:11px!important;min-height:44px!important}
+ body.fe-sp-enabled #analysisCard .fe-p4-secondary-actions button{font-size:10.5px!important}
+ body.fe-sp-enabled #analysisCard .fe-p4-reason span,
+ body.fe-sp-enabled #analysisCard .fe-p4-reason b{font-size:11px!important}
+ body.fe-sp-enabled #betTrackerCard :is(.section-head,.bet-kpis,.bet-tabs),
+ body.fe-sp-enabled #connectCard :is(.connect-accordion,summary){color:#142d4e!important}
+ body.fe-sp-enabled #betTrackerCard button,
+ body.fe-sp-enabled #connectCard button{border-radius:11px!important;min-height:40px}
+ body.fe-sp-enabled #connectCard .connect-accordion{padding:10px!important;border-radius:13px!important;background:#f7faff!important;border-color:#dce8f2!important}
+}
+
+@media (min-width:768px){#feSportsPremium{display:none!important}}
+@media (prefers-reduced-motion:reduce){.sp-switch::after{transition:none!important}}
+
+/* V3: mobile readability and compact match-first presentation.
+   Scoped to mobile; original desktop and business handlers are unchanged. */
+@media(max-width:767px){
+ body.fe-sp-enabled{font-size:15px!important;-webkit-text-size-adjust:100%;text-size-adjust:100%}
+ body.fe-sp-enabled .app{padding:8px 14px calc(100px + env(safe-area-inset-bottom))!important}
+ body.fe-sp-enabled .topbar{min-height:64px!important;padding:12px 0!important;margin-bottom:12px!important}
+ body.fe-sp-enabled .topbar .brand h1{font-size:25px!important;font-style:normal!important;letter-spacing:-.7px!important}
+ body.fe-sp-enabled .topbar .brand .sub{font-size:10px!important;line-height:1.5!important}
+ body.fe-sp-enabled .topbar .brand::after{display:none!important}
+ body.fe-sp-enabled #feSportsPremium{font-size:14px!important;line-height:1.5}
+ body.fe-sp-enabled #feSportsPremium .sp-mode{padding:8px 10px;gap:8px;margin-bottom:10px;border-radius:12px;box-shadow:none;font-size:11px}
+ body.fe-sp-enabled #feSportsPremium .sp-mode strong{font-size:11px;letter-spacing:.02em}
+ body.fe-sp-enabled #spModeSub{display:none}
+ body.fe-sp-enabled #feSportsPremium .sp-mode button{min-height:44px;font-size:12px;padding:8px;border-radius:9px}
+ body.fe-sp-enabled #feSportsPremium .sp-system{padding:12px;gap:8px;margin-bottom:12px}
+ body.fe-sp-enabled #feSportsPremium .sp-system-info{gap:8px;flex:1}
+ body.fe-sp-enabled #feSportsPremium .sp-dot{flex-basis:24px;width:24px;height:24px}
+ body.fe-sp-enabled #feSportsPremium .sp-dot::after{inset:7px}
+ body.fe-sp-enabled #feSportsPremium .sp-system strong{font-size:14px;line-height:1.35;color:#142d4e}
+ body.fe-sp-enabled #feSportsPremium .sp-system small{font-size:11px;line-height:1.5;max-width:none;margin-top:3px}
+ body.fe-sp-enabled #feSportsPremium .sp-scan-btn{min-width:108px;min-height:44px;padding:8px;font-size:12px;gap:6px;border-radius:10px}
+ body.fe-sp-enabled #feSportsPremium .sp-scan-btn>span:first-child{display:none}
+ body.fe-sp-enabled #feSportsPremium .sp-scan-btn:disabled{opacity:.72}
+ body.fe-sp-enabled #feSportsPremium .sp-tabs{padding:4px;margin-bottom:14px}
+ body.fe-sp-enabled #feSportsPremium .sp-tabs button{font-size:13px;min-height:46px;padding:10px 2px;letter-spacing:0}
+ body.fe-sp-enabled #feSportsPremium .sp-top-head{display:grid;grid-template-columns:auto 1fr;gap:4px 10px;padding:12px!important}
+ body.fe-sp-enabled #feSportsPremium .sp-top-head strong{font-size:17px;line-height:1.3}
+ body.fe-sp-enabled #feSportsPremium .sp-top-head>span{font-size:12px;grid-column:1/-1;grid-row:2;white-space:normal}
+ body.fe-sp-enabled #feSportsPremium #spTopGate{grid-column:2;grid-row:1;justify-self:end;max-width:100%;white-space:normal;text-align:center;font-size:10px;padding:5px 7px}
+ body.fe-sp-enabled #feSportsPremium .sp-top-inner{padding:14px 12px!important}
+ body.fe-sp-enabled #feSportsPremium .sp-league{font-size:12px!important;margin-bottom:14px}
+ body.fe-sp-enabled #feSportsPremium .sp-top-match{grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);gap:8px;margin-bottom:14px}
+ body.fe-sp-enabled #feSportsPremium .sp-crest{display:grid;place-items:center;width:44px;height:50px;margin:0 auto 8px;font-size:17px!important;line-height:1}
+ body.fe-sp-enabled #feSportsPremium .sp-crest img{width:44px;height:44px;object-fit:contain}
+ body.fe-sp-enabled #feSportsPremium .sp-monogram{height:44px;background:#eaf2ff;border:1px solid #d5e4f8;border-radius:13px;color:#285b96;font-weight:850}
+ body.fe-sp-enabled #feSportsPremium .sp-team{font-size:14px!important;line-height:1.35;overflow-wrap:anywhere}
+ body.fe-sp-enabled #feSportsPremium .sp-score-main{font-size:40px!important;letter-spacing:-1px!important;line-height:1.15;font-variant-numeric:tabular-nums}
+ body.fe-sp-enabled #feSportsPremium .sp-minute{font-size:11px;padding:4px 7px;max-width:110px;white-space:normal;line-height:1.4}
+ body.fe-sp-enabled #feSportsPremium .sp-metrics{gap:8px;margin:12px 0 9px}
+ body.fe-sp-enabled #feSportsPremium .sp-metric{padding:10px!important;border-radius:12px}
+ body.fe-sp-enabled #feSportsPremium .sp-metric small{font-size:11px;line-height:1.4;color:#627895}
+ body.fe-sp-enabled #feSportsPremium .sp-metric b{font-size:24px!important;line-height:1.4}
+ body.fe-sp-enabled #feSportsPremium .sp-freshness{font-size:11px;line-height:1.5;color:#647b98;text-align:left;padding:5px 0}
+ body.fe-sp-enabled #feSportsPremium .sp-data-warning{background:#fff3dc;color:#925b10;border-radius:7px;padding:5px 7px}
+ body.fe-sp-enabled #feSportsPremium .sp-reason{text-align:left;font-size:12px;color:#536c8d;margin:4px 0 10px}
+ body.fe-sp-enabled #feSportsPremium .sp-reason summary{min-height:44px;display:flex;align-items:center;cursor:pointer;color:#246ac6;font-weight:650}
+ body.fe-sp-enabled #feSportsPremium .sp-reason summary::after{content:'⌄';margin-left:auto}
+ body.fe-sp-enabled #feSportsPremium .sp-reason p{line-height:1.6;font-size:12px;margin:0 0 10px;overflow-wrap:anywhere}
+ body.fe-sp-enabled #feSportsPremium .sp-cta{font-size:16px!important;min-height:50px;line-height:1.4;padding:12px!important;letter-spacing:0!important;text-transform:none!important}
+ body.fe-sp-enabled #feSportsPremium .sp-section-line{margin:18px 0 10px;gap:6px}
+ body.fe-sp-enabled #feSportsPremium .sp-section-line h2{font-size:17px!important;letter-spacing:-.3px!important;text-transform:none!important;line-height:1.4!important}
+ body.fe-sp-enabled #feSportsPremium .sp-section-line button{font-size:12px;min-height:44px;padding:6px 0;background:none!important;box-shadow:none!important}
+ body.fe-sp-enabled #feSportsPremium .sp-row{min-height:82px!important;grid-template-columns:43px minmax(0,1fr) 85px 10px;padding:12px 10px!important;gap:8px!important;border-radius:14px!important}
+ body.fe-sp-enabled #feSportsPremium .sp-teams{font-size:14px!important;line-height:1.45}
+ body.fe-sp-enabled #feSportsPremium .sp-teams small{font-size:13px;line-height:1.5;margin-top:3px;color:#637997}
+ body.fe-sp-enabled #feSportsPremium .sp-row-score{font-size:20px!important}
+ body.fe-sp-enabled #feSportsPremium .sp-row-score small{font-size:10px!important;white-space:normal;line-height:1.5;margin-bottom:3px}
+ body.fe-sp-enabled #feSportsPremium .sp-live{font-size:10px;padding:5px 3px}
+ body.fe-sp-enabled #feSportsPremium .sp-stats{padding:14px;margin:16px 0 10px}
+ body.fe-sp-enabled #feSportsPremium .sp-stats h2{font-size:16px!important;line-height:1.4!important;margin:0 0 4px!important;text-transform:none!important;letter-spacing:-.2px!important;color:#142d4e!important}
+ body.fe-sp-enabled #feSportsPremium .sp-stat-note{font-size:11px;line-height:1.5;color:#647b98;margin:5px 0 12px;overflow-wrap:anywhere}
+ body.fe-sp-enabled #feSportsPremium .sp-stat{display:grid;grid-template-columns:minmax(0,1.4fr) 36px minmax(30px,1fr) 36px;align-items:center;gap:8px;padding:12px 0;border-top:1px solid #edf1f6;font-size:12px}
+ body.fe-sp-enabled #feSportsPremium .sp-stat strong{text-align:center;font-size:13px;color:#142d4e}
+ body.fe-sp-enabled #feSportsPremium .sp-stat-bar{height:6px;border-radius:8px;overflow:hidden;background:#e2eaf4}
+ body.fe-sp-enabled #feSportsPremium .sp-stat-bar i{display:block;height:100%;background:#2478ed;border-radius:8px}
+ body.fe-sp-enabled #feSportsPremium .sp-help{font-size:12px;color:#647b98;padding:5px 2px 20px}
+ body.fe-sp-enabled #feSportsPremium .sp-help summary{min-height:44px;cursor:pointer;display:flex;align-items:center}
+ body.fe-sp-enabled #feSportsPremium .sp-help p{font-size:12px;line-height:1.6;margin:0}
+ body.fe-sp-enabled .bottom-nav .bottom-item b{font-size:11px!important;letter-spacing:0!important}
+ body.fe-sp-enabled .bottom-nav .bottom-item{min-height:48px!important}
+ body.fe-sp-enabled .bottom-nav .bottom-icon{font-size:24px!important}
+ body.fe-sp-enabled .bottom-nav .bottom-center .center-plus{width:52px!important;height:52px!important;top:-10px!important}
+ body.fe-sp-enabled :is(#scanCard,#analysisCard,#betTrackerCard,#connectCard) button{font-size:13px!important;min-height:44px;line-height:1.4!important}
+ body.fe-sp-enabled :is(#scanCard,#analysisCard,#betTrackerCard,#connectCard) input,
+ body.fe-sp-enabled :is(#scanCard,#analysisCard,#betTrackerCard,#connectCard) select,
+ body.fe-sp-enabled :is(#scanCard,#analysisCard,#betTrackerCard,#connectCard) textarea{font-size:16px!important;max-width:100%;min-height:44px}
+ body.fe-sp-enabled :is(#scanCard,#analysisCard,#betTrackerCard,#connectCard) p{line-height:1.6!important}
+ body.fe-sp-enabled.sp-view-settings:not(.fe-route-matches):not(.fe-route-analysis) #technicalCard{display:block!important;background:white;border:1px solid #e2eaf4;border-radius:14px;margin-top:12px;padding:12px}
+ body.fe-sp-enabled #scanCard .fe-p3-filter-row button{font-size:12px!important;min-height:44px!important}
+ body.fe-sp-enabled #analysisCard .fe-p4-team b{font-size:14px!important}
+ body.fe-sp-enabled #analysisCard .fe-p4-note{font-size:12px!important;line-height:1.6!important}
+}
+@media(max-width:767px){
+ body.fe-sp-enabled #feSportsPremium .sp-tabs button{font-size:13px!important;font-weight:750!important}
+ body.fe-sp-enabled #feSportsPremium .sp-mode button{font-size:12px!important}
+ body.fe-sp-enabled #feSportsPremium .sp-scan-btn{font-size:12px!important}
+ body.fe-sp-enabled #feSportsPremium .sp-reason{border:0!important;background:transparent!important;box-shadow:none!important;padding:0!important;border-radius:0!important}
+ body.fe-sp-enabled #feSportsPremium .sp-reason summary{padding:0!important;font-size:12px!important;min-height:40px!important}
+ body.fe-sp-enabled #feSportsPremium .sp-help{background:transparent!important;border:0!important;padding:2px 0 15px!important;box-shadow:none!important}
+ body.fe-sp-enabled #feSportsPremium .sp-help summary{padding:0!important;font-size:12px!important}
+}
+
+/* Native TOP 1–5 standings. Mobile presentation only. */
+@media(max-width:767px){
+ body.fe-sp-enabled .sp-ranking{padding:16px;margin-top:14px}
+ body.fe-sp-enabled .sp-ranking-head{display:flex;align-items:center;justify-content:space-between;gap:8px}
+ body.fe-sp-enabled .sp-ranking-head h2{margin:0;font-size:17px;color:#17345b}
+ body.fe-sp-enabled #spRankCount{font-size:12px;color:#61758f;white-space:nowrap}
+ body.fe-sp-enabled .sp-rank-note{font-size:12px;line-height:1.5;color:#61758f;margin:8px 0}
+ body.fe-sp-enabled .sp-rank-row{display:flex;align-items:center;gap:10px;width:100%;padding:12px 8px;min-height:66px;box-sizing:border-box;border:0;border-bottom:1px solid #e8edf4;border-radius:0;background:white;text-align:left;color:#17345b;font:inherit;cursor:pointer}
+ body.fe-sp-enabled .sp-rank-row:last-child{border-bottom:0}
+ body.fe-sp-enabled .sp-rank-leader{background:#effaf6;border-radius:12px}
+ body.fe-sp-enabled .sp-rank-num{display:grid;place-items:center;flex:0 0 30px;height:30px;border-radius:9px;background:#edf3fb;color:#2767cd;font-size:16px}
+ body.fe-sp-enabled .sp-rank-leader .sp-rank-num{background:#11aa7c;color:white}
+ body.fe-sp-enabled .sp-rank-match{min-width:0;flex:1}
+ body.fe-sp-enabled .sp-rank-match strong{display:block;font-size:14px;line-height:1.4;overflow-wrap:anywhere}
+ body.fe-sp-enabled .sp-rank-match small{display:block;margin-top:4px;color:#61758f;font-size:11px;line-height:1.4}
+ body.fe-sp-enabled .sp-rank-result{flex:0 0 auto;text-align:right;font-variant-numeric:tabular-nums}
+ body.fe-sp-enabled .sp-rank-result strong{font-size:16px}
+ body.fe-sp-enabled .sp-rank-result small{display:block;margin-top:4px;font-size:12px;color:#61758f}
+ body.fe-sp-enabled .sp-rank-result .sp-rank-up{color:#07865d}
+ body.fe-sp-enabled .sp-rank-result .sp-rank-down{color:#c34c4c}
+ body.fe-sp-enabled .sp-rank-empty{color:#8290a4;font-size:13px;cursor:default}
+ body.fe-sp-enabled .sp-rank-row:focus-visible{outline:2px solid #2767cd;outline-offset:2px}
+}

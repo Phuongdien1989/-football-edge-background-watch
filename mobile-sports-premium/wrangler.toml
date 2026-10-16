@@ -1,0 +1,8 @@
+name = "football-edge-mobile-sports-premium-preview"
+main = "worker.mjs"
+compatibility_date = "2026-10-01"
+workers_dev = true
+[assets]
+directory = "./site"
+binding = "ASSETS"
+run_worker_first = true
