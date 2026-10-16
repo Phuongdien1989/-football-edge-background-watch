@@ -55,7 +55,7 @@
  body.fe-sp-enabled .sp-switch::after{content:'';position:absolute;left:3px;top:3px;height:13px;width:13px;border-radius:50%;background:white;transition:transform .15s}
  body.fe-sp-enabled .sp-scan-btn[data-on="true"] .sp-switch{background:#2478ed}body.fe-sp-enabled .sp-scan-btn[data-on="true"] .sp-switch::after{transform:translateX(13px)}
  body.fe-sp-enabled .sp-tabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:3px;padding:5px}
- body.fe-sp-enabled .sp-tabs button{border:0;background:transparent;color:#526988;font-weight:750;font-size:12px;padding:12px 3px;border-radius:11px;min-height:44px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+ body.fe-sp-enabled .sp-tabs button{border:0;background:transparent;color:#526988;font-weight:750;font-size:13px;padding:12px 3px;border-radius:11px;min-height:44px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
  body.fe-sp-enabled .sp-tabs button.active{background:var(--sp-blue);color:white;box-shadow:0 3px 9px #2478ed31}
  body.fe-sp-enabled .sp-top{padding:9px 9px 10px;border-left:4px solid #abebd2}
  body.fe-sp-enabled .sp-top-head{background:#eaf8f2;display:flex;align-items:center;gap:6px;border-radius:11px 11px 0 0;padding:10px;font-size:12px;color:#1e7656}
@@ -84,7 +84,7 @@
  body.fe-sp-enabled .sp-row{width:100%;display:grid;grid-template-columns:45px minmax(0,1fr) 70px 20px;align-items:center;gap:7px;padding:11px 10px;border-radius:13px;border:1px solid #e3eaf4;background:white;text-align:left;min-height:75px;box-shadow:0 3px 10px #19345b0a}
  body.fe-sp-enabled .sp-row .sp-live{font-size:10px;font-weight:800;color:white;background:#10b981;border-radius:7px;padding:5px 4px;text-align:center}
  body.fe-sp-enabled .sp-row .sp-live.stale{background:#a2aec0}body.fe-sp-enabled .sp-row .sp-live.pre{background:#e6eefc;color:#365f9b}
- body.fe-sp-enabled .sp-teams{min-width:0;font-size:12px;line-height:1.45;color:#153154;font-weight:750;overflow-wrap:anywhere}
+ body.fe-sp-enabled .sp-teams{min-width:0;font-size:13.5px;line-height:1.45;color:#153154;font-weight:750;overflow-wrap:anywhere}
  body.fe-sp-enabled .sp-teams small{font-size:11px;font-weight:500;color:#7186a3;display:block}
  body.fe-sp-enabled .sp-row-score{font-size:18px;font-weight:900;text-align:center;font-variant-numeric:tabular-nums;color:#122b55;white-space:nowrap}
  body.fe-sp-enabled .sp-row-score small{display:block;font-size:10px;color:#138e65;font-weight:650}
