@@ -59,6 +59,7 @@ jobs:
           npx playwright install --with-deps chromium webkit
           node mobile-sports-premium/tests/browser_ci.mjs
           node mobile-sports-premium/tests/native_fixture_mock.mjs
+          node mobile-sports-premium/tests/premium_finish.mjs
           node mobile-sports-premium/tests/premium_routes_v2.mjs
           FE_SP_ENGINE=webkit node mobile-sports-premium/tests/premium_routes_v2.mjs
       - name: Wrangler package dry run only

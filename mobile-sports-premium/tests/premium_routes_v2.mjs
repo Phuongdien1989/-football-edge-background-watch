@@ -40,7 +40,7 @@ try{
   }
   const mobile=await page.evaluate(()=>({premiumVisible:getComputedStyle(document.querySelector('#feSportsPremium')).display!=='none',premiumBrand:getComputedStyle(document.querySelector('.topbar .brand'),'::after').content,sourceVersion:document.querySelector('#feSportsPremium')?.dataset.uiVersion,ids:[...document.querySelectorAll('[id]')].map(x=>x.id)}));
   if(mobile.ids.length!==new Set(mobile.ids).size)throw Error('DUPLICATE_DOM_IDS');
-  if(!mobile.premiumVisible||!mobile.premiumBrand.includes('SPORTS PREMIUM')||mobile.sourceVersion!=='SPORTS-PREMIUM-REVIEW-2')throw Error('PREMIUM_V2_NOT_ACTIVATED_'+JSON.stringify(mobile));
+  if(!mobile.premiumVisible||!mobile.premiumBrand.includes('SPORTS PREMIUM')||mobile.sourceVersion!=='SPORTS-PREMIUM-REVIEW-3')throw Error('PREMIUM_V2_NOT_ACTIVATED_'+JSON.stringify(mobile));
   if(errors.length||calls.length)throw Error('PREMIUM_EXTRA_SIDE_EFFECTS_'+JSON.stringify({errors,calls}));
   out.push({width,views:'home/matches/analysis/tracking/settings/home',nativeControlsReused:true,duplicateIDs:false,unexpectedApiRequests:0,scriptErrors:0});
   await context.close();

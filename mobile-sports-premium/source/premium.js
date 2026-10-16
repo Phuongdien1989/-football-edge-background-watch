@@ -17,24 +17,24 @@
  const isLive=s=>['1H','HT','2H','ET','BT','P','INT','LIVE'].includes(String(s||''));
  const isPre=s=>['NS','TBD'].includes(String(s||''));
  const demoRows=[
-   {manual:true,id:910011,league:'Giải minh họa',home:'North City',away:'Riverside',short:'2H',minute:67,scoreHome:1,scoreAway:0,dq:86,top:1,why:'Dữ liệu minh họa, không phải nhận định',entry:'WATCH',market:null,edge:null},
-   {manual:true,id:910012,league:'Giải minh họa',home:'Harbor United',away:'East Town',short:'2H',minute:54,scoreHome:0,scoreAway:0,dq:82,top:null},
-   {id:910013,league:'Giải minh họa',home:'Central FC',away:'West Athletic',short:'2H',minute:72,scoreHome:1,scoreAway:1,dq:91,top:null},
+   {manual:true,id:910011,league:'Giải minh họa',home:'North City',away:'Riverside',short:'2H',minute:67,scoreHome:1,scoreAway:0,dq:4.3,dqScale:5,top:1,why:'Dữ liệu minh họa, không phải nhận định',entry:'WATCH',market:null,edge:null,metrics:{home:{shots:12,sot:5,possession:58},away:{shots:5,sot:2,possession:42}}},
+   {manual:true,id:910012,league:'Giải minh họa',home:'Harbor United',away:'East Town',short:'2H',minute:54,scoreHome:0,scoreAway:0,dq:4.1,dqScale:5,top:null},
+   {id:910013,league:'Giải minh họa',home:'Central FC',away:'West Athletic',short:'2H',minute:72,scoreHome:1,scoreAway:1,dq:4.5,dqScale:5,top:null},
    {id:910014,league:'Giải minh họa',home:'Upcoming FC',away:'Future Club',short:'NS',minute:null,scoreHome:null,scoreAway:null,dq:null,top:null}
  ];
  const state={group:'LIVE',selected:null,selectedId:null,rows:[],rank:[],lastUIUpdate:0,renderCount:0};
- const shell=h('div','sp-root',`<div class="sp-mode" id="spMode"><div><strong id="spModeName">SPORTS PREMIUM V2 · DEMO</strong><div id="spModeSub">Không kết nối, không quét, không gửi Push.</div></div><button id="spModeAction" type="button">DỮ LIỆU THẬT ›</button></div>
+ const shell=h('div','sp-root',`<div class="sp-mode" id="spMode"><div><strong id="spModeName">BẢN THỬ · DỮ LIỆU MINH HỌA</strong><div id="spModeSub">Chưa kết nối dữ liệu thật.</div></div><button id="spModeAction" type="button">DỮ LIỆU THẬT ›</button></div>
  <section class="sp-card sp-system"><div class="sp-system-info"><i id="spDot" class="sp-dot"></i><div><strong id="spConn">Chưa xác minh</strong><small id="spFresh">Chưa có lần cập nhật từ nguồn</small></div></div><button id="spScan" type="button" class="sp-scan-btn" data-on="false"><span aria-hidden="true">◉</span><span id="spScanLabel">Quét nền: —</span><span class="sp-switch" aria-hidden="true"></span></button></section>
  <nav class="sp-card sp-tabs" aria-label="Nhóm trận"><button class="active" data-sp-group="LIVE" aria-current="page" type="button">◉ LIVE</button><button data-sp-group="PRE" type="button">▦ Sắp diễn ra</button><button data-sp-group="WATCH" type="button">☆ Theo dõi</button></nav>
  <section class="sp-card sp-top" aria-label="TOP 1 từ engine"><div class="sp-top-head"><strong>🏆 TOP 1</strong><span>Ưu tiên phân tích sâu</span><b class="sp-pill" id="spTopGate">CHỜ DỮ LIỆU</b></div><div id="spTopContent" class="sp-top-inner"><div class="sp-empty">Chưa có TOP 1 từ engine.</div></div></section>
  <div class="sp-section-line"><h2 id="spListTitle">Trận đang theo dõi</h2><button id="spAll" type="button">Xem tất cả ›</button></div><div id="spRows" class="sp-list" role="list"></div><p id="spInlineError" class="sp-inline-blank" hidden></p>
- <p class="sp-footer-note">TOP 1 là thứ tự ưu tiên phân tích, không phải xác nhận vào kèo. DQ/EDGE và trạng thái chỉ hiện khi nguồn dữ liệu có giá trị.</p>`);
+ <section class="sp-card sp-stats" id="spStats" aria-label="Thống kê trận đã chọn"></section><details class="sp-help"><summary>Thông tin bản thử</summary><p>TOP 1 là ưu tiên phân tích từ engine hiện tại. Chế độ minh họa không quét hoặc gửi thông báo. Bản đang dùng được giữ nguyên.</p></details>`);
  shell.id='feSportsPremium';
- shell.dataset.uiVersion='SPORTS-PREMIUM-REVIEW-2';
+ shell.dataset.uiVersion='SPORTS-PREMIUM-REVIEW-3';
  // Adds exactly one presentation shell; native app cards remain intact in original DOM.
  const anchor=$('appTop')||document.querySelector('.app');anchor?.insertAdjacentElement('afterend',shell);
- function applyWidth(){document.body.classList.toggle('fe-sp-enabled',mql.matches)}
- mql.addEventListener?.('change',applyWidth);applyWidth();
+ function applyWidth(){document.body.classList.toggle('fe-sp-enabled',mql.matches);if(mql.matches)schedule()}
+ mql.addEventListener?.('change',applyWidth);document.body.classList.toggle('fe-sp-enabled',mql.matches);
  function openNative(destination){
    const map={matches:'#scanCard',analysis:'#analysisCard',settings:'#connectCard',tracking:'#betTrackerCard',home:'#appTop'};
    const el=document.querySelector('.bottom-nav .bottom-item[href="'+map[destination]+'"]');
@@ -58,6 +58,7 @@
  },true);
  // Opening a URL with an explicit native hash must not hide its target.
  markNativeView(nativeViews[location.hash]?location.hash:'#appTop');
+ window.addEventListener('hashchange',()=>markNativeView(location.hash||'#appTop'));
  function addonRows(){try{const rows=window.FEAddonBridge?.masterRows?.();return Array.isArray(rows)?rows:[]}catch(e){return []}}
  function nativeRows(){try{
    const read=window.FEUIReadBridge?.read?.();return Array.isArray(read?.state?.fixtures)?read.state.fixtures:[];
@@ -66,7 +67,7 @@
    const map=new Map();
    for(const f of nativeRows()){
      const id=number(f?.fixture?.id);if(id===null)continue;
-     map.set(id,{id,league:val(f?.league?.name),home:val(f?.teams?.home?.name),away:val(f?.teams?.away?.name),short:f?.fixture?.status?.short||null,minute:number(f?.fixture?.status?.elapsed),scoreHome:number(f?.goals?.home),scoreAway:number(f?.goals?.away),timestamp:number(f?.fixture?.timestamp),loaded:true,dq:null,top:null,edge:null,updatedAt:null,why:null});
+     map.set(id,{id,league:val(f?.league?.name),home:val(f?.teams?.home?.name),away:val(f?.teams?.away?.name),short:f?.fixture?.status?.short||null,minute:number(f?.fixture?.status?.elapsed),scoreHome:number(f?.goals?.home),scoreAway:number(f?.goals?.away),homeLogo:f?.teams?.home?.logo||null,awayLogo:f?.teams?.away?.logo||null,timestamp:number(f?.fixture?.timestamp),loaded:true,dq:null,top:null,edge:null,updatedAt:null,why:null});
    }
    const rankings=addonRows();
    for(const x of rankings){
@@ -74,8 +75,8 @@
      const rank=x.__rank||{},p=rank.primary||{},s=(x.latest||x.h1||x.ft||x.hc)?.latest||{};
      const row=map.get(id)||{id,league:val(x.league),home:val(x.home),away:val(x.away),short:s.status??null,minute:number(s.minute),scoreHome:number(s?.goals?.home),scoreAway:number(s?.goals?.away),loaded:false};
      row.top=number(rank.top);row.manual=x.__addon?.manual===true;
-     row.dq=number(p?.dq);row.edge=p?.edge??null;row.entry=x.__addon?.entry?.status||null;row.why=x.__addon?.rankWhy||null;row.market=p?.marketLabel||null;
-     row.updatedAt=number(s.captured_at??s.fresh_at);
+     row.dq=number(p?.dq);row.dqScale=5;row.metrics=s.metrics||null;row.statsPresence=s.stats_presence||null;row.engine=p.engine||null;row.engineState=rank.primary?.engine==='HC'?x.hc?.eval?.state:rank.primary?.engine==='H1'?x.h1?.state:x.ft?.state;row.homeLogo=row.homeLogo||s.fixture?.teams?.home?.logo||null;row.awayLogo=row.awayLogo||s.fixture?.teams?.away?.logo||null;row.edge=p?.edge??null;row.entry=x.__addon?.entry?.status||null;row.why=x.__addon?.rankWhy||null;row.market=p?.marketLabel||null;
+     row.updatedAt=number(s.fresh_at??s.captured_at);row.statsUpdatedAt=row.updatedAt;
      map.set(id,row);
    }
    state.rank=rankings;
@@ -87,10 +88,10 @@
    const diff=Date.now()-ms;if(diff<0)return 'Thời điểm nguồn chưa xác minh';
    const min=Math.floor(diff/60000);return min<1?'Vừa cập nhật':min<60?`${min} phút trước`:`${Math.floor(min/60)} giờ trước`;
  }
- function stateAge(x){return x?.updatedAt===null||x?.updatedAt===undefined?'unknown':Date.now()-(x.updatedAt<1e11?x.updatedAt*1000:x.updatedAt)>120000?'stale':'fresh'}
+ function stateAge(x){const at=number(x?.updatedAt);if(at===null||at<=0)return 'unknown';const age=Date.now()-(at<1e11?at*1000:at);return age < -5000?'unknown':age>60000?'stale':'fresh'}
  function score(x){return x.scoreHome===null||x.scoreHome===undefined||x.scoreAway===null||x.scoreAway===undefined?'—':`${x.scoreHome} – ${x.scoreAway}`}
  function when(x){
-   if(isLive(x.short))return x.minute===null?'LIVE • phút —':`${x.minute}′ · ${x.short}`;
+   if(isLive(x.short))return x.minute===null?'LIVE • phút —':`${x.minute}′ · ${({ '1H':'Hiệp 1','2H':'Hiệp 2',HT:'Nghỉ giữa hiệp',ET:'Hiệp phụ' })[x.short]||x.short}`;
    if(x.timestamp){const dt=new Date(x.timestamp*1000);return Number.isNaN(dt.getTime())?'Chưa có giờ':dt.toLocaleString('vi-VN',{timeZone:'Asia/Ho_Chi_Minh',hour:'2-digit',minute:'2-digit',day:'2-digit',month:'2-digit'})}
    return x.short||'Chưa có giờ';
  }
@@ -101,23 +102,42 @@
    const isKnown=liveMode&&(pressed==='true'||pressed==='false');
    let on=isKnown&&pressed==='false';
    const healthy=liveMode&&conn?.classList.contains('ok');
-   $('spConn').textContent=!liveMode?'DEMO • Không kết nối':healthy?'Đã kết nối API':raw&&raw!=='Chưa cấu hình'?'Kết nối cần xác minh':'Chưa cấu hình nguồn';
+   $('spConn').textContent=!liveMode?'Chế độ minh họa':healthy?'Đã kết nối API':raw&&raw!=='Chưa cấu hình'?'Kết nối cần xác minh':'Chưa cấu hình nguồn';
    $('spConn').className=healthy?'':liveMode?'warn':'';
    $('spDot').className='sp-dot '+(healthy?'ok':liveMode?'warn':'');
    const fresh=(()=>{try{return window.FEAddonBridge?.unified?.()?.lastAt}catch{return null}})();
-   $('spFresh').textContent=!liveMode?'Đây chỉ là giao diện thử nghiệm':fresh?'Lần quét: '+ageLabel(fresh):badge&&badge!=='CHƯA KIỂM TRA'?'Worker: '+badge:'Chưa có dữ liệu mới';
-   $('spScanLabel').textContent=!liveMode?'Quét nền (DEMO)':!isKnown?'Kiểm tra quét':on?'Quét nền ON':'Quét nền OFF';
+   $('spFresh').textContent=!liveMode?'Không gọi API hoặc gửi Push':fresh?'Lần quét: '+ageLabel(fresh):badge&&badge!=='CHƯA KIỂM TRA'?'Worker: '+badge:'Chưa có dữ liệu mới';
+   $('spScanLabel').textContent=!liveMode?'Quét LIVE':!isKnown?'Kiểm tra quét':on?'Quét nền ON':'Quét nền OFF';
    $('spScan').dataset.on=on?'true':'false';$('spScan').setAttribute('aria-pressed',String(on));
    $('spScan').disabled=!liveMode;
+ }
+ function crest(url,name){
+   const safe=typeof url==='string'&&/^https:\/\//i.test(url);
+   const initials=String(name||'?').split(/\s+/).filter(Boolean).map(x=>x[0]).slice(0,2).join('');
+   return safe?`<span class="sp-crest"><img src="${escape(url)}" alt="" loading="lazy" referrerpolicy="no-referrer"></span>`:`<span class="sp-crest sp-monogram" aria-hidden="true">${escape(initials)}</span>`;
+ }
+ function renderStats(rows){
+   const chosen=rows.find(x=>x.id===state.selectedId)||rows.find(x=>x.top===1);
+   const el=$('spStats');
+   if(!chosen){el.innerHTML='<h2>Thống kê trận đã chọn</h2><p class="sp-stat-note">Chọn một trận để xem dữ liệu.</p>';return}
+   const m=chosen.metrics||{};
+   const defs=[['Số cú sút','shots'],['Sút trúng đích','sot'],['Kiểm soát bóng','possession']];
+   el.innerHTML=`<h2>Thống kê trận đã chọn</h2><p class="sp-stat-note">${escape(chosen.home)} · ${escape(chosen.away)}${!liveMode?' · Minh họa':' · '+escape(ageLabel(chosen.statsUpdatedAt??chosen.updatedAt))}</p>`+defs.map(([label,key])=>{
+     const permitted=!chosen.statsPresence||chosen.statsPresence[key]!==false;
+     const h=permitted?number(m.home?.[key]):null,a=permitted?number(m.away?.[key]):null,has=h!==null&&a!==null;
+     const unit=key==='possession'?'%':'';
+     return `<div class="sp-stat"><span>${label}</span><strong>${h===null?'—':h+unit}</strong><div class="sp-stat-bar" aria-hidden="true">${has&&h>=0&&a>=0&&h+a>0?`<i style="width:${Math.max(0,Math.min(100,h/(h+a)*100))}%"></i>`:''}</div><strong>${a===null?'—':a+unit}</strong></div>`;
+   }).join('')+(!m.home||!m.away?'<p class="sp-stat-note">Chưa có thống kê hai đội từ nguồn hiện tại.</p>':'');
  }
  function renderTop(rows){
    const found=rows.find(x=>x.top===1)||null;
    const gate=$('spTopGate'),el=$('spTopContent');
    if(!found){gate.textContent='CHỜ DỮ LIỆU';el.innerHTML='<div class="sp-empty">Chưa có TOP 1 do engine xếp hạng. Hãy quét và kiểm tra dữ liệu trước khi phân tích.</div><button type="button" class="sp-cta" id="spOpenMatches">MỞ DANH SÁCH TRẬN ›</button>';return}
-   gate.textContent=val(found.entry)==='—'?'CHỜ XÁC NHẬN':String(found.entry).toUpperCase();
-   const dq=found.dq===null||found.dq===undefined?'—':val(found.dq);
+   gate.textContent=({WATCH:'ĐANG THEO DÕI',NO_ENTRY:'CHƯA VÀO',WAIT:'CHỜ XÁC NHẬN',SUITABLE:'PHÙ HỢP',CAUTION:'CẦN THẬN TRỌNG',AVOID:'NÊN TRÁNH'})[found.entry]||found.entry||'CHỜ XÁC NHẬN';
+   const dq=found.dq===null||found.dq===undefined?'—':val(found.dq)+(found.dqScale?' / '+found.dqScale:'');
+   const freshness=liveMode?stateAge(found):'demo';const freshnessText=freshness==='stale'?'DỮ LIỆU CŨ':freshness==='unknown'?'CHƯA XÁC MINH ĐỘ MỚI':!liveMode?'DỮ LIỆU MINH HỌA':ageLabel(found.updatedAt);
    const edge=found.edge===null||found.edge===undefined?'—':String(found.edge); // Do not invent % units.
-   el.innerHTML=`<div class="sp-league">${escape(found.league)} · #${found.id}</div><div class="sp-top-match"><div class="sp-team"><span class="sp-crest" aria-hidden="true">⚽</span>${escape(found.home)}</div><div><span class="sp-minute">${escape(when(found))}</span><div class="sp-score-main">${escape(score(found))}</div></div><div class="sp-team"><span class="sp-crest" aria-hidden="true">⚽</span>${escape(found.away)}</div></div><div class="sp-metrics"><div class="sp-metric"><small>Data Quality · theo nguồn</small><b>${escape(dq)}</b></div><div class="sp-metric edge"><small>EDGE · theo engine</small><b>${escape(edge)}</b></div></div><div class="sp-why">${escape(found.why||'Chưa có lý do ưu tiên từ engine.')}${found.market?' · Market: '+escape(found.market):''} · Dữ liệu: ${escape(ageLabel(found.updatedAt))}</div><button class="sp-cta" type="button" data-sp-deep="${found.id}">Phân tích DEEP ›</button>`;
+   el.innerHTML=`<div class="sp-league">${escape(found.league)} · #${found.id}</div><div class="sp-top-match"><div class="sp-team">${crest(found.homeLogo,found.home)}${escape(found.home)}</div><div><span class="sp-minute ${freshness==='stale'||freshness==='unknown'?'sp-data-warning':''}">${escape(when(found))}</span><div class="sp-score-main">${escape(score(found))}</div></div><div class="sp-team">${crest(found.awayLogo,found.away)}${escape(found.away)}</div></div><div class="sp-metrics"><div class="sp-metric"><small>Chất lượng dữ liệu</small><b>${escape(dq)}</b></div><div class="sp-metric edge"><small>EDGE từ engine</small><b>${escape(edge)}</b></div></div><div class="sp-freshness ${freshness==='stale'||freshness==='unknown'?'sp-data-warning':''}">${escape(freshnessText)}</div><details class="sp-reason"><summary>Lý do ưu tiên${found.engine?' · '+escape(found.engine):''}</summary><p>${escape(found.why||'Chưa có lý do ưu tiên từ engine.')}${found.market?' · Thị trường: '+escape(found.market):''}</p></details><button class="sp-cta" type="button" data-sp-deep="${found.id}">Phân tích DEEP ›</button>`;
  }
  function rowHTML(x){
    const live=isLive(x.short),freshness=stateAge(x),stale=freshness==='stale',unknown=liveMode&&freshness==='unknown',badge=live?(stale?'CŨ':unknown?'LIVE ?':'LIVE'):isPre(x.short)?'PRE':val(x.short);
@@ -127,12 +147,12 @@
    if(!mql.matches)return;
    state.rows=liveMode?fixtureRows():demoRows.map(x=>({...x,loaded:false,updatedAt:null}));
    const ranked=state.rows;
-   renderTop(ranked);
+   renderTop(ranked);renderStats(ranked);
    const list=state.group==='LIVE'?ranked.filter(x=>isLive(x.short)):state.group==='PRE'?ranked.filter(x=>isPre(x.short)):ranked.filter(x=>x.manual===true);
    const visible=list.slice(0,3);
    const titles={LIVE:'Trận LIVE đang có',PRE:'Trận sắp diễn ra',WATCH:'Trận đang theo dõi'};
    $('spListTitle').textContent=titles[state.group]+(list.length?' ('+list.length+')':'');
-   $('spRows').innerHTML=visible.length?visible.map(rowHTML).join(''):'<div class="sp-inline-blank">Không có trận trong nhóm này. Không tự tạo dữ liệu để lấp danh sách.</div>';
+   $('spRows').innerHTML=visible.length?visible.map(rowHTML).join(''):'<div class="sp-inline-blank">Chưa có trận trong nhóm này.</div>';
    setHeader();state.renderCount++;state.lastUIUpdate=Date.now();
  }
  let scheduled=false;function schedule(){if(scheduled)return;scheduled=true;requestAnimationFrame(()=>{scheduled=false;render()})}
@@ -182,6 +202,6 @@
  if(!liveMode){$('spModeAction').textContent='THỬ KẾT NỐI ›'}
  else{$('spModeName').textContent='PREVIEW KẾT NỐI · DỮ LIỆU THẬT';$('spModeSub').textContent='Tự cấu hình riêng; quét/Push/ON-OFF chỉ theo thao tác người dùng.';$('spModeAction').textContent='VỀ DEMO';}
  // One listener only; selecting/route changes will not introduce a second listener.
- window.__FE_SP_DIAGNOSTICS__=Object.freeze({read:()=>({mode,width:innerWidth,renderCount:state.renderCount,rows:state.rows.length,top:state.rows.find(x=>x.top===1)?.id??null,selected:state.selectedId,hasNativeSelect:typeof window.FE_SP_NATIVE?.selectById==='function',hasNativeReader:typeof window.FEUIReadBridge?.read==='function',hasEngineReader:typeof window.FEAddonBridge?.masterRows==='function',observerCount:1,addedNetworkRequests:0})});
+ window.__FE_SP_DIAGNOSTICS__=Object.freeze({read:()=>({mode,width:innerWidth,renderCount:state.renderCount,rows:state.rows.length,top:state.rows.find(x=>x.top===1)?.id??null,selected:state.selectedId,hasNativeSelect:typeof window.FE_SP_NATIVE?.selectById==='function',hasNativeReader:typeof window.FEUIReadBridge?.read==='function',hasEngineReader:typeof window.FEAddonBridge?.masterRows==='function',observerCount:1,networkMeasurement:'Use browser request trace; no inferred counter'})});
  render();
 })();
