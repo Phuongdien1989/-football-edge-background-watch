@@ -29,7 +29,7 @@ jobs:
         run: |
           node --input-type=module <<'JS'
           import {execFileSync} from 'node:child_process';
-          const qa='b6c7501bab1b90f7b6c6173347e68e5b72406ede',id='38875556351';
+          const qa='e9172c117e298156f5d5ea8f0679aa867ab31c1a',id='38878542447';
           const r=await fetch('https://api.github.com/repos/'+process.env.GITHUB_REPOSITORY+'/actions/runs/'+id,{headers:{Authorization:'Bearer '+process.env.GITHUB_TOKEN},signal:AbortSignal.timeout(20000)}),j=await r.json();
           if(!r.ok||j.head_sha!==qa||j.conclusion!=='success')throw Error('Exact QA not PASS');
           const files=execFileSync('git',['diff','--name-only',qa,'HEAD'],{encoding:'utf8'}).trim().split('\n');
@@ -41,11 +41,12 @@ jobs:
         run: node .github/scripts/mobile-premium-release.mjs preflight
       - name: Build exact tested preview and production bundles
         run: |
+          python3 mobile-sports-premium/recover_baseline.py mobile-sports-premium/release-backup/index.html
           python3 mobile-sports-premium/build.py
           python3 mobile-sports-premium/build_production.py
           node --input-type=module <<'JS'
           import {readFileSync} from 'node:fs';import {createHash} from 'node:crypto';
-          for(const [p,h] of [['site','a6baa019f5b2fca6c1294a70a47f9afc13fa92ec9964778a6fc67c3357b4f1c0'],['production-site','d3ccb4205e993b3fd4a835be2853398945c2069d0b335f304c181d6077075efd']])if(createHash('sha256').update(readFileSync('mobile-sports-premium/'+p+'/index.html')).digest('hex')!==h)throw Error('Bundle not exact tested source '+p);
+          for(const [p,h] of [['site','829ebc72667cda0b3e594fa6b9e24fe719dcf8d0c4a44a63cebcbc4ed6908b3b'],['production-site','a9b82cdb5fb6c4742ba8ba1e960fa5f60406204d8bd8ec0f7f62f2d709c6ce7b']])if(createHash('sha256').update(readFileSync('mobile-sports-premium/'+p+'/index.html')).digest('hex')!==h)throw Error('Bundle not exact tested source '+p);
           JS
           npm install --no-save wrangler@4 playwright@1.56.1
           npx wrangler deploy --dry-run --config mobile-sports-premium/wrangler-production.toml
@@ -71,7 +72,7 @@ jobs:
             await p.waitForFunction(()=>window.__FE_SP_DIAGNOSTICS__);
             const d=await p.evaluate(()=>({mode:window.__FE_SP_DIAGNOSTICS__.read().mode,overflow:document.documentElement.scrollWidth>innerWidth+1,shown:getComputedStyle(document.querySelector('#feSportsPremium')).display!=='none'}));
             if(!r.ok()||d.mode!=='production'||d.overflow||d.shown!==(width<768))throw Error('Live presentation failed '+JSON.stringify(d));
-            if(width<768){for(const [hash,selector] of [['#scanCard','#scanCard'],['#analysisCard','#analysisCard'],['#betTrackerCard','#betTrackerCard'],['#connectCard','#connectCard'],['#appTop','#feSportsPremium']]){await p.locator('.bottom-item[href="'+hash+'"]').click();if(!await p.locator(selector).isVisible())throw Error('Live native route hidden '+hash)}}
+            if(width<768){if(await p.locator('#spRankRows > *').count()!==5)throw Error('TOP-five standings missing');for(const [hash,selector] of [['#scanCard','#scanCard'],['#analysisCard','#analysisCard'],['#betTrackerCard','#betTrackerCard'],['#connectCard','#connectCard'],['#appTop','#feSportsPremium']]){await p.locator('.bottom-item[href="'+hash+'"]').click();if(!await p.locator(selector).isVisible())throw Error('Live native route hidden '+hash)}}
             if(errors.length||api.length)throw Error('Live empty-config side effects '+JSON.stringify({errors,api}));
             await p.screenshot({path:'mobile-sports-premium/screenshots/applied-'+width+'.png',fullPage:true});
             console.log('LIVE_MOBILE_UI_PASS',JSON.stringify({width,mode:d.mode,apiRequests:api.length,consoleErrors:errors.length}));await c.close();

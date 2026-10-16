@@ -3,7 +3,7 @@ import {readFileSync,writeFileSync,existsSync,mkdirSync} from 'node:fs';
 const phase=process.argv[2],a=process.env.CLOUDFLARE_ACCOUNT_ID,t=process.env.CLOUDFLARE_API_TOKEN;
 if(!a||!t)throw Error('Cloudflare credentials unavailable');
 const api='https://api.cloudflare.com/client/v4/accounts/'+encodeURIComponent(a)+'/workers/scripts/';
-const original={mobile:'03c1d55d-358a-448b-96f3-f356704831df',desktop:'a332ee39-abb2-422d-a021-db78ef19cc10',backend:'2be01a61-cc5d-43c7-9c6d-13e581296453'};
+const original={mobile:'8fc5b2ca-1ddb-4c0b-b161-c71141462ae5',desktop:'a332ee39-abb2-422d-a021-db78ef19cc10',backend:'2be01a61-cc5d-43c7-9c6d-13e581296453'};
 const names={mobile:'shiny-silence-d892',desktop:'football-edge-desktop-b2-test',backend:'football-edge-background-watch',preview:'football-edge-mobile-sports-premium-preview'};
 const publicRoot='https://shiny-silence-d892.ngophuonghuy.workers.dev';
 const hash=b=>createHash('sha256').update(b).digest('hex');
@@ -16,7 +16,7 @@ if(phase==='preflight'){
  await cf(names.mobile+'/versions/'+original.mobile);
  const settings=await cf(names.mobile+'/settings');
  if((settings.bindings||[]).some(x=>!['assets','plain_text','secret_text'].includes(x.type)))throw Error('Mobile has unsupported bindings; refusing assets replacement');
- const base=await bytes(publicRoot+'/');if(hash(base)!=='aa4f0f6318cd52c14ff62b195c5ea04c5267107455924da44c9aa78169fe7f28')throw Error('Mobile source drift');
+ const base=await bytes(publicRoot+'/');if(hash(base)!=='d3ccb4205e993b3fd4a835be2853398945c2069d0b335f304c181d6077075efd')throw Error('Mobile source drift');
  writeFileSync('mobile-sports-premium/baseline.html',base);
  const staticHashes={};mkdirSync('mobile-sports-premium/production-site',{recursive:true});mkdirSync('mobile-sports-premium/release-backup',{recursive:true});
  writeFileSync('mobile-sports-premium/release-backup/index.html',base);
@@ -41,7 +41,7 @@ if(phase==='preflight'){
  writeFileSync('mobile-sports-premium/release-result.json',JSON.stringify(result,null,2));console.log('MOBILE_APPLIED_VERIFIED',JSON.stringify(result));
 }else if(phase==='rollback'){
  if(!existsSync('mobile-sports-premium/release-state.json')||!existsSync('mobile-sports-premium/deployment-attempted')){console.log('No production deployment attempted');process.exit(0)}
- const current=await active(names.mobile);if(current!==original.mobile)await cf(names.mobile+'/deployments',{method:'POST',body:JSON.stringify({strategy:'percentage',versions:[{version_id:original.mobile,percentage:100}],annotations:{'workers/message':'Restore pre-Premium Mobile after release verification failed'}})});
- if(await active(names.mobile)!==original.mobile||hash(await bytes(publicRoot+'/'))!=='aa4f0f6318cd52c14ff62b195c5ea04c5267107455924da44c9aa78169fe7f28')throw Error('ROLLBACK_NOT_VERIFIED');
+ const current=await active(names.mobile);if(current!==original.mobile)await cf(names.mobile+'/deployments',{method:'POST',body:JSON.stringify({strategy:'percentage',versions:[{version_id:original.mobile,percentage:100}],annotations:{'workers/message':'Restore pre-TOP-five Mobile after release verification failed'}})});
+ if(await active(names.mobile)!==original.mobile||hash(await bytes(publicRoot+'/'))!=='d3ccb4205e993b3fd4a835be2853398945c2069d0b335f304c181d6077075efd')throw Error('ROLLBACK_NOT_VERIFIED');
  console.log('MOBILE_ROLLBACK_VERIFIED',original.mobile);
 }else throw Error('Unknown phase');
