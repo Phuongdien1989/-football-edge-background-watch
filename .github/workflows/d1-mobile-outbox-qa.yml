@@ -1,0 +1,54 @@
+name: D1 Mobile outbox offline candidate QA NO DEPLOY
+on:
+  push:
+    branches:
+      - fix/d1-sync-entry-fixture-idempotent-20261016
+    paths:
+      - 'mobile-outbox-candidate/**'
+      - 'tests/test-mobile-outbox-candidate.mjs'
+      - '.github/workflows/d1-mobile-outbox-qa.yml'
+jobs:
+  offline-candidate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    permissions: {contents: read}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Download PUBLIC pinned Mobile frontend, read only; verify exact hash
+        run: |
+          node --input-type=module <<'JS'
+          import {createHash} from 'node:crypto';
+          import {writeFileSync,mkdirSync} from 'node:fs';
+          const r=await fetch('https://shiny-silence-d892.ngophuonghuy.workers.dev/?d1_candidate_20261016=1',{headers:{'Cache-Control':'no-cache'},signal:AbortSignal.timeout(25000)});
+          if(!r.ok)throw Error('MOBILE_BASELINE_HTTP_'+r.status);
+          const bytes=Buffer.from(await r.arrayBuffer());
+          const sha=createHash('sha256').update(bytes).digest('hex');
+          if(sha!=='aa4f0f6318cd52c14ff62b195c5ea04c5267107455924da44c9aa78169fe7f28')throw Error('MOBILE_SHA_DRIFT_STOP');
+          mkdirSync('mobile-outbox-candidate',{recursive:true});
+          writeFileSync('mobile-outbox-candidate/baseline.html',bytes);
+          console.log('FE_D1_MOBILE_BASELINE_VERIFIED '+JSON.stringify({bytes:bytes.length,sha256:sha}));
+          JS
+      - name: Generate offline Mobile candidate without deployment
+        run: |
+          node --check mobile-outbox-candidate/build_mobile_candidate.mjs
+          node mobile-outbox-candidate/build_mobile_candidate.mjs mobile-outbox-candidate/baseline.html mobile-outbox-candidate/candidate_mobile.html
+          test -f mobile-outbox-candidate/candidate_mobile.html
+      - name: Test IndexedDB revision, fingerprint and ACK real IndexedDB semantics
+        run: |
+          npm install --no-save fake-indexeddb@6
+          node tests/test-mobile-outbox-candidate.mjs
+      - name: Persist ONLY test evidence and candidate bundle (not secrets)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mobile-d1-outbox-candidate-offline
+          path: |
+            mobile-outbox-candidate/candidate_mobile.html
+            mobile-outbox-candidate/build_mobile_candidate.mjs
+          if-no-files-found: ignore
