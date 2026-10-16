@@ -72,6 +72,15 @@ async function bench(version){
  const observed=(await query('SELECT last_seen_at FROM '+prefix+'fixture_history WHERE fixture_id=?',[catalog.fixture_id])).results[0].last_seen_at;
  if(version==='patch')assert.equal(observed,oldObservedAt,'stale identical replay must not advance provider freshness');
  await step('catalog_changed_score',()=>cat({...catalog,minute:22,score_home:1}));
+ const orderedFixture={...catalog,fixture_id:987654322,home_team_id:9831,away_team_id:9832,source_revision:1,status:'1H',minute:24,score_home:0,score_away:0};
+ const orderedFinal={...orderedFixture,source_revision:2,status:'FT',minute:90,score_home:1,score_away:0,fulltime_home:1,fulltime_away:0};
+ await step('fixture_order_first',()=>cat(orderedFixture));
+ await step('fixture_order_new_terminal',()=>cat(orderedFinal));
+ await step('fixture_order_old_retry',()=>cat(orderedFixture));
+ const orderedHistory=(await query("SELECT status,minute,score_home,score_away,terminal FROM "+prefix+"fixture_history WHERE fixture_id=?",[orderedFixture.fixture_id])).results[0];
+ const fixtureOrderingSafe=orderedHistory.status==='FT'&&orderedHistory.minute===90&&orderedHistory.score_home===1&&orderedHistory.score_away===0&&orderedHistory.terminal===1;
+ if(version==='patch')assert.ok(fixtureOrderingSafe,'older catalog revision must not rewrite terminal metadata');
+
  const q={id:'SYN-Q',fixture_id:catalog.fixture_id,engine:'FT',captured_at:1000,outcome:'PENDING'};
  await step('evidence_first',()=>evidence(env,[event('QSIG_RESULT',q)]));
  await step('evidence_retry',()=>evidence(env,[event('QSIG_RESULT',q)]));
@@ -84,6 +93,20 @@ async function bench(version){
  await step('entry_first',()=>sync(env,[event('ENTRY_DECISION',e)]));
  await step('entry_retry',()=>sync(env,[event('ENTRY_DECISION',e)]));
  await step('entry_settle',()=>sync(env,[event('ENTRY_DECISION',{...e,policy_status:'ENTER',resolution:'RESOLVED',outcome:'HIT',resolved_at:4000})]));
+ // Out-of-order ENTRY: valid outcome correction must supersede old payload.
+ const oldDecision={...e,id:'SYN-E-ORDER',source_revision:1,policy_status:'WATCH',resolution:'OPEN'};
+ const resultOne={...oldDecision,resolution:'RESOLVED',policy_status:'ENTER',outcome:'HIT',resolved_at:5000};
+ const corrected={...resultOne,source_revision:2,outcome:'MISS',unit_pl:0,resolved_at:5000};
+ await step('entry_order_first_resolved',()=>sync(env,[event('ENTRY_DECISION',resultOne)]));
+ await step('entry_order_valid_correction',()=>sync(env,[event('ENTRY_DECISION',corrected)]));
+ await step('entry_order_old_resolved_retry',()=>sync(env,[event('ENTRY_DECISION',resultOne)]));
+ await step('entry_order_old_open_retry',()=>sync(env,[event('ENTRY_DECISION',oldDecision)]));
+ const orderedEntry=(await query("SELECT resolution,outcome,unit_pl FROM "+prefix+"entry_decisions WHERE id='SYN-E-ORDER'")).results[0];
+ const orderedOutcome=(await query("SELECT outcome,unit_pl FROM "+prefix+"entry_outcomes WHERE decision_id='SYN-E-ORDER'")).results[0];
+ const orderingEntrySafe=orderedEntry.resolution==='RESOLVED'&&orderedEntry.outcome==='MISS'&&orderedEntry.unit_pl===0;
+ const orderingOutcomeSafe=orderedOutcome.outcome==='MISS'&&orderedOutcome.unit_pl===0;
+ if(version==='patch')assert.ok(orderingEntrySafe&&orderingOutcomeSafe,'out-of-order ENTRY/outcome must not regress corrected result');
+
  const l={id:'SYN-L',fixture_id:catalog.fixture_id,source:'APP',captured_at:3100,minute:22,status:'1H',score_home:1};
  await step('app_live_first',()=>sync(env,[event('LIVE_SNAPSHOT',l)]));
  await step('app_live_retry',()=>sync(env,[event('LIVE_SNAPSHOT',l)]));
@@ -108,9 +131,9 @@ async function bench(version){
  await step('notify_tombstone',()=>watcher(true).deleteNotifyMatch(catalog.fixture_id));
  await step('notify_tombstone_retry',()=>watcher(true).deleteNotifyMatch(catalog.fixture_id));
  const final={};for(const t of ['fixtures','teams','fixture_history','team_fixture_history','qsig_results','validation_results','entry_decisions','entry_outcomes','live_snapshots','fe_notify_live_state']){const r=await query('SELECT COUNT(*) AS n FROM '+prefix+t);final[t]=Number(r.results?.[0]?.n||0)}
- assert.equal(final.fixture_history,1);
- assert.equal(final.teams,2,'both historical teams retained');
- assert.equal(final.team_fixture_history,2,'two sides retained');
+ assert.equal(final.fixture_history,2);
+ assert.equal(final.teams,4,'both sets of historical teams retained');
+ assert.equal(final.team_fixture_history,4,'both fixture sides retained');
  const historyCheck=(await query("SELECT minute,status,score_home,score_away,terminal FROM "+prefix+"fixture_history WHERE fixture_id=?",[catalog.fixture_id])).results[0];
  assert.equal(historyCheck.minute,22);assert.equal(historyCheck.score_home,1);assert.equal(historyCheck.score_away,0);assert.equal(historyCheck.terminal,0);
  const homeCheck=(await query("SELECT goals_for,goals_against FROM "+prefix+"team_fixture_history WHERE team_id=?",[catalog.home_team_id])).results[0];
@@ -119,13 +142,14 @@ async function bench(version){
  assert.equal(entryCheck.resolution,'RESOLVED');assert.equal(entryCheck.outcome,'HIT');assert.equal(entryCheck.captured_at,3000);assert.equal(entryCheck.minute,0);assert.equal(entryCheck.score_home,0);assert.equal(entryCheck.score_away,0);
  const o=(await query("SELECT outcome,resolved_at FROM "+prefix+"entry_outcomes WHERE decision_id='SYN-E'")).results[0];
  assert.equal(o.outcome,'HIT');assert.equal(o.resolved_at,4000);
- output.variants[version]={steps,final,entry_integrity:entryCheck,outcome_integrity:o,history_integrity:historyCheck,team_history_integrity:homeCheck};
+ output.variants[version]={steps,final,entry_integrity:entryCheck,outcome_integrity:o,history_integrity:historyCheck,team_history_integrity:homeCheck,ordering:{entrySafe:orderingEntrySafe,outcomeSafe:orderingOutcomeSafe,fixtureSafe:fixtureOrderingSafe,entry:orderedEntry,outcome:orderedOutcome,fixture:orderedHistory}};
 }
 await bench('base');await bench('patch');
 assert.deepEqual(output.variants.base.entry_integrity,output.variants.patch.entry_integrity,'ENTRY logical integrity differs');
 assert.deepEqual(output.variants.base.outcome_integrity,output.variants.patch.outcome_integrity,'OUTCOME logical integrity differs');
 assert.deepEqual(output.variants.base.history_integrity,output.variants.patch.history_integrity,'fixture history changed');
 assert.deepEqual(output.variants.base.team_history_integrity,output.variants.patch.team_history_integrity,'team history changed');
+assert.ok(!output.variants.base.ordering.entrySafe||!output.variants.base.ordering.outcomeSafe||!output.variants.base.ordering.fixtureSafe,'baseline must reproduce at least one out-of-order regression');
 const a=output.variants.base.steps,b=output.variants.patch.steps;
 output.comparison=Object.keys({...a,...b}).map(k=>({source:k,first_or_retry:/retry/.test(k)?'RETRY':'FIRST_OR_CHANGED',baseline_sqlite_changes:a[k]?.sqlite_changes||0,patched_sqlite_changes:b[k]?.sqlite_changes||0,baseline_d1_rows_written:a[k]?.d1_rows_written||0,patched_d1_rows_written:b[k]?.d1_rows_written||0}));
 output.totals=output.comparison.reduce((o,r)=>({baseline_sqlite_changes:o.baseline_sqlite_changes+r.baseline_sqlite_changes,patched_sqlite_changes:o.patched_sqlite_changes+r.patched_sqlite_changes,baseline_d1_rows_written:o.baseline_d1_rows_written+r.baseline_d1_rows_written,patched_d1_rows_written:o.patched_d1_rows_written+r.patched_d1_rows_written}),{baseline_sqlite_changes:0,patched_sqlite_changes:0,baseline_d1_rows_written:0,patched_d1_rows_written:0});
