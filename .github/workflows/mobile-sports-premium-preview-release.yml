@@ -1,0 +1,126 @@
+name: APPROVED Mobile Sports Premium — ISOLATED PREVIEW Worker (NO MOBILE REPLACEMENT)
+on:
+  push:
+    branches: [feature/mobile-sports-premium-preview-20261016]
+    paths: ['.github/workflows/mobile-sports-premium-preview-release.yml']
+jobs:
+  isolated-preview:
+    if: github.ref == 'refs/heads/feature/mobile-sports-premium-preview-20261016'
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    environment: football-edge-production
+    concurrency:
+      group: fe-mobile-sports-premium-preview-one-worker
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Require exact PASS QA source, no code drift after QA
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          QA=3fddf91fa8553b0882f3d1577c36eeca50a02e27
+          git cat-file -e "$QA^{commit}"
+          test "$(git diff --name-only "$QA" HEAD)" = '.github/workflows/mobile-sports-premium-preview-release.yml'
+          node --input-type=module <<'JS'
+          const r=await fetch('https://api.github.com/repos/'+process.env.GITHUB_REPOSITORY+'/actions/runs/38860690377',{headers:{Authorization:'Bearer '+process.env.GITHUB_TOKEN,Accept:'application/vnd.github+json'},signal:AbortSignal.timeout(15000)});
+          const j=await r.json();
+          if(!r.ok||j.conclusion!=='success'||j.head_sha!=='3fddf91fa8553b0882f3d1577c36eeca50a02e27')throw Error('PINNED_QA_RESULT_NOT_PASS');
+          console.log('FE_SP_PINNED_QA_SOURCE_VERIFIED '+j.head_sha);
+          JS
+      - name: Cloudflare read-only baseline, versions and new Worker namespace preflight
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          node --input-type=module <<'JS'
+          import {createHash} from 'node:crypto';
+          import {writeFileSync} from 'node:fs';
+          const a=process.env.CLOUDFLARE_ACCOUNT_ID,t=process.env.CLOUDFLARE_API_TOKEN;
+          if(!a||!t)throw Error('NO_CLOUDFLARE_AUTH');
+          const root='https://api.cloudflare.com/client/v4/accounts/'+encodeURIComponent(a)+'/workers/scripts/';
+          const h={Authorization:'Bearer '+t};
+          for(const [name,version] of [['shiny-silence-d892','03c1d55d-358a-448b-96f3-f356704831df'],['football-edge-desktop-b2-test','a332ee39-abb2-422d-a021-db78ef19cc10'],['football-edge-background-watch','2be01a61-cc5d-43c7-9c6d-13e581296453']]){
+            const r=await fetch(root+name+'/deployments',{headers:h,signal:AbortSignal.timeout(15000)}),j=await r.json();
+            const v=j?.result?.deployments?.[0]?.versions||[];
+            if(!r.ok||!j.success||v.length!==1||v[0].version_id!==version||v[0].percentage!==100)throw Error('PRODUCTION_VERSION_DRIFT_'+name);
+          }
+          const trial=await fetch(root+'football-edge-mobile-sports-premium-preview/settings',{headers:h,signal:AbortSignal.timeout(15000)});
+          if(trial.status!==404)throw Error('PREVIEW_WORKER_ALREADY_EXISTS_OR_NOT_AUTHORIZED_'+trial.status);
+          const r=await fetch('https://shiny-silence-d892.ngophuonghuy.workers.dev/?sp_preview_verify=20261016',{headers:{'Cache-Control':'no-cache'},signal:AbortSignal.timeout(25000)});
+          if(!r.ok)throw Error('PRODUCTION_HTML_UNAVAILABLE_'+r.status);
+          const buf=Buffer.from(await r.arrayBuffer()),sha=createHash('sha256').update(buf).digest('hex');
+          if(sha!=='aa4f0f6318cd52c14ff62b195c5ea04c5267107455924da44c9aa78169fe7f28')throw Error('PRODUCTION_FRONTEND_SHA_DRIFT');
+          writeFileSync('mobile-sports-premium/baseline.html',buf);
+          console.log('FE_SP_PREVIEW_PREFLIGHT_PASS '+JSON.stringify({mobile:'unchanged',desktop:'unchanged',backend:'unchanged',productionSha:sha,newWorker:trial.status}));
+          JS
+      - name: Rebuild exactly pinned production-base Mobile preview; no DEMO mixing
+        run: |
+          python3 mobile-sports-premium/build.py mobile-sports-premium/baseline.html
+          node --check mobile-sports-premium/source/premium.js
+          node --check mobile-sports-premium/worker.mjs
+          node --input-type=module <<'JS'
+          import {createHash} from 'node:crypto';import {readFileSync} from 'node:fs';
+          const b=readFileSync('mobile-sports-premium/site/index.html');
+          const sha=createHash('sha256').update(b).digest('hex');
+          if(sha!=='41b5af5cb96f5635308a7833147551d175f9bd0fe39e4859e71ae3c41a83f7b2')throw Error('PREVIEW_QA_HTML_SHA_DRIFT');
+          if(!b.includes('FE_SP_PREMIUM_JS')||!b.includes('SPORTS_PREMIUM_PREVIEW_NATIVE_SELECTION_BRIDGE'))throw Error('REAL_BRIDGE_MISSING');
+          console.log('FE_SP_PREVIEW_HTML_PINNED '+JSON.stringify({sha256:sha,bytes:b.length}));
+          JS
+      - name: Deploy ONLY separate STATIC preview Worker (no D1/DO/backend binding)
+        working-directory: mobile-sports-premium
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          WRANGLER_SEND_METRICS: 'false'
+        run: |
+          grep -q 'name = "football-edge-mobile-sports-premium-preview"' wrangler.toml
+          if grep -Eq '^\[\[d1_databases\]\]|^\[durable_objects\]|^\[triggers\]' wrangler.toml; then echo 'WRANGLER_FORBIDDEN_BINDING'; exit 1; fi
+          npm install --no-save wrangler@4
+          npx wrangler deploy
+      - name: Verify HTTPS preview files / strict DEMO CSP / production still identical
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          node --input-type=module <<'JS'
+          import {createHash} from 'node:crypto';
+          const origin='https://football-edge-mobile-sports-premium-preview.ngophuonghuy.workers.dev';
+          let health=null,doc=null;
+          for(let i=0;i<14;i++){
+            try{
+              const h=await fetch(origin+'/__sports/health',{signal:AbortSignal.timeout(13000)});
+              if(h.ok){const o=await h.json();if(o.ok&&o.service==='football-edge-mobile-sports-premium-preview'){health=o;break}}
+            }catch{}
+            await new Promise(r=>setTimeout(r,1500));
+          }
+          if(!health?.ok||health.production_replaced!==false||health.backend_deployed!==false||health.push_registration!==false)throw Error('PREVIEW_HEALTH_NOT_VALID');
+          for(let i=0;i<14;i++){
+           try{
+            const r=await fetch(origin+'/?test=20261016',{headers:{'Cache-Control':'no-cache'},signal:AbortSignal.timeout(13000)});
+            if(r.ok){const b=Buffer.from(await r.arrayBuffer()),sha=createHash('sha256').update(b).digest('hex');
+              if(sha==='41b5af5cb96f5635308a7833147551d175f9bd0fe39e4859e71ae3c41a83f7b2'&&r.headers.get('content-security-policy')?.includes("connect-src 'none'")){doc={http:r.status,sha,csp:'DEMO_BLOCK_NETWORK',bytes:b.length};break}
+            }
+           }catch{}
+           await new Promise(r=>setTimeout(r,1500));
+          }
+          if(!doc)throw Error('PREVIEW_HTML_OR_DEMO_NETWORK_GUARD_UNVERIFIED');
+          const a=process.env.CLOUDFLARE_ACCOUNT_ID,t=process.env.CLOUDFLARE_API_TOKEN,api='https://api.cloudflare.com/client/v4/accounts/'+encodeURIComponent(a)+'/workers/scripts/';
+          const deployments={};
+          for(const name of ['shiny-silence-d892','football-edge-desktop-b2-test','football-edge-background-watch','football-edge-mobile-sports-premium-preview']){
+            const r=await fetch(api+name+'/deployments',{headers:{Authorization:'Bearer '+t},signal:AbortSignal.timeout(15000)}),j=await r.json(),v=j?.result?.deployments?.[0]?.versions||[];
+            if(!r.ok||!j.success||v.length!==1||v[0].percentage!==100)throw Error('VERSION_NOT_100_'+name);
+            deployments[name]=v[0].version_id;
+          }
+          if(deployments['shiny-silence-d892']!=='03c1d55d-358a-448b-96f3-f356704831df'||deployments['football-edge-desktop-b2-test']!=='a332ee39-abb2-422d-a021-db78ef19cc10'||deployments['football-edge-background-watch']!=='2be01a61-cc5d-43c7-9c6d-13e581296453')throw Error('PRODUCTION_VERSION_DRIFT_AFTER_PREVIEW_DEPLOY');
+          console.log('FE_SP_ISOLATED_HTTPS_DEPLOY_VERIFIED '+JSON.stringify({preview_url:origin,preview_version:deployments['football-edge-mobile-sports-premium-preview'],mobile_version:deployments['shiny-silence-d892'],desktop_version:deployments['football-edge-desktop-b2-test'],backend_version:deployments['football-edge-background-watch'],html:doc}));
+          JS
