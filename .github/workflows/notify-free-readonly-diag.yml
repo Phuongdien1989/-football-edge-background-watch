@@ -1,0 +1,28 @@
+name: Notification Free exhaustion production READ ONLY 20261016
+on:
+  push:
+    branches:
+      - diag/notify-free-exhaustion-readonly-20261016
+    paths:
+      - '.github/scripts/notify-free-readonly-diag.mjs'
+      - '.github/workflows/notify-free-readonly-diag.yml'
+jobs:
+  observe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    environment: football-edge-production
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Read actual scan, API budget and Cloudflare D1 counters without mutations
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node .github/scripts/notify-free-readonly-diag.mjs
