@@ -261,3 +261,27 @@
  body.fe-sp-enabled #feSportsPremium .sp-help{background:transparent!important;border:0!important;padding:2px 0 15px!important;box-shadow:none!important}
  body.fe-sp-enabled #feSportsPremium .sp-help summary{padding:0!important;font-size:12px!important}
 }
+
+/* Native TOP 1–5 standings. Mobile presentation only. */
+@media(max-width:767px){
+ body.fe-sp-enabled .sp-ranking{padding:16px;margin-top:14px}
+ body.fe-sp-enabled .sp-ranking-head{display:flex;align-items:center;justify-content:space-between;gap:8px}
+ body.fe-sp-enabled .sp-ranking-head h2{margin:0;font-size:17px;color:#17345b}
+ body.fe-sp-enabled #spRankCount{font-size:12px;color:#61758f;white-space:nowrap}
+ body.fe-sp-enabled .sp-rank-note{font-size:12px;line-height:1.5;color:#61758f;margin:8px 0}
+ body.fe-sp-enabled .sp-rank-row{display:flex;align-items:center;gap:10px;width:100%;padding:12px 8px;min-height:66px;box-sizing:border-box;border:0;border-bottom:1px solid #e8edf4;border-radius:0;background:white;text-align:left;color:#17345b;font:inherit;cursor:pointer}
+ body.fe-sp-enabled .sp-rank-row:last-child{border-bottom:0}
+ body.fe-sp-enabled .sp-rank-leader{background:#effaf6;border-radius:12px}
+ body.fe-sp-enabled .sp-rank-num{display:grid;place-items:center;flex:0 0 30px;height:30px;border-radius:9px;background:#edf3fb;color:#2767cd;font-size:16px}
+ body.fe-sp-enabled .sp-rank-leader .sp-rank-num{background:#11aa7c;color:white}
+ body.fe-sp-enabled .sp-rank-match{min-width:0;flex:1}
+ body.fe-sp-enabled .sp-rank-match strong{display:block;font-size:14px;line-height:1.4;overflow-wrap:anywhere}
+ body.fe-sp-enabled .sp-rank-match small{display:block;margin-top:4px;color:#61758f;font-size:11px;line-height:1.4}
+ body.fe-sp-enabled .sp-rank-result{flex:0 0 auto;text-align:right;font-variant-numeric:tabular-nums}
+ body.fe-sp-enabled .sp-rank-result strong{font-size:16px}
+ body.fe-sp-enabled .sp-rank-result small{display:block;margin-top:4px;font-size:12px;color:#61758f}
+ body.fe-sp-enabled .sp-rank-result .sp-rank-up{color:#07865d}
+ body.fe-sp-enabled .sp-rank-result .sp-rank-down{color:#c34c4c}
+ body.fe-sp-enabled .sp-rank-empty{color:#8290a4;font-size:13px;cursor:default}
+ body.fe-sp-enabled .sp-rank-row:focus-visible{outline:2px solid #2767cd;outline-offset:2px}
+}

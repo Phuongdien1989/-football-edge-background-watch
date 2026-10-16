@@ -30,7 +30,7 @@ jobs:
           const account=process.env.CLOUDFLARE_ACCOUNT_ID,token=process.env.CLOUDFLARE_API_TOKEN;
           if(!account||!token)throw Error('REQUIRED_AUTH_NOT_AVAILABLE');
           const endpoint='https://api.cloudflare.com/client/v4/accounts/'+encodeURIComponent(account)+'/workers/scripts/';
-          const expected={mobile:'03c1d55d-358a-448b-96f3-f356704831df',desktop:'a332ee39-abb2-422d-a021-db78ef19cc10'};
+          const expected={mobile:'8fc5b2ca-1ddb-4c0b-b161-c71141462ae5',desktop:'a332ee39-abb2-422d-a021-db78ef19cc10'};
           for(const [name,want] of [['shiny-silence-d892',expected.mobile],['football-edge-desktop-b2-test',expected.desktop]]){
            const r=await fetch(endpoint+name+'/deployments',{headers:{Authorization:'Bearer '+token},signal:AbortSignal.timeout(15000)});
            const j=await r.json();const versions=j.result?.deployments?.[0]?.versions||[];
@@ -39,11 +39,12 @@ jobs:
           const url='https://shiny-silence-d892.ngophuonghuy.workers.dev/?premium_baseline=20261016';
           const r=await fetch(url,{headers:{'Cache-Control':'no-cache'},signal:AbortSignal.timeout(25000)});
           if(!r.ok)throw Error('BASELINE_HTTP_'+r.status);
-          const b=Buffer.from(await r.arrayBuffer()),sha=createHash('sha256').update(b).digest('hex'),want='aa4f0f6318cd52c14ff62b195c5ea04c5267107455924da44c9aa78169fe7f28';
+          const b=Buffer.from(await r.arrayBuffer()),sha=createHash('sha256').update(b).digest('hex'),want='d3ccb4205e993b3fd4a835be2853398945c2069d0b335f304c181d6077075efd';
           if(sha!==want)throw Error('MOBILE_BASELINE_SHA_DRIFT_'+sha);
-          writeFileSync('mobile-sports-premium/baseline.html',b);
+          writeFileSync('mobile-sports-premium/current-live.html',b);
           console.log('FE_SP_BASELINE_ACTUAL_PRODUCTION_VERIFIED '+JSON.stringify({sha256:sha,bytes:b.length,mobile_version:expected.mobile,desktop_version:expected.desktop}));
           JS
+          python3 mobile-sports-premium/recover_baseline.py mobile-sports-premium/current-live.html
       - name: Build isolated preview HTML and check source boundaries
         run: |
           python3 mobile-sports-premium/build.py mobile-sports-premium/baseline.html
@@ -60,6 +61,8 @@ jobs:
           node mobile-sports-premium/tests/browser_ci.mjs
           node mobile-sports-premium/tests/native_fixture_mock.mjs
           node mobile-sports-premium/tests/premium_finish.mjs
+          node mobile-sports-premium/tests/top_five.mjs
+          FE_SP_ENGINE=webkit node mobile-sports-premium/tests/top_five.mjs
           node mobile-sports-premium/tests/premium_routes_v2.mjs
           FE_SP_ENGINE=webkit node mobile-sports-premium/tests/premium_routes_v2.mjs
       - name: Production presentation bundle retains native Push SW and sync exactly

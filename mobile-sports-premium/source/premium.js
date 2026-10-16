@@ -22,11 +22,12 @@
    {id:910013,league:'Giải minh họa',home:'Central FC',away:'West Athletic',short:'2H',minute:72,scoreHome:1,scoreAway:1,dq:4.5,dqScale:5,top:null},
    {id:910014,league:'Giải minh họa',home:'Upcoming FC',away:'Future Club',short:'NS',minute:null,scoreHome:null,scoreAway:null,dq:null,top:null}
  ];
- const state={group:'LIVE',selected:null,selectedId:null,rows:[],rank:[],lastUIUpdate:0,renderCount:0};
+ const state={group:'LIVE',selected:null,selectedId:null,rows:[],rank:[],lastUIUpdate:0,renderCount:0,previousRanks:new Map(),rankMoves:new Map()};
  const shell=h('div','sp-root',`<div class="sp-mode" id="spMode"><div><strong id="spModeName">BẢN THỬ · DỮ LIỆU MINH HỌA</strong><div id="spModeSub">Chưa kết nối dữ liệu thật.</div></div><button id="spModeAction" type="button">DỮ LIỆU THẬT ›</button></div>
  <section class="sp-card sp-system"><div class="sp-system-info"><i id="spDot" class="sp-dot"></i><div><strong id="spConn">Chưa xác minh</strong><small id="spFresh">Chưa có lần cập nhật từ nguồn</small></div></div><button id="spScan" type="button" class="sp-scan-btn" data-on="false"><span aria-hidden="true">◉</span><span id="spScanLabel">Quét nền: —</span><span class="sp-switch" aria-hidden="true"></span></button></section>
  <nav class="sp-card sp-tabs" aria-label="Nhóm trận"><button class="active" data-sp-group="LIVE" aria-current="page" type="button">◉ LIVE</button><button data-sp-group="PRE" type="button">▦ Sắp diễn ra</button><button data-sp-group="WATCH" type="button">☆ Theo dõi</button></nav>
  <section class="sp-card sp-top" aria-label="TOP 1 từ engine"><div class="sp-top-head"><strong>🏆 TOP 1</strong><span>Ưu tiên phân tích sâu</span><b class="sp-pill" id="spTopGate">CHỜ DỮ LIỆU</b></div><div id="spTopContent" class="sp-top-inner"><div class="sp-empty">Chưa có TOP 1 từ engine.</div></div></section>
+ <section class="sp-card sp-ranking" aria-label="Bảng xếp hạng TOP 1 đến 5"><div class="sp-ranking-head"><h2>🏆 BẢNG TOP 1–5</h2><span id="spRankCount">0/5 trận</span></div><p class="sp-rank-note">H1 · FT · HC — thứ hạng cập nhật theo engine hiện tại.</p><div id="spRankRows" role="list"></div><p class="sp-rank-note">TOP là ưu tiên phân tích, chưa phải lệnh vào kèo.</p></section>
  <div class="sp-section-line"><h2 id="spListTitle">Trận đang theo dõi</h2><button id="spAll" type="button">Xem tất cả ›</button></div><div id="spRows" class="sp-list" role="list"></div><p id="spInlineError" class="sp-inline-blank" hidden></p>
  <section class="sp-card sp-stats" id="spStats" aria-label="Thống kê trận đã chọn"></section><details class="sp-help"><summary>Thông tin bản thử</summary><p>TOP 1 là ưu tiên phân tích từ engine hiện tại. Chế độ minh họa không quét hoặc gửi thông báo. Bản đang dùng được giữ nguyên.</p></details>`);
  shell.id='feSportsPremium';
@@ -139,6 +140,28 @@
    const edge=found.edge===null||found.edge===undefined?'—':String(found.edge); // Do not invent % units.
    el.innerHTML=`<div class="sp-league">${escape(found.league)} · #${found.id}</div><div class="sp-top-match"><div class="sp-team">${crest(found.homeLogo,found.home)}${escape(found.home)}</div><div><span class="sp-minute ${freshness==='stale'||freshness==='unknown'?'sp-data-warning':''}">${escape(when(found))}</span><div class="sp-score-main">${escape(score(found))}</div></div><div class="sp-team">${crest(found.awayLogo,found.away)}${escape(found.away)}</div></div><div class="sp-metrics"><div class="sp-metric"><small>Chất lượng dữ liệu</small><b>${escape(dq)}</b></div><div class="sp-metric edge"><small>EDGE từ engine</small><b>${escape(edge)}</b></div></div><div class="sp-freshness ${freshness==='stale'||freshness==='unknown'?'sp-data-warning':''}">${escape(freshnessText)}</div><details class="sp-reason"><summary>Lý do ưu tiên${found.engine?' · '+escape(found.engine):''}</summary><p>${escape(found.why||'Chưa có lý do ưu tiên từ engine.')}${found.market?' · Thị trường: '+escape(found.market):''}</p></details><button class="sp-cta" type="button" data-sp-deep="${found.id}">Phân tích DEEP ›</button>`;
  }
+ function renderRanking(rows){
+   // Consume native rank verbatim. No scoring, competition rules or polling here.
+   const ranked=rows.filter(x=>Number.isInteger(x.top)&&x.top>=1&&x.top<=5).sort((a,b)=>a.top-b.top);
+   const current=new Map(ranked.map(x=>[x.id,x.top]));
+   for(const x of ranked){
+     const before=state.previousRanks.get(x.id);
+     if(before!==undefined&&before!==x.top)state.rankMoves.set(x.id,before-x.top);
+     else if(before===undefined)state.rankMoves.delete(x.id);
+   }
+   for(const id of state.rankMoves.keys())if(!current.has(id))state.rankMoves.delete(id);
+   state.previousRanks=current;
+   $('spRankCount').textContent=ranked.length+'/5 trận';
+   $('spRankRows').innerHTML=Array.from({length:5},(_,i)=>{
+     const rank=i+1,x=ranked.find(row=>row.top===rank);
+     if(!x)return `<div class="sp-rank-row sp-rank-empty" role="listitem"><b class="sp-rank-num">${rank}</b><span>Chưa có trận ở TOP ${rank}</span></div>`;
+     const move=state.rankMoves.get(x.id),label=move>0?'↑ '+move:move<0?'↓ '+Math.abs(move):'—';
+     const moveText=move>0?'Tăng '+move+' hạng':move<0?'Giảm '+Math.abs(move)+' hạng':'Chưa ghi nhận đổi hạng';
+     const fresh=liveMode?stateAge(x):'demo',warning=fresh==='stale'?' · DỮ LIỆU CŨ':fresh==='unknown'?' · CHƯA RÕ ĐỘ MỚI':'';
+     const engine=x.engine==='H1'?'H1 / HT':x.engine||'—';
+     return `<button role="listitem" class="sp-rank-row ${rank===1?'sp-rank-leader':''}" data-sp-open="${x.id}" data-sp-rank="${rank}" type="button" aria-label="TOP ${rank}: ${escape(x.home)} với ${escape(x.away)}"><b class="sp-rank-num">${rank}</b><span class="sp-rank-match"><strong>${escape(x.home)} · ${escape(x.away)}</strong><small>${escape(engine)} · ${escape(when(x))}${escape(warning)}</small></span><span class="sp-rank-result"><strong>${escape(score(x))}</strong><small class="${move>0?'sp-rank-up':move<0?'sp-rank-down':''}" aria-label="${moveText}">${label}</small></span></button>`;
+   }).join('');
+ }
  function rowHTML(x){
    const live=isLive(x.short),freshness=stateAge(x),stale=freshness==='stale',unknown=liveMode&&freshness==='unknown',badge=live?(stale?'CŨ':unknown?'LIVE ?':'LIVE'):isPre(x.short)?'PRE':val(x.short);
    return `<button role="listitem" class="sp-row" data-sp-open="${x.id}" type="button" aria-label="Xem trận ${escape(x.home)} với ${escape(x.away)}"><span class="sp-live ${live?(stale||unknown?'stale':''):'pre'}">${escape(badge)}</span><span class="sp-teams">${escape(x.home)}<small>${escape(x.away)}</small></span><span class="sp-row-score"><small>${escape(when(x))}</small>${escape(score(x))}</span><span class="sp-row-arrow" aria-hidden="true">›</span></button>`;
@@ -147,7 +170,7 @@
    if(!mql.matches)return;
    state.rows=liveMode?fixtureRows():demoRows.map(x=>({...x,loaded:false,updatedAt:null}));
    const ranked=state.rows;
-   renderTop(ranked);renderStats(ranked);
+   renderTop(ranked);renderRanking(ranked);renderStats(ranked);
    const list=state.group==='LIVE'?ranked.filter(x=>isLive(x.short)):state.group==='PRE'?ranked.filter(x=>isPre(x.short)):ranked.filter(x=>x.manual===true);
    const visible=list.slice(0,3);
    const titles={LIVE:'Trận LIVE đang có',PRE:'Trận sắp diễn ra',WATCH:'Trận đang theo dõi'};
