@@ -115,6 +115,10 @@ async function bench(version){
  await step('entry_order_valid_correction',()=>sync(env,[event('ENTRY_DECISION',corrected)]));
  await step('entry_order_old_resolved_retry',()=>sync(env,[event('ENTRY_DECISION',resultOne)]));
  await step('entry_order_old_open_retry',()=>sync(env,[event('ENTRY_DECISION',oldDecision)]));
+ // A later revision attempting to reopen resolved ENTRY must be held until
+ // there is an explicit outcome invalidation/compensation protocol.
+ const reopening={...corrected,source_revision:3,resolution:'OPEN',outcome:null,unit_pl:null};
+ await step('entry_order_reopen_not_supported',()=>sync(env,[event('ENTRY_DECISION',reopening)]));
  const orderedEntry=(await query("SELECT resolution,outcome,unit_pl FROM "+prefix+"entry_decisions WHERE id='SYN-E-ORDER'")).results[0];
  const orderedOutcome=(await query("SELECT outcome,unit_pl FROM "+prefix+"entry_outcomes WHERE decision_id='SYN-E-ORDER'")).results[0];
  const orderingEntrySafe=orderedEntry.resolution==='RESOLVED'&&orderedEntry.outcome==='MISS'&&orderedEntry.unit_pl===0;
