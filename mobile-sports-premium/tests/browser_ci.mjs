@@ -20,13 +20,15 @@ try {
   const response=await page.goto(url,{waitUntil:'domcontentloaded',timeout:30000});
   await page.waitForFunction(()=>Boolean(window.__FE_SP_DIAGNOSTICS__?.read()),{timeout:12000});
   const d=await page.evaluate(()=>({diag:window.__FE_SP_DIAGNOSTICS__.read(),scroll:document.documentElement.scrollWidth,viewport:innerWidth,nativeAnalysisCount:document.querySelectorAll('#analysisCard').length,notificationRegDisabled:!document.documentElement.outerHTML.includes('navigator.serviceWorker.register(FE_PUSH_P02.sw')}));
-  if(response.status()!==200||d.scroll>width+1||errors.length||d.nativeAnalysisCount!==1||d.diag.hasNativeReader!==true||d.diag.hasEngineReader!==true||apiCalls.length)throw Error('SP_BROWSER_FAIL '+JSON.stringify({width,errors,d,apiCount:apiCalls.length}));
+  if(response.status()!==200||d.scroll>width+1||errors.length||d.nativeAnalysisCount!==1||d.diag.hasNativeReader!==true||d.diag.hasEngineReader!==true||d.diag.hasNativeSelect!==true||apiCalls.length)throw Error('SP_BROWSER_FAIL '+JSON.stringify({width,errors,d,apiCount:apiCalls.length}));
   if(width<=767){
    if(!await page.locator('#feSportsPremium').isVisible())throw Error('SP_MOBILE_NOT_VISIBLE_'+width);
    if((await page.locator('#spRows [data-sp-open]').count())!==3)throw Error('SP_DEMO_ROWS_NOT_3_'+width);
    await page.locator('[data-sp-group="PRE"]').click();
    await page.waitForFunction(()=>document.querySelectorAll('#spRows [data-sp-open]').length===1,{timeout:5000});
    if((await page.locator('#spRows [data-sp-open]').count())!==1)throw Error('SP_PRE_FILTER_FAIL_'+width);
+   await page.locator('[data-sp-group="WATCH"]').click();
+   await page.waitForFunction(()=>document.querySelectorAll('#spRows [data-sp-open]').length===2,{timeout:5000});
    await page.locator('[data-sp-group="LIVE"]').click();
    await page.waitForFunction(()=>document.querySelectorAll('#spRows [data-sp-open]').length===3,{timeout:5000});
    await page.locator('#spRows [data-sp-open]').first().click();
