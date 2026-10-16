@@ -103,11 +103,11 @@ async function bench(version){
  await step('notify_tombstone_retry',()=>watcher(true).deleteNotifyMatch(catalog.fixture_id));
  const final={};for(const t of ['fixtures','teams','fixture_history','team_fixture_history','qsig_results','validation_results','entry_decisions','entry_outcomes','live_snapshots','fe_notify_live_state']){const r=await query('SELECT COUNT(*) AS n FROM '+prefix+t);final[t]=Number(r.results?.[0]?.n||0)}
  assert.equal(final.fixture_history,1);
- const e=(await query("SELECT policy_status,resolution,outcome,minute,score_home,score_away,captured_at FROM "+prefix+"entry_decisions WHERE id='SYN-E'")).results[0];
- assert.equal(e.resolution,'RESOLVED');assert.equal(e.outcome,'HIT');assert.equal(e.captured_at,3000);assert.equal(e.minute,0);assert.equal(e.score_home,0);assert.equal(e.score_away,0);
+ const entryCheck=(await query("SELECT policy_status,resolution,outcome,minute,score_home,score_away,captured_at FROM "+prefix+"entry_decisions WHERE id='SYN-E'")).results[0];
+ assert.equal(entryCheck.resolution,'RESOLVED');assert.equal(entryCheck.outcome,'HIT');assert.equal(entryCheck.captured_at,3000);assert.equal(entryCheck.minute,0);assert.equal(entryCheck.score_home,0);assert.equal(entryCheck.score_away,0);
  const o=(await query("SELECT outcome,resolved_at FROM "+prefix+"entry_outcomes WHERE decision_id='SYN-E'")).results[0];
  assert.equal(o.outcome,'HIT');assert.equal(o.resolved_at,4000);
- output.variants[version]={steps,final,entry_integrity:e,outcome_integrity:o};
+ output.variants[version]={steps,final,entry_integrity:entryCheck,outcome_integrity:o};
 }
 await bench('base');await bench('patch');
 assert.deepEqual(output.variants.base.entry_integrity,output.variants.patch.entry_integrity,'ENTRY logical integrity differs');
