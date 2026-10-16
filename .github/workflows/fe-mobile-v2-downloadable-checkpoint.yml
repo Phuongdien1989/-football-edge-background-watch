@@ -1,0 +1,124 @@
+name: Downloadable Mobile V2 Checkpoint ZIP - HANDOVER ONLY
+on:
+  push:
+    branches:
+      - handover/mobile-v2-download-20261016
+  workflow_dispatch:
+permissions:
+  contents: write
+  actions: read
+jobs:
+  handover:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Checkout exact checkpoint-derived handover branch
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Retrieve pinned baseline without modifying production
+        run: |
+          python3 - <<'PY'
+          import urllib.request,hashlib,pathlib
+          url='https://shiny-silence-d892.ngophuonghuy.workers.dev/?premium_baseline=20261016'
+          req=urllib.request.Request(url,headers={'Cache-Control':'no-cache','User-Agent':'FootballEdge-ReadOnly-Handover'})
+          with urllib.request.urlopen(req,timeout=30) as r: data=r.read()
+          want='aa4f0f6318cd52c14ff62b195c5ea04c5267107455924da44c9aa78169fe7f28'
+          got=hashlib.sha256(data).hexdigest()
+          if got!=want: raise SystemExit('BLOCKED: baseline SHA drift '+got)
+          pathlib.Path('mobile-sports-premium/baseline.html').write_bytes(data)
+          print('BASELINE_SHA256_PASS',got,len(data))
+          PY
+      - name: Build and verify preview matching frozen SHA
+        run: |
+          python3 mobile-sports-premium/build.py mobile-sports-premium/baseline.html
+          echo '42e54e9eb777d89b67b53b64bbec5b8aec1baa82659f2fda53b08c8c490cd72a  mobile-sports-premium/site/index.html' | sha256sum -c -
+          node --check mobile-sports-premium/source/premium.js
+          node --check mobile-sports-premium/worker.mjs
+          echo FE_SP_HANDOVER_BUILD_PASS
+      - name: Copy public-source screenshot QA artifact if available
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p /tmp/fe-sp-qa
+          gh run download 38867373267 --repo "$GITHUB_REPOSITORY" -n fe-mobile-sports-premium-review-images -D /tmp/fe-sp-qa
+          find /tmp/fe-sp-qa -type f -printf 'QA_EVIDENCE %p %s bytes\n'
+      - name: Make self-contained ZIP, manifest, documentation, and integrity-test
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/fe-sp-pack/FOOTBALL_EDGE_MOBILE_V2_CHECKPOINT
+          B=/tmp/fe-sp-pack/FOOTBALL_EDGE_MOBILE_V2_CHECKPOINT
+          cp -a mobile-sports-premium "$B/"
+          mkdir -p "$B/evidence"
+          if [ -d /tmp/fe-sp-qa ]; then cp -a /tmp/fe-sp-qa/. "$B/evidence/" || true; fi
+          cat > "$B/CHECKPOINT.md" <<'EOF'
+          # Football Edge Mobile V2 - checkpoint 16/10/2026
+          Repository: https://github.com/Phuongdien1989/-football-edge-background-watch
+          Source branch: feature/mobile-sports-premium-preview-20261016
+          Source HEAD verified: bc2f1e1ba0b95a4a07ed080cb310e1ac6254c542
+          PR #8: OPEN/DRAFT, not merged at initial handover verification.
+          Baseline branch: baseline/mobile-sports-premium-20261016
+          Preview URL: https://football-edge-mobile-sports-premium-preview.ngophuonghuy.workers.dev/?mode=demo&v=2
+          Last verified preview version via GitHub CI: af669c19-e97e-48fd-8ee7-23d37bea7d86
+          Mobile production version: 03c1d55d-358a-448b-96f3-f356704831df
+          Desktop B2 version: a332ee39-abb2-422d-a021-db78ef19cc10
+          Backend version: 2be01a61-cc5d-43c7-9c6d-13e581296453
+          Source baseline SHA256: aa4f0f6318cd52c14ff62b195c5ea04c5267107455924da44c9aa78169fe7f28
+          Generated preview HTML SHA256: 42e54e9eb777d89b67b53b64bbec5b8aec1baa82659f2fda53b08c8c490cd72a
+          Workflow QA run: https://github.com/Phuongdien1989/-football-edge-background-watch/actions/runs/38867373267
+          Preview release run: https://github.com/Phuongdien1989/-football-edge-background-watch/actions/runs/38867639613
+          This is an archived, reproducible Mobile PREVIEW frontend, not a live backend/database backup.
+          This download-specific archive is regenerated via GitHub Actions and is NOT byte-identical to the ChatGPT local handover ZIP.
+          EOF
+          cat > "$B/HANDOVER.md" <<'EOF'
+          # HANDOVER: Football Edge Mobile Sports Premium V2
+          Scope: Preview-only Mobile interface with isolated Worker; preserve mobile production, Desktop B2, backend, D1, push, TOP/EDGE, scanning controls, quota, Outbox.
+          Done: source CSS/JS, five-tab routing, DEMO CSP isolation, native-bridge UI, Chromium/WebKit CI, isolated Worker release.
+          Outstanding: readability refinement at 375/390/430px; compressed header/DEMO; TOP1 visibility and team logos; true freshness; selected match statistics; complete five-tab consistency; connected fixture selection and native scan/DEEP/Copy/threshold persistence; measured actual requests.
+          Real iPhone Safari/PWA, true LIVE data, Cloudflare cross-origin CORS and Push deliveries remain UNVERIFIED. Mock/DEMO PASS is not proof of LIVE.
+          CI screenshots under evidence/ if available. Selected user's reference/mockup artwork and prior DOCX/PDF handover from local ChatGPT history are NOT included in this separate GitHub-generated archive.
+          NO merge, NO production deploy, NO background scanner activation.
+          EOF
+          cat > "$B/REQUIRED_ACCESS.md" <<'EOF'
+          To deploy preview yourself: Cloudflare account with Workers permission, local Wrangler authentication, preview Worker access.
+          To use connected mode: permitted app configuration, authorized provider integration and correct CORS on the separate preview origin.
+          No API tokens, passwords, private environment files or user data are contained in this archive.
+          Never copy real credentials to this package. Preview cannot prove real iPhone Push or live performance by itself.
+          EOF
+          cat > "$B/BUILD_AND_ROLLBACK.md" <<'EOF'
+          # Build, verification and rollback
+          Run from extracted archive root:
+          python3 mobile-sports-premium/build.py mobile-sports-premium/baseline.html
+          sha256sum mobile-sports-premium/baseline.html mobile-sports-premium/site/index.html
+          Expected baseline: aa4f0f6318cd52c14ff62b195c5ea04c5267107455924da44c9aa78169fe7f28
+          Expected site: 42e54e9eb777d89b67b53b64bbec5b8aec1baa82659f2fda53b08c8c490cd72a
+          Deployment is not required to inspect or build this checkpoint.
+          If future UI candidate fails, do NOT change production; revert isolated preview to GitHub source commit bc2f1e1ba0b95a4a07ed080cb310e1ac6254c542, or stop using preview origin.
+          Last VERIFIED versions: mobile production 03c1d55d-358a-448b-96f3-f356704831df, Desktop B2 a332ee39-abb2-422d-a021-db78ef19cc10, backend 2be01a61-cc5d-43c7-9c6d-13e581296453. Recheck current Cloudflare state before any deployment.
+          This process did not modify deployed Workers, live data, scanner, or subscriptions.
+          EOF
+          (cd "$B" && find . -type f ! -name MANIFEST_SHA256.txt -print0 | sort -z | xargs -0 sha256sum > MANIFEST_SHA256.txt && sha256sum -c MANIFEST_SHA256.txt)
+          (cd /tmp/fe-sp-pack && zip -qr "$GITHUB_WORKSPACE/FOOTBALL_EDGE_MOBILE_V2_CHECKPOINT_GITHUB_20261016.zip" FOOTBALL_EDGE_MOBILE_V2_CHECKPOINT)
+          unzip -t FOOTBALL_EDGE_MOBILE_V2_CHECKPOINT_GITHUB_20261016.zip | tail -1
+          sha256sum FOOTBALL_EDGE_MOBILE_V2_CHECKPOINT_GITHUB_20261016.zip | tee FOOTBALL_EDGE_MOBILE_V2_CHECKPOINT_GITHUB_20261016.zip.sha256
+          echo FE_SP_HANDOVER_ZIP_PASS
+      - name: Publish independent public GitHub Release download (no Worker deploy)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          TAG="fe-mobile-sp-v2-checkpoint-20261016"
+          ASSET=FOOTBALL_EDGE_MOBILE_V2_CHECKPOINT_GITHUB_20261016.zip
+          gh release create "$TAG" "$ASSET" "$ASSET.sha256" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "Football Edge Mobile V2 checkpoint (download only)" --notes "Reproducible preview source ZIP with pinned production HTML baseline, exact V2 HTML build, SHA-256 manifest, CI screenshots if available, verification docs. Handover only. No production changes."
+          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json url,assets
+          echo "DIRECT_DOWNLOAD=https://github.com/$GITHUB_REPOSITORY/releases/download/$TAG/$ASSET"
+      - name: Save ZIP also as a workflow artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: football-edge-mobile-v2-checkpoint-download
+          path: |
+            FOOTBALL_EDGE_MOBILE_V2_CHECKPOINT_GITHUB_20261016.zip
+            FOOTBALL_EDGE_MOBILE_V2_CHECKPOINT_GITHUB_20261016.zip.sha256
+          if-no-files-found: ignore
