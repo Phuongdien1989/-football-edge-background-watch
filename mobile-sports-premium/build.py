@@ -14,6 +14,16 @@ s=s.replace(auto,"/* PREVIEW ISOLATED: main service worker autoregistration disa
 reg="const reg=await navigator.serviceWorker.register(FE_PUSH_P02.sw,{scope:FE_PUSH_P02.scope});"
 assert s.count(reg)==1,'Push registration anchor drift'
 s=s.replace(reg,"throw new Error('PREVIEW: Push registration disabled; use installed production app for Push');")
+# One scoped native presentation bridge, no engine render/API and no duplicated DOM listener.
+sp_anchor='  // FE_ADDON_BRIDGE_END'
+assert s.count(sp_anchor)==1,'Native addon anchor drift'
+sp_bridge="""  // SPORTS_PREMIUM_PREVIEW_NATIVE_SELECTION_BRIDGE — UI-only, no network.
+  if(!window.FE_SP_NATIVE)Object.defineProperty(window,'FE_SP_NATIVE',{value:Object.freeze({
+    selectById:id=>{const index=state.fixtures.findIndex(f=>Number(f?.fixture?.id)===Number(id));if(index<0)return false;selectFixture(index);return true;},
+    selectedId:()=>state.selected?.fixture?.id??null
+  }),writable:false,configurable:false});
+"""
+s=s.replace(sp_anchor,sp_bridge+sp_anchor)
 css=(root/'source/premium.css').read_text();js=(root/'source/premium.js').read_text()
 assert '<style' not in css.lower() and '</script' not in js.lower()
 assert s.count('</head>')==1 and s.count('</body>')==1
