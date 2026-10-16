@@ -1,0 +1,42 @@
+name: D1 sync ENTRY and fixture real staging index A B
+on:
+  push:
+    branches:
+      - fix/d1-sync-entry-fixture-idempotent-20261016
+    paths:
+      - 'tests/test-d1-sync-staging-ab.mjs'
+      - '.github/workflows/d1-sync-staging-ab.yml'
+jobs:
+  staging-ab:
+    runs-on: ubuntu-latest
+    timeout-minutes: 14
+    environment: football-edge-production
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check only modified backend files for syntax
+        run: |
+          node --check worker.js
+          node --check worker_v122.js
+          node --check worker_v123.js
+          node --check tests/test-d1-sync-staging-ab.mjs
+      - name: Compare SAME synthetic load on ACTUAL production index equivalent schema in staging D1
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node tests/test-d1-sync-staging-ab.mjs
+      - name: Preserve detailed per-source A B and integrity evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: d1-sync-index-matched-staging-a-b
+          path: d1-staging-meter-results.json
+          if-no-files-found: ignore
