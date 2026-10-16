@@ -23,7 +23,7 @@ try {
   if(response.status()!==200||d.scroll>width+1||errors.length||d.nativeAnalysisCount!==1||d.diag.hasNativeReader!==true||d.diag.hasEngineReader!==true||apiCalls.length)throw Error('SP_BROWSER_FAIL '+JSON.stringify({width,errors,d,apiCount:apiCalls.length}));
   if(width<=767){
    if(!await page.locator('#feSportsPremium').isVisible())throw Error('SP_MOBILE_NOT_VISIBLE_'+width);
-   if((await page.locator('#spRows [data-sp-open]').count())!==2)throw Error('SP_DEMO_ROWS_NOT_2_'+width);
+   if((await page.locator('#spRows [data-sp-open]').count())!==3)throw Error('SP_DEMO_ROWS_NOT_3_'+width);
    await page.locator('[data-sp-group="PRE"]').click();
    if((await page.locator('#spRows [data-sp-open]').count())!==1)throw Error('SP_PRE_FILTER_FAIL_'+width);
    await page.locator('[data-sp-group="LIVE"]').click();
