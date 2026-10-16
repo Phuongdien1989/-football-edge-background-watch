@@ -1,0 +1,48 @@
+name: D1 sync backend release readiness NO DEPLOY
+on:
+  push:
+    branches: [fix/d1-sync-entry-fixture-idempotent-20261016]
+    paths:
+      - '.github/scripts/d1-sync-backend-release-readonly.mjs'
+      - '.github/workflows/d1-sync-backend-release-readonly.yml'
+      - 'worker.js'
+      - 'worker_v122.js'
+      - 'worker_v123.js'
+jobs:
+  no-deploy-release-preflight:
+    runs-on: ubuntu-latest
+    timeout-minutes: 9
+    environment: football-edge-production
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify candidate based on PR7 metered production without frontend, cron or scan changes
+        run: |
+          set -euo pipefail
+          git cat-file -e 'd73d4b19a069b0b2aed7e2687f27f1820f50e3d1^{commit}'
+          test -z "$(git diff --name-only d73d4b19a069b0b2aed7e2687f27f1820f50e3d1 HEAD -- wrangler.toml worker_notify_v138_peak_window.js d1-production-meter.mjs worker_notify_v137_quota50000.js)"
+          test -z "$(git diff --name-only d73d4b19a069b0b2aed7e2687f27f1820f50e3d1 HEAD -- '*.html' '*.css' '*.js' ':!worker.js' ':!worker_v122.js' ':!worker_v123.js')"
+          node --check worker.js
+          node --check worker_v122.js
+          node --check worker_v123.js
+          node --check worker_notify_v138_peak_window.js
+          echo FE_D1_SYNC_CANDIDATE_BOUNDARY_PASS
+      - name: Verify actual Cloudflare versions, scan OFF, D1 binding, rollback, unchanged PR6 PR7
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node .github/scripts/d1-sync-backend-release-readonly.mjs
+      - name: Wrangler production bundle DRY RUN only
+        run: |
+          npm install --no-save wrangler@4
+          npx wrangler deploy --dry-run --outdir /tmp/d1-sync-backend-candidate
+          echo FE_D1_SYNC_BUNDLE_DRY_RUN_PASS
