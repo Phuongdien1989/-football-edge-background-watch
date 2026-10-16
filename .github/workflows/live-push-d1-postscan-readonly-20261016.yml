@@ -1,0 +1,26 @@
+name: Football Edge LIVE Push D1 after approved backend release - READ ONLY
+on:
+  push:
+    branches:
+      - diag/live-push-d1-after-release-20261016
+    paths:
+      - '.github/workflows/live-push-d1-postscan-readonly-20261016.yml'
+jobs:
+  observe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    environment: football-edge-production
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Query only actual production health / D1 Analytics / stored PR7 logs
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node .github/scripts/live-push-d1-postscan-readonly-20261016.mjs
