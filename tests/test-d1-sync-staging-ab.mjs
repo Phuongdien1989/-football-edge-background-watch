@@ -65,6 +65,12 @@ async function bench(version){
  const cat=p=>history(env,[event('FIXTURE_CATALOG',p)]);
  await step('catalog_first',()=>cat(catalog));
  await step('catalog_retry_ack_lost',()=>cat(catalog));
+ // Age persisted observation one hour; replay the identical old provider content.
+ const oldObservedAt=Date.now()-3600000;
+ await query('UPDATE '+prefix+'fixture_history SET last_seen_at=? WHERE fixture_id=?',[oldObservedAt,catalog.fixture_id]);
+ await step('catalog_identical_replay_after_1h',()=>cat(catalog));
+ const observed=(await query('SELECT last_seen_at FROM '+prefix+'fixture_history WHERE fixture_id=?',[catalog.fixture_id])).results[0].last_seen_at;
+ if(version==='patch')assert.equal(observed,oldObservedAt,'stale identical replay must not advance provider freshness');
  await step('catalog_changed_score',()=>cat({...catalog,minute:22,score_home:1}));
  const q={id:'SYN-Q',fixture_id:catalog.fixture_id,engine:'FT',captured_at:1000,outcome:'PENDING'};
  await step('evidence_first',()=>evidence(env,[event('QSIG_RESULT',q)]));
