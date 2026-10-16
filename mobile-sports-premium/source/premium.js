@@ -23,13 +23,14 @@
    {id:910014,league:'Giải minh họa',home:'Upcoming FC',away:'Future Club',short:'NS',minute:null,scoreHome:null,scoreAway:null,dq:null,top:null}
  ];
  const state={group:'LIVE',selected:null,selectedId:null,rows:[],rank:[],lastUIUpdate:0,renderCount:0};
- const shell=h('div','sp-root',`<div class="sp-mode" id="spMode"><div><strong id="spModeName">DEMO · DỮ LIỆU MINH HỌA</strong><div id="spModeSub">Không kết nối, không quét, không gửi Push.</div></div><button id="spModeAction" type="button">DỮ LIỆU THẬT ›</button></div>
+ const shell=h('div','sp-root',`<div class="sp-mode" id="spMode"><div><strong id="spModeName">SPORTS PREMIUM V2 · DEMO</strong><div id="spModeSub">Không kết nối, không quét, không gửi Push.</div></div><button id="spModeAction" type="button">DỮ LIỆU THẬT ›</button></div>
  <section class="sp-card sp-system"><div class="sp-system-info"><i id="spDot" class="sp-dot"></i><div><strong id="spConn">Chưa xác minh</strong><small id="spFresh">Chưa có lần cập nhật từ nguồn</small></div></div><button id="spScan" type="button" class="sp-scan-btn" data-on="false"><span aria-hidden="true">◉</span><span id="spScanLabel">Quét nền: —</span><span class="sp-switch" aria-hidden="true"></span></button></section>
  <nav class="sp-card sp-tabs" aria-label="Nhóm trận"><button class="active" data-sp-group="LIVE" aria-current="page" type="button">◉ LIVE</button><button data-sp-group="PRE" type="button">▦ Sắp diễn ra</button><button data-sp-group="WATCH" type="button">☆ Theo dõi</button></nav>
  <section class="sp-card sp-top" aria-label="TOP 1 từ engine"><div class="sp-top-head"><strong>🏆 TOP 1</strong><span>Ưu tiên phân tích sâu</span><b class="sp-pill" id="spTopGate">CHỜ DỮ LIỆU</b></div><div id="spTopContent" class="sp-top-inner"><div class="sp-empty">Chưa có TOP 1 từ engine.</div></div></section>
  <div class="sp-section-line"><h2 id="spListTitle">Trận đang theo dõi</h2><button id="spAll" type="button">Xem tất cả ›</button></div><div id="spRows" class="sp-list" role="list"></div><p id="spInlineError" class="sp-inline-blank" hidden></p>
  <p class="sp-footer-note">TOP 1 là thứ tự ưu tiên phân tích, không phải xác nhận vào kèo. DQ/EDGE và trạng thái chỉ hiện khi nguồn dữ liệu có giá trị.</p>`);
  shell.id='feSportsPremium';
+ shell.dataset.uiVersion='SPORTS-PREMIUM-REVIEW-2';
  // Adds exactly one presentation shell; native app cards remain intact in original DOM.
  const anchor=$('appTop')||document.querySelector('.app');anchor?.insertAdjacentElement('afterend',shell);
  function applyWidth(){document.body.classList.toggle('fe-sp-enabled',mql.matches)}
@@ -42,6 +43,21 @@
    if(destination==='settings')$('connectAccordion')?.setAttribute('open','');
    return true;
  }
+ // Presentation-only tab routing. It never prevents the native handler, writes
+ // state, triggers scans, or creates a second navigation tree.
+ const nativeViews={'#appTop':'home','#scanCard':'matches','#analysisCard':'analysis','#betTrackerCard':'tracking','#connectCard':'settings'};
+ function markNativeView(href){
+   const view=nativeViews[href];if(!view)return;
+   for(const old of Object.values(nativeViews))document.body.classList.remove('sp-view-'+old);
+   document.body.classList.add('sp-view-'+view);
+ }
+ document.addEventListener('click',event=>{
+   const link=event.target.closest?.('.bottom-nav a.bottom-item, .topbar a[href^="#"], .topbar button[data-sp-to]');
+   if(!link)return;
+   markNativeView(link.getAttribute('href')||link.getAttribute('data-sp-to'));
+ },true);
+ // Opening a URL with an explicit native hash must not hide its target.
+ markNativeView(nativeViews[location.hash]?location.hash:'#appTop');
  function addonRows(){try{const rows=window.FEAddonBridge?.masterRows?.();return Array.isArray(rows)?rows:[]}catch(e){return []}}
  function nativeRows(){try{
    const read=window.FEUIReadBridge?.read?.();return Array.isArray(read?.state?.fixtures)?read.state.fixtures:[];
@@ -114,7 +130,7 @@
    renderTop(ranked);
    const list=state.group==='LIVE'?ranked.filter(x=>isLive(x.short)):state.group==='PRE'?ranked.filter(x=>isPre(x.short)):ranked.filter(x=>x.manual===true);
    const visible=list.slice(0,3);
-   const titles={LIVE:'Trận LIVE đang có',PRE:'Trận sắp diễn ra',WATCH:'Trận trong TOP / EDGE'};
+   const titles={LIVE:'Trận LIVE đang có',PRE:'Trận sắp diễn ra',WATCH:'Trận đang theo dõi'};
    $('spListTitle').textContent=titles[state.group]+(list.length?' ('+list.length+')':'');
    $('spRows').innerHTML=visible.length?visible.map(rowHTML).join(''):'<div class="sp-inline-blank">Không có trận trong nhóm này. Không tự tạo dữ liệu để lấp danh sách.</div>';
    setHeader();state.renderCount++;state.lastUIUpdate=Date.now();
