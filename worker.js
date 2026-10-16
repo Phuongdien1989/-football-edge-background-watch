@@ -45,6 +45,15 @@ async function dbStats(env){
   if(!dbConfigured(env))return {ok:false,configured:false};
   return {ok:true,configured:true,schema_version:await dbSchemaVersion(env),entry_decisions:await dbCount(env,'entry_decisions'),entry_outcomes:await dbCount(env,'entry_outcomes'),live_snapshots:await dbCount(env,'live_snapshots'),fixtures:await dbCount(env,'fixtures')};
 }
+// source_revision is an OPTIONAL monotonic domain-data revision assigned by the producer.
+// Never compare Worker receipt time. Legacy clients have no revision; their ambiguous
+// corrections remain possible, except that a resolved decision cannot become OPEN.
+function d1SourceRevisionNewer(table){
+  return `(json_type(excluded.payload_json,'$.source_revision') IN ('integer','real') AND json_type(${table}.payload_json,'$.source_revision') IN ('integer','real') AND CAST(json_extract(excluded.payload_json,'$.source_revision') AS REAL)>CAST(json_extract(${table}.payload_json,'$.source_revision') AS REAL))`;
+}
+function d1SourceRevisionAllows(table){
+  return `(COALESCE(json_type(${table}.payload_json,'$.source_revision'),'') NOT IN ('integer','real') OR ${d1SourceRevisionNewer(table)})`;
+}
 function dbFixtureStmt(env,p,now){
   const fid=n(p?.fixture_id??p?.id);if(!Number.isFinite(fid))return null;
   return env.FOOTBALL_DB.prepare(`INSERT INTO fixtures (fixture_id,league,home,away,kickoff,status,first_seen_at,last_seen_at)
@@ -66,14 +75,14 @@ function dbEntryStmt(env,p,now){
       signal_state=excluded.signal_state,data_level=excluded.data_level,market_level=excluded.market_level,edge_level=excluded.edge_level,model_prob=excluded.model_prob,
       break_even=excluded.break_even,market_prob=excluded.market_prob,edge=excluded.edge,model_ev=excluded.model_ev,candidate_supported=excluded.candidate_supported,
       auto_settle_supported=excluded.auto_settle_supported,resolution=excluded.resolution,outcome=excluded.outcome,unit_pl=excluded.unit_pl,resolved_at=excluded.resolved_at,
-      payload_json=excluded.payload_json,updated_at=excluded.updated_at WHERE entry_decisions.payload_json IS NOT excluded.payload_json`)
+      payload_json=excluded.payload_json,updated_at=excluded.updated_at WHERE entry_decisions.payload_json IS NOT excluded.payload_json AND ${d1SourceRevisionAllows('entry_decisions')} AND (entry_decisions.resolution IS NOT 'RESOLVED' OR excluded.resolution='RESOLVED' OR ${d1SourceRevisionNewer('entry_decisions')})`)
     .bind(cleanStr(p?.id,160),n(p?.fixture_id),cleanStr(p?.engine,20),cleanStr(p?.policy_status,40),cleanStr(p?.policy_reason,500),n(p?.captured_at,now),n(p?.minute,null),n(score?.home,null),n(score?.away,null),cleanStr(p?.market_type,40),cleanStr(p?.selection,40),n(p?.line,null),n(p?.price,null),cleanStr(p?.odds_format,20),cleanStr(p?.price_zone,40),cleanStr(p?.behavior_state,50),cleanStr(p?.signal_state,80),cleanStr(p?.data_level,80),cleanStr(p?.market_level,80),cleanStr(p?.edge_level,80),n(p?.model_prob,null),n(p?.break_even,null),n(p?.market_prob,null),n(p?.edge,null),n(p?.model_ev,null),p?.candidate_supported?1:0,p?.auto_settle_supported?1:0,cleanStr(p?.resolution,40),cleanStr(p?.outcome,40),n(p?.unit_pl,null),n(p?.resolved_at,null),dbJson(p),now);
 }
 function dbEntryOutcomeStmt(env,p,now){
   if(String(p?.resolution||'')!=='RESOLVED'||!p?.id)return null;const final=p?.final_score||{};
   return env.FOOTBALL_DB.prepare(`INSERT INTO entry_outcomes (decision_id,fixture_id,engine,outcome,unit_pl,final_score_home,final_score_away,resolved_at,payload_json,updated_at)
     VALUES (?,?,?,?,?,?,?,?,?,?)
-    ON CONFLICT(decision_id) DO UPDATE SET outcome=excluded.outcome,unit_pl=excluded.unit_pl,final_score_home=excluded.final_score_home,final_score_away=excluded.final_score_away,resolved_at=excluded.resolved_at,payload_json=excluded.payload_json,updated_at=excluded.updated_at WHERE entry_outcomes.payload_json IS NOT excluded.payload_json`)
+    ON CONFLICT(decision_id) DO UPDATE SET outcome=excluded.outcome,unit_pl=excluded.unit_pl,final_score_home=excluded.final_score_home,final_score_away=excluded.final_score_away,resolved_at=excluded.resolved_at,payload_json=excluded.payload_json,updated_at=excluded.updated_at WHERE entry_outcomes.payload_json IS NOT excluded.payload_json AND ${d1SourceRevisionAllows('entry_outcomes')}`)
     .bind(cleanStr(p.id,160),n(p.fixture_id),cleanStr(p.engine,20),cleanStr(p.outcome,40),n(p.unit_pl,null),n(final?.home,null),n(final?.away,null),n(p.resolved_at,now),dbJson(p),now);
 }
 function dbLiveStmt(env,p,now){
