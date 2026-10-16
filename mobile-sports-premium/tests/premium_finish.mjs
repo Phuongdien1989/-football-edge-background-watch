@@ -36,6 +36,8 @@ try{
  await page.locator('.bottom-item[href="#connectCard"]').click();
  assert.equal(await page.locator('#connectCard').isVisible(),true);
  await page.locator('.bottom-item[href="#appTop"]').click();
+ await page.evaluate(()=>{location.hash='#appTop'});
+ await page.waitForFunction(()=>document.body.classList.contains('sp-view-home'));
  await page.evaluate(()=>{location.hash='#connectCard'});
  await page.waitForFunction(()=>document.body.classList.contains('sp-view-settings'));
  assert.equal(await page.locator('#connectCard').isVisible(),true);
