@@ -14,6 +14,19 @@ s=s.replace(auto,"/* PREVIEW ISOLATED: main service worker autoregistration disa
 reg="const reg=await navigator.serviceWorker.register(FE_PUSH_P02.sw,{scope:FE_PUSH_P02.scope});"
 assert s.count(reg)==1,'Push registration anchor drift'
 s=s.replace(reg,"throw new Error('PREVIEW: Push registration disabled; use installed production app for Push');")
+# Preview-only guard: opening/reopening the site must not silently sync to production.
+# Explicit native buttons remain available in connected mode; only passive startup/
+# visibility handlers and QSIG registration on a timer are disabled.
+passive=[
+ "setTimeout(()=>{if(bgEnabled())bgSyncNow({silent:true})},900);",
+ "if(document.visibilityState==='visible'&&Date.now()-Number(BG_STATE.lastSyncAt||0)>15000)bgSyncNow({silent:true})",
+ "setInterval(()=>{feEvidenceRegisterPending().catch(e=>log('QSIG evidence registration error',e.message))},60000);",
+ "setTimeout(()=>{feEvidenceRegisterPending().catch(e=>log('QSIG evidence registration error',e.message))},5000);",
+]
+for expression in passive:
+    assert s.count(expression)==1, 'Passive sync anchor drift: '+expression[:90]
+    s=s.replace(expression, '/* SPORTS PREMIUM PREVIEW: passive network/sync disabled */')
+assert 'bgSyncNow({silent:false})' in s, 'Explicit sync should remain available'
 # One scoped native presentation bridge, no engine render/API and no duplicated DOM listener.
 sp_anchor='  // FE_ADDON_BRIDGE_END'
 assert s.count(sp_anchor)==1,'Native addon anchor drift'
