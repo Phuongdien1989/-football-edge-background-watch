@@ -1,0 +1,23 @@
+name: D1 sync prod/staging indexes and write churn READ ONLY
+on:
+  push:
+    branches: [fix/d1-sync-entry-fixture-idempotent-20261016]
+    paths:
+      - '.github/scripts/d1-sync-index-churn-readonly.mjs'
+      - '.github/workflows/d1-sync-index-churn-readonly.yml'
+jobs:
+  indexes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    environment: football-edge-production
+    permissions: {contents: read}
+    steps:
+      - uses: actions/checkout@v4
+        with: {ref: ${{ github.sha }}, persist-credentials: false}
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Read D1 metadata and aggregated counts, no D1 writes
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node .github/scripts/d1-sync-index-churn-readonly.mjs
