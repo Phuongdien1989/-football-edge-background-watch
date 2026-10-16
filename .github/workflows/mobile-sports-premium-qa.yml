@@ -62,6 +62,15 @@ jobs:
           node mobile-sports-premium/tests/premium_finish.mjs
           node mobile-sports-premium/tests/premium_routes_v2.mjs
           FE_SP_ENGINE=webkit node mobile-sports-premium/tests/premium_routes_v2.mjs
+      - name: Production presentation bundle retains native Push SW and sync exactly
+        run: |
+          python3 mobile-sports-premium/build_production.py
+          node mobile-sports-premium/tests/production_ui.mjs
+          FE_SP_ENGINE=webkit node mobile-sports-premium/tests/production_ui.mjs
+          cp mobile-sports-premium/site/index.html /tmp/premium-demo.html
+          cp mobile-sports-premium/production-site/index.html mobile-sports-premium/site/index.html
+          node mobile-sports-premium/tests/native_fixture_mock.mjs
+          cp /tmp/premium-demo.html mobile-sports-premium/site/index.html
       - name: Wrangler package dry run only
         working-directory: mobile-sports-premium
         run: |
