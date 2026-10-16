@@ -4,6 +4,19 @@ import http from 'node:http';
 import {resolve,dirname} from 'node:path';
 const root=resolve('mobile-sports-premium'),site=readFileSync(root+'/site/index.html','utf8'),baseline=readFileSync(root+'/baseline.html','utf8');
 const images=root+'/screenshots';mkdirSync(images,{recursive:true});
+// Preview may expose manual actions, but opening/focusing the page cannot silently
+// sync Background Watch, schedule QSIG registration or register Push.
+const passiveAuto=[
+ "setTimeout(()=>{if(bgEnabled())bgSyncNow({silent:true})},900);",
+ "if(document.visibilityState==='visible'&&Date.now()-Number(BG_STATE.lastSyncAt||0)>15000)bgSyncNow({silent:true})",
+ "setInterval(()=>{feEvidenceRegisterPending().catch(e=>log('QSIG evidence registration error',e.message))},60000);",
+ "setTimeout(()=>{feEvidenceRegisterPending().catch(e=>log('QSIG evidence registration error',e.message))},5000);"
+];
+for(const old of passiveAuto)if(site.includes(old))throw Error('PASSIVE_SYNC_NOT_REMOVED');
+if(site.split('SPORTS PREMIUM PREVIEW: passive network/sync disabled').length!==5)throw Error('PREVIEW_AUTO_SYNC_GUARDS_INCOMPLETE');
+if(!site.includes("function bgSyncNow(")||!site.includes('feDbSyncOutbox('))throw Error('EXPLICIT_NATIVE_FEATURES_UNEXPECTEDLY_REMOVED');
+if(!site.includes("unknown?'LIVE ?':'LIVE'"))throw Error('UNKNOWN_LIVE_FRESHNESS_NOT_DISCLOSED');
+
 const server=http.createServer((req,res)=>{const path=(req.url||'/').split('?')[0];if(path==='/'||path==='/index.html'||path==='/baseline.html'){
  res.writeHead(200,{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store'});res.end(path==='/baseline.html'?baseline:site);return;
 }res.writeHead(404);res.end('Not Found')});
