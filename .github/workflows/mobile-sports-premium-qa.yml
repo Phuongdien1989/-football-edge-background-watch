@@ -51,6 +51,7 @@ jobs:
           node --check mobile-sports-premium/worker.mjs
           node --check mobile-sports-premium/tests/browser_ci.mjs
           node --check mobile-sports-premium/tests/native_fixture_mock.mjs
+          node --check mobile-sports-premium/tests/premium_routes_v2.mjs
           test -f mobile-sports-premium/site/index.html
       - name: Chromium localhost 375/390/430 / Desktop / filters / safe DEMO
         run: |
@@ -58,6 +59,7 @@ jobs:
           npx playwright install --with-deps chromium
           node mobile-sports-premium/tests/browser_ci.mjs
           node mobile-sports-premium/tests/native_fixture_mock.mjs
+          node mobile-sports-premium/tests/premium_routes_v2.mjs
       - name: Wrangler package dry run only
         working-directory: mobile-sports-premium
         run: |
