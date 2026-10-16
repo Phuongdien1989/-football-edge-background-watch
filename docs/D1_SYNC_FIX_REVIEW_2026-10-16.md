@@ -27,7 +27,7 @@
 
 ## Independent staging evidence (same input, REAL Cloudflare D1 rows_written)
 
-[Staging A/B indexed from **actual production** SQLite schema](https://github.com/Phuongdien1989/-football-edge-background-watch/actions/runs/38840273757).
+[Staging A/B indexed from **actual production** SQLite schema](https://github.com/Phuongdien1989/-football-edge-background-watch/actions/runs/38840499189).
 
 - Dedicated isolated test tables in **STAGING** D1 `7d503048-9118-4b29-b662-4e1ba6e32167`, generated from actual production `sqlite_master` DDL (11 tables / 16 indexes checked).
 - Production database `0d12a7cc-12a9-4c71-b55b-61dfd2dac4d4` was **read-only** for schema/index and aggregates, not modified.
@@ -36,6 +36,8 @@
 - Breakdown under SAME indexed synthetic load: CATALOG 22→10; ENTRY 28→17; app LIVE 21→17; Smart Follow 21→17; Evidence 13→9; Validation 7→7; Notification 5→5; invalid event 2→0. These are grouped *test operations* rather than inferred percentages of real production routes.
 - Other unaffected or partly affected groups continue to write and are explicitly accounted for in the workflow artifact.
 - ENTRY / outcome preserved: `RESOLVED`, `HIT`, `resolved_at=4000`, `captured_at=3000`, legitimate minute/score **0** all verified under both variants.
+- Fixture history integrity additionally asserted on BOTH variants: minute=22, status change maintained, home score=1, away score=0, two team records retained, home goals-for=1 / against=0. Full comparable logical fields equal; server request timestamp fields are intentionally not used as provider freshness.
+- The latest source-related regression checks are PASS at https://github.com/Phuongdien1989/-football-edge-background-watch/actions/runs/38840499189 ; unrelated Push/TOP/EDGE tests were not rerun because their sources were untouched.
 - Extrapolation caveat: true production write costs depend on volume of genuinely new ENTRY records, other applications sharing D1 quota, and log collection coverage.
 
 ## Mobile candidate tests
