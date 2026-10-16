@@ -25,8 +25,10 @@ try {
    if(!await page.locator('#feSportsPremium').isVisible())throw Error('SP_MOBILE_NOT_VISIBLE_'+width);
    if((await page.locator('#spRows [data-sp-open]').count())!==3)throw Error('SP_DEMO_ROWS_NOT_3_'+width);
    await page.locator('[data-sp-group="PRE"]').click();
+   await page.waitForFunction(()=>document.querySelectorAll('#spRows [data-sp-open]').length===1,{timeout:5000});
    if((await page.locator('#spRows [data-sp-open]').count())!==1)throw Error('SP_PRE_FILTER_FAIL_'+width);
    await page.locator('[data-sp-group="LIVE"]').click();
+   await page.waitForFunction(()=>document.querySelectorAll('#spRows [data-sp-open]').length===3,{timeout:5000});
    await page.locator('#spRows [data-sp-open]').first().click();
    if(!(await page.locator('#spInlineError').innerText()).includes('DEMO'))throw Error('SP_DEMO_OPEN_NOT_GUARDED_'+width);
    await page.screenshot({path:images+'/mobile_'+width+'.png',fullPage:true,animations:'disabled'});
