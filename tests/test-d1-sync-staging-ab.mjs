@@ -80,6 +80,20 @@ async function bench(version){
  const orderedHistory=(await query("SELECT status,minute,score_home,score_away,terminal FROM "+prefix+"fixture_history WHERE fixture_id=?",[orderedFixture.fixture_id])).results[0];
  const fixtureOrderingSafe=orderedHistory.status==='FT'&&orderedHistory.minute===90&&orderedHistory.score_home===1&&orderedHistory.score_away===0&&orderedHistory.terminal===1;
  if(version==='patch')assert.ok(fixtureOrderingSafe,'older catalog revision must not rewrite terminal metadata');
+ // A legitimate *higher* producer revision can reopen/restate final status.
+ const validFixtureCorrection={...orderedFixture,source_revision:3,status:'2H',minute:89,score_home:0,score_away:0};
+ await step('fixture_order_newer_correction',()=>cat(validFixtureCorrection));
+ await step('fixture_order_previous_terminal_retry',()=>cat(orderedFinal));
+ const newerFixture=(await query("SELECT status,minute,score_home,score_away,terminal FROM "+prefix+"fixture_history WHERE fixture_id=?",[orderedFixture.fixture_id])).results[0];
+ const newerFixtureSafe=newerFixture.status==='2H'&&newerFixture.minute===89&&newerFixture.score_home===0&&newerFixture.score_away===0&&newerFixture.terminal===0;
+ if(version==='patch')assert.ok(newerFixtureSafe,'legitimate revision-3 fixture correction must prevail, including 0 score and reopened state');
+ const legacyCatalog={...catalog,fixture_id:987654323,home_team_id:9841,away_team_id:9842,status:'FT',minute:90,score_home:0,score_away:0};
+ await step('fixture_legacy_terminal',()=>cat(legacyCatalog));
+ await step('fixture_legacy_old_1h',()=>cat({...legacyCatalog,status:'1H',minute:30}));
+ const legacyHistory=(await query("SELECT status,minute,terminal FROM "+prefix+"fixture_history WHERE fixture_id=?",[legacyCatalog.fixture_id])).results[0];
+ const legacyFixtureSafe=legacyHistory.status==='FT'&&legacyHistory.minute===90&&legacyHistory.terminal===1;
+ if(version==='patch')assert.ok(legacyFixtureSafe,'unversioned terminal fixture cannot regress to first half');
+
 
  const q={id:'SYN-Q',fixture_id:catalog.fixture_id,engine:'FT',captured_at:1000,outcome:'PENDING'};
  await step('evidence_first',()=>evidence(env,[event('QSIG_RESULT',q)]));
@@ -106,6 +120,21 @@ async function bench(version){
  const orderingEntrySafe=orderedEntry.resolution==='RESOLVED'&&orderedEntry.outcome==='MISS'&&orderedEntry.unit_pl===0;
  const orderingOutcomeSafe=orderedOutcome.outcome==='MISS'&&orderedOutcome.unit_pl===0;
  if(version==='patch')assert.ok(orderingEntrySafe&&orderingOutcomeSafe,'out-of-order ENTRY/outcome must not regress corrected result');
+ // Old Mobile has no producer revision. We can protect terminal lifecycle,
+ // but still allow a RESOLVED outcome correction with same resolved_at.
+ const legacyEntry={...e,id:'SYN-LEGACY-E',resolution:'RESOLVED',outcome:'HIT',unit_pl:1,resolved_at:5100};
+ await step('entry_legacy_resolved',()=>sync(env,[event('ENTRY_DECISION',legacyEntry)]));
+ await step('entry_legacy_old_open',()=>sync(env,[event('ENTRY_DECISION',{...legacyEntry,resolution:'OPEN',outcome:null,unit_pl:null,resolved_at:null})]));
+ const legacyAfterOpen=(await query("SELECT resolution,outcome FROM "+prefix+"entry_decisions WHERE id='SYN-LEGACY-E'")).results[0];
+ const legacyLifecycleSafe=legacyAfterOpen.resolution==='RESOLVED'&&legacyAfterOpen.outcome==='HIT';
+ if(version==='patch')assert.ok(legacyLifecycleSafe,'old Mobile OPEN retry cannot reverse settled ENTRY');
+ const legacyCorrection={...legacyEntry,outcome:'MISS',unit_pl:0};
+ await step('entry_legacy_valid_correction',()=>sync(env,[event('ENTRY_DECISION',legacyCorrection)]));
+ const legacyAfterCorrection=(await query("SELECT resolution,outcome,unit_pl FROM "+prefix+"entry_decisions WHERE id='SYN-LEGACY-E'")).results[0];
+ const legacyOutcomeCorrection=(await query("SELECT outcome,unit_pl FROM "+prefix+"entry_outcomes WHERE decision_id='SYN-LEGACY-E'")).results[0];
+ const legacyCorrectionSafe=legacyAfterCorrection.resolution==='RESOLVED'&&legacyAfterCorrection.outcome==='MISS'&&legacyAfterCorrection.unit_pl===0&&legacyOutcomeCorrection.outcome==='MISS'&&legacyOutcomeCorrection.unit_pl===0;
+ if(version==='patch')assert.ok(legacyCorrectionSafe,'unversioned same-resolved-at correction must not be blocked by receiver time');
+
 
  const l={id:'SYN-L',fixture_id:catalog.fixture_id,source:'APP',captured_at:3100,minute:22,status:'1H',score_home:1};
  await step('app_live_first',()=>sync(env,[event('LIVE_SNAPSHOT',l)]));
@@ -131,9 +160,9 @@ async function bench(version){
  await step('notify_tombstone',()=>watcher(true).deleteNotifyMatch(catalog.fixture_id));
  await step('notify_tombstone_retry',()=>watcher(true).deleteNotifyMatch(catalog.fixture_id));
  const final={};for(const t of ['fixtures','teams','fixture_history','team_fixture_history','qsig_results','validation_results','entry_decisions','entry_outcomes','live_snapshots','fe_notify_live_state']){const r=await query('SELECT COUNT(*) AS n FROM '+prefix+t);final[t]=Number(r.results?.[0]?.n||0)}
- assert.equal(final.fixture_history,2);
- assert.equal(final.teams,4,'both sets of historical teams retained');
- assert.equal(final.team_fixture_history,4,'both fixture sides retained');
+ assert.equal(final.fixture_history,3);
+ assert.equal(final.teams,6,'all three fixtures historical teams retained');
+ assert.equal(final.team_fixture_history,6,'all team fixture side records retained');
  const historyCheck=(await query("SELECT minute,status,score_home,score_away,terminal FROM "+prefix+"fixture_history WHERE fixture_id=?",[catalog.fixture_id])).results[0];
  assert.equal(historyCheck.minute,22);assert.equal(historyCheck.score_home,1);assert.equal(historyCheck.score_away,0);assert.equal(historyCheck.terminal,0);
  const homeCheck=(await query("SELECT goals_for,goals_against FROM "+prefix+"team_fixture_history WHERE team_id=?",[catalog.home_team_id])).results[0];
@@ -142,7 +171,7 @@ async function bench(version){
  assert.equal(entryCheck.resolution,'RESOLVED');assert.equal(entryCheck.outcome,'HIT');assert.equal(entryCheck.captured_at,3000);assert.equal(entryCheck.minute,0);assert.equal(entryCheck.score_home,0);assert.equal(entryCheck.score_away,0);
  const o=(await query("SELECT outcome,resolved_at FROM "+prefix+"entry_outcomes WHERE decision_id='SYN-E'")).results[0];
  assert.equal(o.outcome,'HIT');assert.equal(o.resolved_at,4000);
- output.variants[version]={steps,final,entry_integrity:entryCheck,outcome_integrity:o,history_integrity:historyCheck,team_history_integrity:homeCheck,ordering:{entrySafe:orderingEntrySafe,outcomeSafe:orderingOutcomeSafe,fixtureSafe:fixtureOrderingSafe,entry:orderedEntry,outcome:orderedOutcome,fixture:orderedHistory}};
+ output.variants[version]={steps,final,entry_integrity:entryCheck,outcome_integrity:o,history_integrity:historyCheck,team_history_integrity:homeCheck,ordering:{entrySafe:orderingEntrySafe,outcomeSafe:orderingOutcomeSafe,fixtureSafe:fixtureOrderingSafe,entry:orderedEntry,outcome:orderedOutcome,fixture:orderedHistory,revision3CorrectionSafe:newerFixtureSafe,legacyFixtureSafe,legacyLifecycleSafe,legacyCorrectionSafe}};
 }
 await bench('base');await bench('patch');
 assert.deepEqual(output.variants.base.entry_integrity,output.variants.patch.entry_integrity,'ENTRY logical integrity differs');
