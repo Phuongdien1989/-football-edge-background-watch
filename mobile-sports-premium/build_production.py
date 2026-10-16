@@ -16,7 +16,7 @@ bridge="""  // SPORTS_PREMIUM_PRODUCTION_NATIVE_SELECTION_BRIDGE — presentatio
 """
 assert s.count(anchor)==1
 s=s.replace(anchor,bridge+anchor)
-css=(r/'source/premium.css').read_text()+"\n@media(max-width:767px){body.fe-sp-enabled #spMode{display:none!important}}\n"
+css=(r/'source/premium.css').read_text()+"\n@media(max-width:767px){body.fe-sp-enabled #spMode,body.fe-sp-enabled .sp-help{display:none!important}}\n"
 js=(r/'source/premium.js').read_text()
 old="const mode=new URLSearchParams(location.search).get('mode')==='connected'?'connected':'demo';"
 assert js.count(old)==1

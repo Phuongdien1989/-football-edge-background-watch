@@ -16,6 +16,7 @@ try{
   await p.waitForFunction(()=>window.__FE_SP_DIAGNOSTICS__);
   assert.equal(await p.evaluate(()=>window.__FE_SP_DIAGNOSTICS__.read().mode),'production');
   assert.equal(await p.locator('#spMode').isVisible(),false);
+  if(width<768)assert.equal(await p.locator('.sp-help').isVisible(),false);
   assert.equal(await p.locator('[data-sp-open]').count(),0);
   if(width<768){
    for(const [hash,selector] of [['#appTop','#feSportsPremium'],['#scanCard','#scanCard'],['#analysisCard','#analysisCard'],['#betTrackerCard','#betTrackerCard'],['#connectCard','#connectCard']]){
