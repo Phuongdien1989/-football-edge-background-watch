@@ -252,3 +252,12 @@
  body.fe-sp-enabled #analysisCard .fe-p4-team b{font-size:14px!important}
  body.fe-sp-enabled #analysisCard .fe-p4-note{font-size:12px!important;line-height:1.6!important}
 }
+@media(max-width:767px){
+ body.fe-sp-enabled #feSportsPremium .sp-tabs button{font-size:13px!important;font-weight:750!important}
+ body.fe-sp-enabled #feSportsPremium .sp-mode button{font-size:12px!important}
+ body.fe-sp-enabled #feSportsPremium .sp-scan-btn{font-size:12px!important}
+ body.fe-sp-enabled #feSportsPremium .sp-reason{border:0!important;background:transparent!important;box-shadow:none!important;padding:0!important;border-radius:0!important}
+ body.fe-sp-enabled #feSportsPremium .sp-reason summary{padding:0!important;font-size:12px!important;min-height:40px!important}
+ body.fe-sp-enabled #feSportsPremium .sp-help{background:transparent!important;border:0!important;padding:2px 0 15px!important;box-shadow:none!important}
+ body.fe-sp-enabled #feSportsPremium .sp-help summary{padding:0!important;font-size:12px!important}
+}
