@@ -61,7 +61,7 @@ function dbFixtureStmt(env,p,now){
     ON CONFLICT(fixture_id) DO UPDATE SET
       league=COALESCE(excluded.league,fixtures.league),home=COALESCE(excluded.home,fixtures.home),away=COALESCE(excluded.away,fixtures.away),
       kickoff=COALESCE(excluded.kickoff,fixtures.kickoff),status=COALESCE(excluded.status,fixtures.status),last_seen_at=MAX(fixtures.last_seen_at,excluded.last_seen_at)
-    WHERE fixtures.league IS NOT COALESCE(excluded.league,fixtures.league) OR fixtures.home IS NOT COALESCE(excluded.home,fixtures.home) OR fixtures.away IS NOT COALESCE(excluded.away,fixtures.away) OR fixtures.kickoff IS NOT COALESCE(excluded.kickoff,fixtures.kickoff) OR fixtures.status IS NOT COALESCE(excluded.status,fixtures.status)`)
+    WHERE (fixtures.league IS NOT COALESCE(excluded.league,fixtures.league) OR fixtures.home IS NOT COALESCE(excluded.home,fixtures.home) OR fixtures.away IS NOT COALESCE(excluded.away,fixtures.away) OR fixtures.kickoff IS NOT COALESCE(excluded.kickoff,fixtures.kickoff) OR fixtures.status IS NOT COALESCE(excluded.status,fixtures.status)) AND (fixtures.status NOT IN ('FT','AET','PEN','PST','CANC','ABD','AWD','WO') OR excluded.status IS NULL OR excluded.status IN ('FT','AET','PEN','PST','CANC','ABD','AWD','WO'))`)
     .bind(fid,cleanStr(p?.league),cleanStr(p?.home),cleanStr(p?.away),n(p?.kickoff,null),cleanStr(p?.status,20),now,now);
 }
 function dbEntryStmt(env,p,now){
