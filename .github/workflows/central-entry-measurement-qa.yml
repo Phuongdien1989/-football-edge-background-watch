@@ -6,6 +6,7 @@ on:
       - 'central-entry-measurement.mjs'
       - 'tests/test-central-entry-measurement.mjs'
       - '.github/scripts/central-entry-measurement-staging.mjs'
+      - '.github/scripts/provider-final-measurement.mjs'
       - '.github/workflows/central-entry-measurement-qa.yml'
   workflow_dispatch:
 jobs:
@@ -29,6 +30,11 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: node .github/scripts/central-entry-measurement-staging.mjs
+      - name: Independently refresh final fixture scores in at most eight quota-controlled batches
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node .github/scripts/provider-final-measurement.mjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -36,3 +42,4 @@ jobs:
           path: |
             central-entry-measurement-staging.json
             central-entry-measurements.json
+            provider-final-*.json

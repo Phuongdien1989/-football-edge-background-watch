@@ -9,6 +9,8 @@ assert.deepEqual(settlePeriodOU(0,.5,'UNDER',1.9),{outcome:'WIN',unit_pl:.9});
 assert.throws(()=>settlePeriodOU(null,.5,'OVER',2));
 assert.throws(()=>settlePeriodOU(0,.3,'OVER',2));
 assert.equal(measureEntry(e,[s]).outcome,'WIN');
+assert.equal(measureEntry(e,[{...s,source:'PROVIDER_FINAL_REFRESH'}]).outcome,'WIN');
+assert.equal(measureEntry(e,[{...s,source:'UNTRUSTED'}]).measurement_status,'UNKNOWN');
 assert.equal(measureEntry({...e,price:null},[s]).measurement_status,'UNKNOWN');
 assert.equal(measureEntry({...e,score_home:null},[s]).reason,'MISSING_ENTRY_SCORE');
 assert.equal(measureEntry(e,[{...s,fulltime_home:null}]).measurement_status,'UNKNOWN');

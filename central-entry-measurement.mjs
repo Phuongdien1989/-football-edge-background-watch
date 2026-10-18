@@ -41,7 +41,7 @@ export function measureEntry(e,snapshots){
  const isFT=e.engine==='FT',h=isFT?'fulltime_home':'halftime_home',a=isFT?'fulltime_away':'halftime_away';
  const candidates=[];
  for(const s of snapshots){
-  if(s.fixture_id!==e.fixture_id||s.raw_fixture_id!==e.fixture_id||s.raw_status!==s.status||!['BACKGROUND','EVIDENCE_FOLLOWUP'].includes(s.source)||typeof s.id!=='string')continue;
+  if(s.fixture_id!==e.fixture_id||s.raw_fixture_id!==e.fixture_id||s.raw_status!==s.status||!['BACKGROUND','EVIDENCE_FOLLOWUP','PROVIDER_FINAL_REFRESH'].includes(s.source)||typeof s.id!=='string')continue;
   if(!numeric(s.captured_at)||s.captured_at<e.captured_at)continue;
   if(isFT?s.status!=='FT':!['HT','2H','FT'].includes(s.status))continue;
   if(!score(s[h])||!score(s[a]))continue;
