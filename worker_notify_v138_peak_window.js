@@ -1,3 +1,4 @@
+import {providerDiagnosticDetail} from './provider-diagnostic-detail.mjs';
 import base,{BackgroundWatcher as QuotaWatcher} from './worker_notify_v137_quota50000.js';
 import {providerRateScope} from './provider_errors.mjs';
 import {instrumentD1Env} from './d1-production-meter.mjs';
@@ -48,7 +49,7 @@ export class BackgroundWatcher extends QuotaWatcher{
     const budget=await this.notifyBudgetView(),status=await this.ctx.storage.get('notify:status');
     const devices=(await this.devices()).filter(d=>d?.prefs?.enabled&&(d.prefs.h1||d.prefs.goal||d.prefs.gap));
     const lastCycleAt=Number(status?.startedAt||0);
-    const publicObservation=o=>o?{at:o.at,http:o.http,code:o.code,limits:o.limits,retry_after_ms:o.retry_after_ms,rate_scope:providerRateScope(o.detail),request_kind:o.request_kind||null,cooldown_scope:o.cooldown_scope||null,response_count:o.response_count??null}:null;
+    const publicObservation=o=>o?{at:o.at,http:o.http,code:o.code,limits:o.limits,retry_after_ms:o.retry_after_ms,rate_scope:providerRateScope(o.detail),request_kind:o.request_kind||null,cooldown_scope:o.cooldown_scope||null,response_count:o.response_count??null,error_detail:providerDiagnosticDetail(o,this.env.APISPORTS_KEY)}:null;
     const probeKey='api:provider-probe:v1:'+this.env.FE_PROVIDER_PROBE_RUN_ID;
     const lastSuccess=await this.ctx.storage.get('api:last-provider-success:v1');
     const lastFailure=await this.ctx.storage.get('api:last-provider-error:v1');
