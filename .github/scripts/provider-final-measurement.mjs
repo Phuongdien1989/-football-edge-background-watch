@@ -6,7 +6,7 @@ const a=process.env.CLOUDFLARE_ACCOUNT_ID,t=process.env.CLOUDFLARE_API_TOKEN;
 if(!a||!t)throw Error('Cloudflare credentials unavailable');
 const prod='0d12a7cc-12a9-4c71-b55b-61dfd2dac4d4',stage='7d503048-9118-4b29-b662-4e1ba6e32167',worker='football-edge-background-watch';
 const root='https://api.cloudflare.com/client/v4/accounts/'+encodeURIComponent(a),helper='fe-result-check-'+process.env.GITHUB_RUN_ID,auth=randomBytes(32).toString('hex');
-const report={at:new Date().toISOString(),mode:'BOUNDED_PROVIDER_CHECK_STAGING_ONLY',productionD1Writes:0,providerBatchesAttempted:0,providerBatchCap:8,cleanup:false,errors:[]};
+const report={at:new Date().toISOString(),mode:'BOUNDED_PROVIDER_CHECK_STAGING_ONLY',productionD1Writes:0,providerBatchesAttempted:0,providerBatchCap:process.env.FE_PROVIDER_BASIC_FINALS==='true'?160:8,requestShape:process.env.FE_PROVIDER_BASIC_FINALS==='true'?'BASIC_SINGLE_ID':'DETAILED_IDS',cleanup:false,errors:[]};
 async function cf(path,opts={}){const r=await fetch(root+path,{...opts,headers:{Authorization:'Bearer '+t,...opts.headers},signal:AbortSignal.timeout(30000)});const j=await r.json();if(!r.ok||!j.success)throw Error('CF HTTP '+r.status+' '+path);return j.result}
 async function query(db,sql,params=[]){if(db===prod&&!/^SELECT\b/.test(sql))throw Error('Production D1 writes prohibited');if(![prod,stage].includes(db))throw Error('Wrong DB');const rr=await cf('/d1/database/'+db+'/query',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sql,params})});const r=rr[0];if(!r?.success)throw Error('D1 query failed');if(db===prod)assert.equal(Number(r.meta?.rows_written||0),0);return r}
 async function deployments(){const result={};for(const n of [worker,'shiny-silence-d892','football-edge-desktop-b2-test'])result[n]=(await cf('/workers/scripts/'+n+'/deployments')).deployments?.[0]?.versions;return result}
@@ -19,7 +19,7 @@ const source=`export default {async fetch(request,env){
  const body=await request.json();const ids=body.ids;
  if(!Array.isArray(ids)||!ids.length||ids.length>20||ids.some(x=>!Number.isSafeInteger(x)||x<=0))return new Response('Invalid fixture IDs',{status:400});
  try{
-  const rows=await stub.api('/fixtures',{ids:ids.join('-')},true);
+  const rows=await stub.api('/fixtures',body.basic===true&&ids.length===1?{id:ids[0]}:{ids:ids.join('-')},true);
   return Response.json({ok:true,at:Date.now(),diagnostics:await diagnostics(),rows:rows.filter(f=>ids.includes(f.fixture?.id)).map(f=>({fixture:f.fixture,goals:f.goals,score:f.score}))});
  }catch(e){return Response.json({ok:false,error:String(e.message||e).slice(0,180),diagnostics:await diagnostics()},{status:502})}
 }};`;
@@ -47,11 +47,11 @@ try{
  const pacing=dj.diagnostics?.provider?.pacing||{},until=Math.max(Number(pacing.cooldown_until||0),...(pacing.endpoint_cooldowns||[]).filter(x=>x.request_kind==='OTHER_ENDPOINT').map(x=>Number(x.until)||0));
  if(until>Date.now()){report.blockedUntil=until;throw Error('Existing provider cooldown active; no probe sent')}
  if(Number(dj.diagnostics?.quota?.remaining||0)<8)throw Error('Insufficient existing API budget; no probe sent');
- report.batchGapMs=5000;report.batchDiagnostics=[];
- for(let i=0;i<ids.length;i+=20){
+ report.batchGapMs=process.env.FE_PROVIDER_BASIC_FINALS==='true'?2000:5000;report.batchSize=process.env.FE_PROVIDER_BASIC_FINALS==='true'?1:20;report.batchDiagnostics=[];
+ for(let i=0;i<ids.length;i+=report.batchSize){
   if(i)await new Promise(r=>setTimeout(r,report.batchGapMs));
-  if(report.providerBatchesAttempted>=8)throw Error('Provider batch cap');report.providerBatchesAttempted++;
-  const response=await fetch(url,{method:'POST',headers:{Authorization:'Bearer '+auth,'Content-Type':'application/json'},body:JSON.stringify({ids:ids.slice(i,i+20)}),signal:AbortSignal.timeout(60000)});
+  if(report.providerBatchesAttempted>=report.providerBatchCap)throw Error('Provider batch cap');report.providerBatchesAttempted++;
+  const response=await fetch(url,{method:'POST',headers:{Authorization:'Bearer '+auth,'Content-Type':'application/json'},body:JSON.stringify({ids:ids.slice(i,i+report.batchSize),basic:report.batchSize===1}),signal:AbortSignal.timeout(60000)});
   const result=await response.json();report.batchDiagnostics.push({batch:report.providerBatchesAttempted,ok:result.ok===true,diagnostics:result.diagnostics||null});if(!response.ok||!result.ok)throw Error('Provider check failed: '+(result.error||response.status));
   for(const f of result.rows||[]){const fid=f.fixture?.id,status=f.fixture?.status?.short;report.statuses??={};report.statuses[status]=(report.statuses[status]||0)+1;
    sources.push({id:'PROVIDER-FINAL-'+fid+'-'+result.at,fixture_id:fid,raw_fixture_id:fid,source:'PROVIDER_FINAL_REFRESH',status,raw_status:status,captured_at:result.at,fulltime_home:f.score?.fulltime?.home??null,fulltime_away:f.score?.fulltime?.away??null,halftime_home:f.score?.halftime?.home??null,halftime_away:f.score?.halftime?.away??null,raw_goals_home:f.goals?.home??null,raw_goals_away:f.goals?.away??null});
