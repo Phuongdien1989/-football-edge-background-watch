@@ -25,6 +25,7 @@ jobs:
       - run: npm install --no-save wrangler@4
       - name: Preserve configuration, deploy detail-only field, read saved evidence
         env:
+          FE_RESTORE_ONLY: "true"
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: node .github/scripts/provider-detail-release.mjs

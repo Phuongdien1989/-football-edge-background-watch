@@ -15,6 +15,18 @@ async function clients(){assert.equal(await version('shiny-silence-d892'),'03c1d
 function bindingSignature(s){return (s.bindings||[]).filter(b=>b.name!=='FE_DEPLOY_COMMIT').map(b=>JSON.stringify(Object.fromEntries(Object.entries(b).sort(([a],[b])=>a.localeCompare(b))))).sort()}
 const run=(args)=>{try{return execFileSync('npx',['--no-install','wrangler',...args],{encoding:'utf8',stdio:'pipe',timeout:120000,env:{...process.env,WRANGLER_SEND_METRICS:'false'}})}catch{throw Error('WRANGLER_COMMAND_FAILED_'+args[0])}};
 try{
+ if(process.env.FE_RESTORE_ONLY==='true'){
+  report.version_before=await version(worker);
+  await cf('/workers/scripts/'+worker+'/deployments',json({strategy:'percentage',versions:[{version_id:original,percentage:100}],annotations:{'workers/message':'Verify restoration of pre-diagnostic production backend'}}));
+  let restored=false;
+  for(let i=0;i<25;i++){
+   const hr=await fetch(origin+'/health',{signal:AbortSignal.timeout(15000)}),h=await hr.json();
+   report.observed_health_commit=h.deploy_commit;report.version_after=await version(worker);
+   if(report.version_after===original&&h.deploy_commit===baseline&&h.peak_status?.enabled===false&&h.next_alarm===null){restored=true;break}
+   await new Promise(r=>setTimeout(r,2000));
+  }
+  assert(restored,'RESTORED_VERSION_OR_COMMIT_NOT_VERIFIED');await clients();report.rollback='PASS';report.checks.restoration='PASS';
+ }else{
  assert(account&&token&&sha);assert.equal(execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(),sha);
  execFileSync('node',['tests/test-provider-diagnostic-detail.mjs'],{stdio:'inherit'});
  const allowed=['provider-diagnostic-detail.mjs','worker_notify_v138_peak_window.js','tests/test-provider-diagnostic-detail.mjs','.github/scripts/provider-detail-release.mjs','.github/workflows/provider-detail-release.yml'];
@@ -42,6 +54,7 @@ try{
  await cf('/workers/scripts/'+helper,{method:'PUT',body:form});created=true;await cf('/workers/scripts/'+helper+'/subdomain',json({enabled:true}));const domain=await cf('/workers/subdomain'),url='https://'+helper+'.'+domain.subdomain+'.workers.dev/';
  let ready=false;for(let i=0;i<10;i++){const r=await fetch(url+'?ready=1',{headers:{Authorization:'Bearer '+auth},signal:AbortSignal.timeout(10000)});if(r.ok){ready=true;break}await new Promise(r=>setTimeout(r,2000))}assert(ready);
  const r=await fetch(url,{headers:{Authorization:'Bearer '+auth},signal:AbortSignal.timeout(20000)});assert(r.ok);report.stored_diagnostics=await r.json();assert('error_detail' in report.stored_diagnostics.provider.last_failure);await health(sha);await clients();assert.equal(await version(worker),report.production_version);report.deployed=true;report.checks.stored_error_read='PASS';
+ }
 }catch(e){report.errors.push(String(e.message||e).slice(0,350));if(attempted){try{await cf('/workers/scripts/'+worker+'/deployments',json({strategy:'percentage',versions:[{version_id:original,percentage:100}],annotations:{'workers/message':'Restore exact backend after read-only detail diagnostic failure'}}));assert.equal(await version(worker),original);await health(baseline);report.rollback='PASS'}catch{report.rollback='UNCONFIRMED'}}process.exitCode=1}
 finally{
  if(created){try{await cf('/workers/scripts/'+helper,{method:'DELETE'});report.helper_cleanup=true}catch{report.helper_cleanup=false;process.exitCode=1}}
