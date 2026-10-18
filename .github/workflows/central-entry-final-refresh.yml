@@ -1,0 +1,28 @@
+name: Continue final-score verification — diagnostics first, bounded paced batches
+on:
+  push:
+    branches: [fix/central-entry-measurement-20261018]
+    paths: ['.github/workflows/central-entry-final-refresh.yml']
+jobs:
+  final-refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    environment: football-edge-production
+    permissions: {contents: read}
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Check bounded job syntax
+        run: node --check .github/scripts/provider-final-measurement.mjs
+      - name: Read cooldown/quota and resume final verification without scan enable or production D1 writes
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node .github/scripts/provider-final-measurement.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: provider-final-checkpoint
+          path: provider-final-*.json

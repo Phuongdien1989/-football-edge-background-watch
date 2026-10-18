@@ -13,13 +13,15 @@ async function deployments(){const result={};for(const n of [worker,'shiny-silen
 const source=`export default {async fetch(request,env){
  if(request.headers.get('authorization')!=='Bearer '+env.CHECK_AUTH)return new Response('Unauthorized',{status:401});
  if(new URL(request.url).searchParams.has('ready'))return Response.json({ready:true});
+ const stub=env.PRODUCTION_DO.get(env.PRODUCTION_DO.idFromName('football-edge-global'));
+ const diagnostics=async()=>{const d=await stub.notifyDiagnostics();return {at:Date.now(),quota:d.global_api_quota,provider:d.provider}};
+ if(request.method==='GET')return Response.json({ok:true,diagnostics:await diagnostics()});
  const body=await request.json();const ids=body.ids;
  if(!Array.isArray(ids)||!ids.length||ids.length>20||ids.some(x=>!Number.isSafeInteger(x)||x<=0))return new Response('Invalid fixture IDs',{status:400});
- const stub=env.PRODUCTION_DO.get(env.PRODUCTION_DO.idFromName('football-edge-global'));
  try{
   const rows=await stub.api('/fixtures',{ids:ids.join('-')},true);
-  return Response.json({ok:true,at:Date.now(),rows:rows.filter(f=>ids.includes(f.fixture?.id)).map(f=>({fixture:f.fixture,goals:f.goals,score:f.score}))});
- }catch(e){return Response.json({ok:false,error:String(e.message||e).slice(0,180)},{status:502})}
+  return Response.json({ok:true,at:Date.now(),diagnostics:await diagnostics(),rows:rows.filter(f=>ids.includes(f.fixture?.id)).map(f=>({fixture:f.fixture,goals:f.goals,score:f.score}))});
+ }catch(e){return Response.json({ok:false,error:String(e.message||e).slice(0,180),diagnostics:await diagnostics()},{status:502})}
 }};`;
 let created=false,before=null,entries=[],sources=[];
 if(process.env.FE_RESUME_SOURCES_PATH){sources=JSON.parse(readFileSync(process.env.FE_RESUME_SOURCES_PATH));if(!Array.isArray(sources))throw Error('Invalid resume sources')}
@@ -40,10 +42,17 @@ try{
  await cf('/workers/scripts/'+helper+'/subdomain',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({enabled:true})});
  const domain=await cf('/workers/subdomain'),url='https://'+helper+'.'+domain.subdomain+'.workers.dev/';
  let ready=false;for(let i=0;i<8;i++){const r=await fetch(url+'?ready=1',{headers:{Authorization:'Bearer '+auth},signal:AbortSignal.timeout(15000)});if(r.ok){ready=true;break}await new Promise(r=>setTimeout(r,2000))}if(!ready)throw Error('Result checker not ready');
+ const dr=await fetch(url,{headers:{Authorization:'Bearer '+auth},signal:AbortSignal.timeout(20000)}),dj=await dr.json();if(!dr.ok||!dj.ok)throw Error('Diagnostics read failed');
+ report.diagnosticsBefore=dj.diagnostics;
+ const pacing=dj.diagnostics?.provider?.pacing||{},until=Math.max(Number(pacing.cooldown_until||0),...(pacing.endpoint_cooldowns||[]).filter(x=>x.request_kind==='OTHER_ENDPOINT').map(x=>Number(x.until)||0));
+ if(until>Date.now()){report.blockedUntil=until;throw Error('Existing provider cooldown active; no probe sent')}
+ if(Number(dj.diagnostics?.quota?.remaining||0)<8)throw Error('Insufficient existing API budget; no probe sent');
+ report.batchGapMs=5000;report.batchDiagnostics=[];
  for(let i=0;i<ids.length;i+=20){
+  if(i)await new Promise(r=>setTimeout(r,report.batchGapMs));
   if(report.providerBatchesAttempted>=8)throw Error('Provider batch cap');report.providerBatchesAttempted++;
   const response=await fetch(url,{method:'POST',headers:{Authorization:'Bearer '+auth,'Content-Type':'application/json'},body:JSON.stringify({ids:ids.slice(i,i+20)}),signal:AbortSignal.timeout(60000)});
-  const result=await response.json();if(!response.ok||!result.ok)throw Error('Provider check failed: '+(result.error||response.status));
+  const result=await response.json();report.batchDiagnostics.push({batch:report.providerBatchesAttempted,ok:result.ok===true,diagnostics:result.diagnostics||null});if(!response.ok||!result.ok)throw Error('Provider check failed: '+(result.error||response.status));
   for(const f of result.rows||[]){const fid=f.fixture?.id,status=f.fixture?.status?.short;report.statuses??={};report.statuses[status]=(report.statuses[status]||0)+1;
    sources.push({id:'PROVIDER-FINAL-'+fid+'-'+result.at,fixture_id:fid,raw_fixture_id:fid,source:'PROVIDER_FINAL_REFRESH',status,raw_status:status,captured_at:result.at,fulltime_home:f.score?.fulltime?.home??null,fulltime_away:f.score?.fulltime?.away??null,halftime_home:f.score?.halftime?.home??null,halftime_away:f.score?.halftime?.away??null,raw_goals_home:f.goals?.home??null,raw_goals_away:f.goals?.away??null});
   }
