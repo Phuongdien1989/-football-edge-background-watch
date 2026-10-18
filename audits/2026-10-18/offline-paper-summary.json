@@ -1,0 +1,409 @@
+{
+  "mode": "OFFLINE_PAPER_RECONCILIATION",
+  "productionWrites": 0,
+  "providerCalls": 0,
+  "arithmetic_tests": "PASS",
+  "raw_source_records": 443,
+  "summaries": {
+    "FT": {
+      "all_snapshots": {
+        "records": 4583,
+        "fixtures": 64,
+        "reconciled": 223,
+        "reconciled_fixtures": 7,
+        "newly_computable_open": 219,
+        "positive": 43,
+        "negative": 180,
+        "push": 0,
+        "paper_unit_pl": -142.4,
+        "paper_roi_pct": -63.857,
+        "stored_mismatches": 0,
+        "unverifiable_reasons": {
+          "NO_ELIGIBLE_RAW_PERIOD_SCORE": 4360
+        }
+      },
+      "same_terms_minute_score_collapsed": {
+        "records": 355,
+        "fixtures": 64,
+        "reconciled": 23,
+        "reconciled_fixtures": 7,
+        "newly_computable_open": 22,
+        "positive": 6,
+        "negative": 17,
+        "push": 0,
+        "paper_unit_pl": -11.575,
+        "paper_roi_pct": -50.326,
+        "stored_mismatches": 0,
+        "unverifiable_reasons": {
+          "NO_ELIGIBLE_RAW_PERIOD_SCORE": 332
+        }
+      },
+      "first_per_fixture": {
+        "records": 64,
+        "fixtures": 64,
+        "reconciled": 7,
+        "reconciled_fixtures": 7,
+        "newly_computable_open": 6,
+        "positive": 3,
+        "negative": 4,
+        "push": 0,
+        "paper_unit_pl": -1.275,
+        "paper_roi_pct": -18.214,
+        "stored_mismatches": 0,
+        "unverifiable_reasons": {
+          "NO_ELIGIBLE_RAW_PERIOD_SCORE": 57
+        }
+      },
+      "first_by_policy": {
+        "CAUTION": {
+          "records": 32,
+          "fixtures": 32,
+          "reconciled": 6,
+          "reconciled_fixtures": 6,
+          "newly_computable_open": 6,
+          "positive": 3,
+          "negative": 3,
+          "push": 0,
+          "paper_unit_pl": -0.275,
+          "paper_roi_pct": -4.583,
+          "stored_mismatches": 0,
+          "unverifiable_reasons": {
+            "NO_ELIGIBLE_RAW_PERIOD_SCORE": 26
+          }
+        },
+        "WAIT_CONFIRM": {
+          "records": 32,
+          "fixtures": 32,
+          "reconciled": 1,
+          "reconciled_fixtures": 1,
+          "newly_computable_open": 0,
+          "positive": 0,
+          "negative": 1,
+          "push": 0,
+          "paper_unit_pl": -1.0,
+          "paper_roi_pct": -100.0,
+          "stored_mismatches": 0,
+          "unverifiable_reasons": {
+            "NO_ELIGIBLE_RAW_PERIOD_SCORE": 31
+          }
+        }
+      },
+      "first_by_utc_day": {
+        "2026-09-19": {
+          "records": 1,
+          "fixtures": 1,
+          "reconciled": 0,
+          "reconciled_fixtures": 0,
+          "newly_computable_open": 0,
+          "positive": 0,
+          "negative": 0,
+          "push": 0,
+          "paper_unit_pl": 0,
+          "paper_roi_pct": null,
+          "stored_mismatches": 0,
+          "unverifiable_reasons": {
+            "NO_ELIGIBLE_RAW_PERIOD_SCORE": 1
+          }
+        },
+        "2026-10-09": {
+          "records": 2,
+          "fixtures": 2,
+          "reconciled": 1,
+          "reconciled_fixtures": 1,
+          "newly_computable_open": 0,
+          "positive": 0,
+          "negative": 1,
+          "push": 0,
+          "paper_unit_pl": -1.0,
+          "paper_roi_pct": -100.0,
+          "stored_mismatches": 0,
+          "unverifiable_reasons": {
+            "NO_ELIGIBLE_RAW_PERIOD_SCORE": 1
+          }
+        },
+        "2026-10-11": {
+          "records": 1,
+          "fixtures": 1,
+          "reconciled": 1,
+          "reconciled_fixtures": 1,
+          "newly_computable_open": 1,
+          "positive": 0,
+          "negative": 1,
+          "push": 0,
+          "paper_unit_pl": -1.0,
+          "paper_roi_pct": -100.0,
+          "stored_mismatches": 0,
+          "unverifiable_reasons": {}
+        },
+        "2026-10-13": {
+          "records": 16,
+          "fixtures": 16,
+          "reconciled": 1,
+          "reconciled_fixtures": 1,
+          "newly_computable_open": 1,
+          "positive": 1,
+          "negative": 0,
+          "push": 0,
+          "paper_unit_pl": 0.75,
+          "paper_roi_pct": 75.0,
+          "stored_mismatches": 0,
+          "unverifiable_reasons": {
+            "NO_ELIGIBLE_RAW_PERIOD_SCORE": 15
+          }
+        },
+        "2026-10-14": {
+          "records": 6,
+          "fixtures": 6,
+          "reconciled": 1,
+          "reconciled_fixtures": 1,
+          "newly_computable_open": 1,
+          "positive": 1,
+          "negative": 0,
+          "push": 0,
+          "paper_unit_pl": 1.15,
+          "paper_roi_pct": 115.0,
+          "stored_mismatches": 0,
+          "unverifiable_reasons": {
+            "NO_ELIGIBLE_RAW_PERIOD_SCORE": 5
+          }
+        },
+        "2026-10-15": {
+          "records": 15,
+          "fixtures": 15,
+          "reconciled": 3,
+          "reconciled_fixtures": 3,
+          "newly_computable_open": 3,
+          "positive": 1,
+          "negative": 2,
+          "push": 0,
+          "paper_unit_pl": -1.175,
+          "paper_roi_pct": -39.167,
+          "stored_mismatches": 0,
+          "unverifiable_reasons": {
+            "NO_ELIGIBLE_RAW_PERIOD_SCORE": 12
+          }
+        },
+        "2026-10-16": {
+          "records": 18,
+          "fixtures": 18,
+          "reconciled": 0,
+          "reconciled_fixtures": 0,
+          "newly_computable_open": 0,
+          "positive": 0,
+          "negative": 0,
+          "push": 0,
+          "paper_unit_pl": 0,
+          "paper_roi_pct": null,
+          "stored_mismatches": 0,
+          "unverifiable_reasons": {
+            "NO_ELIGIBLE_RAW_PERIOD_SCORE": 18
+          }
+        },
+        "2026-10-17": {
+          "records": 5,
+          "fixtures": 5,
+          "reconciled": 0,
+          "reconciled_fixtures": 0,
+          "newly_computable_open": 0,
+          "positive": 0,
+          "negative": 0,
+          "push": 0,
+          "paper_unit_pl": 0,
+          "paper_roi_pct": null,
+          "stored_mismatches": 0,
+          "unverifiable_reasons": {
+            "NO_ELIGIBLE_RAW_PERIOD_SCORE": 5
+          }
+        }
+      }
+    },
+    "H1": {
+      "all_snapshots": {
+        "records": 9556,
+        "fixtures": 81,
+        "reconciled": 1791,
+        "reconciled_fixtures": 22,
+        "newly_computable_open": 1739,
+        "positive": 337,
+        "negative": 1454,
+        "push": 0,
+        "paper_unit_pl": -880.375,
+        "paper_roi_pct": -49.155,
+        "stored_mismatches": 0,
+        "unverifiable_reasons": {
+          "NO_ELIGIBLE_RAW_PERIOD_SCORE": 7765
+        }
+      },
+      "same_terms_minute_score_collapsed": {
+        "records": 532,
+        "fixtures": 81,
+        "reconciled": 122,
+        "reconciled_fixtures": 22,
+        "newly_computable_open": 119,
+        "positive": 27,
+        "negative": 95,
+        "push": 0,
+        "paper_unit_pl": -46.875,
+        "paper_roi_pct": -38.422,
+        "stored_mismatches": 0,
+        "unverifiable_reasons": {
+          "NO_ELIGIBLE_RAW_PERIOD_SCORE": 410
+        }
+      },
+      "first_per_fixture": {
+        "records": 81,
+        "fixtures": 81,
+        "reconciled": 22,
+        "reconciled_fixtures": 22,
+        "newly_computable_open": 20,
+        "positive": 10,
+        "negative": 12,
+        "push": 0,
+        "paper_unit_pl": 8.9,
+        "paper_roi_pct": 40.455,
+        "stored_mismatches": 0,
+        "unverifiable_reasons": {
+          "NO_ELIGIBLE_RAW_PERIOD_SCORE": 59
+        }
+      },
+      "first_by_policy": {
+        "CAUTION": {
+          "records": 53,
+          "fixtures": 53,
+          "reconciled": 16,
+          "reconciled_fixtures": 16,
+          "newly_computable_open": 14,
+          "positive": 9,
+          "negative": 7,
+          "push": 0,
+          "paper_unit_pl": 13.15,
+          "paper_roi_pct": 82.188,
+          "stored_mismatches": 0,
+          "unverifiable_reasons": {
+            "NO_ELIGIBLE_RAW_PERIOD_SCORE": 37
+          }
+        },
+        "WAIT_CONFIRM": {
+          "records": 28,
+          "fixtures": 28,
+          "reconciled": 6,
+          "reconciled_fixtures": 6,
+          "newly_computable_open": 6,
+          "positive": 1,
+          "negative": 5,
+          "push": 0,
+          "paper_unit_pl": -4.25,
+          "paper_roi_pct": -70.833,
+          "stored_mismatches": 0,
+          "unverifiable_reasons": {
+            "NO_ELIGIBLE_RAW_PERIOD_SCORE": 22
+          }
+        }
+      },
+      "first_by_utc_day": {
+        "2026-10-09": {
+          "records": 2,
+          "fixtures": 2,
+          "reconciled": 2,
+          "reconciled_fixtures": 2,
+          "newly_computable_open": 0,
+          "positive": 1,
+          "negative": 1,
+          "push": 0,
+          "paper_unit_pl": 0.025,
+          "paper_roi_pct": 1.25,
+          "stored_mismatches": 0,
+          "unverifiable_reasons": {}
+        },
+        "2026-10-13": {
+          "records": 18,
+          "fixtures": 18,
+          "reconciled": 6,
+          "reconciled_fixtures": 6,
+          "newly_computable_open": 6,
+          "positive": 0,
+          "negative": 6,
+          "push": 0,
+          "paper_unit_pl": -6.0,
+          "paper_roi_pct": -100.0,
+          "stored_mismatches": 0,
+          "unverifiable_reasons": {
+            "NO_ELIGIBLE_RAW_PERIOD_SCORE": 12
+          }
+        },
+        "2026-10-14": {
+          "records": 4,
+          "fixtures": 4,
+          "reconciled": 2,
+          "reconciled_fixtures": 2,
+          "newly_computable_open": 2,
+          "positive": 2,
+          "negative": 0,
+          "push": 0,
+          "paper_unit_pl": 3.55,
+          "paper_roi_pct": 177.5,
+          "stored_mismatches": 0,
+          "unverifiable_reasons": {
+            "NO_ELIGIBLE_RAW_PERIOD_SCORE": 2
+          }
+        },
+        "2026-10-15": {
+          "records": 18,
+          "fixtures": 18,
+          "reconciled": 7,
+          "reconciled_fixtures": 7,
+          "newly_computable_open": 7,
+          "positive": 6,
+          "negative": 1,
+          "push": 0,
+          "paper_unit_pl": 14.575,
+          "paper_roi_pct": 208.214,
+          "stored_mismatches": 0,
+          "unverifiable_reasons": {
+            "NO_ELIGIBLE_RAW_PERIOD_SCORE": 11
+          }
+        },
+        "2026-10-16": {
+          "records": 7,
+          "fixtures": 7,
+          "reconciled": 0,
+          "reconciled_fixtures": 0,
+          "newly_computable_open": 0,
+          "positive": 0,
+          "negative": 0,
+          "push": 0,
+          "paper_unit_pl": 0,
+          "paper_roi_pct": null,
+          "stored_mismatches": 0,
+          "unverifiable_reasons": {
+            "NO_ELIGIBLE_RAW_PERIOD_SCORE": 7
+          }
+        },
+        "2026-10-17": {
+          "records": 32,
+          "fixtures": 32,
+          "reconciled": 5,
+          "reconciled_fixtures": 5,
+          "newly_computable_open": 5,
+          "positive": 1,
+          "negative": 4,
+          "push": 0,
+          "paper_unit_pl": -3.25,
+          "paper_roi_pct": -65.0,
+          "stored_mismatches": 0,
+          "unverifiable_reasons": {
+            "NO_ELIGIBLE_RAW_PERIOD_SCORE": 27
+          }
+        }
+      }
+    }
+  },
+  "limitations": [
+    "Raw scores already stored by app, not independently rechecked with provider.",
+    "Assumes whole-period OU settlement as existing app specifies; not verified bookmaker tickets.",
+    "One first snapshot per fixture/engine selected before checking result availability; unresolved remain excluded and reported.",
+    "WAIT_CONFIRM/CAUTION samples are observational paper candidates, not approved bets.",
+    "Repeated snapshots and H1/FT on same fixture are correlated.",
+    "No production outcomes, engine rules, frontend or thresholds modified."
+  ]
+}
