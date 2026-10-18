@@ -1,4 +1,4 @@
-name: Football Edge OPEN settlement reconciliation READ ONLY
+name: Football Edge final-score history coverage READ ONLY
 on:
   push:
     branches: [diag/result-performance-readonly-20261018]
@@ -18,9 +18,9 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        run: node .github/scripts/settlement-reconcile-readonly.mjs
+        run: node .github/scripts/history-coverage-readonly.mjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: football-edge-settlement-reconciliation
-          path: football-edge-reconciliation-*.json
+          name: football-edge-history-coverage
+          path: football-edge-history-coverage.json
