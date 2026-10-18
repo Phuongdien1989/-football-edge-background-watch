@@ -48,14 +48,18 @@ try{
  report.production_version=await version(worker);assert.notEqual(report.production_version,original);
  let ok=false;for(let i=0;i<12;i++){try{await health(sha);ok=true;break}catch{await new Promise(r=>setTimeout(r,2000))}}assert(ok);
  const after=await cf('/workers/scripts/'+worker+'/settings');assert.deepEqual(bindingSignature(after),bindingSignature(settingsBefore));await clients();report.checks.live_settings_and_clients_unchanged='PASS';
- // Authenticated temporary bridge only reads existing diagnostics. No api() method call.
- const source=`export default {async fetch(r,e){if(r.headers.get('authorization')!=='Bearer '+e.CHECK_AUTH)return new Response('Unauthorized',{status:401});if(new URL(r.url).searchParams.has('ready'))return Response.json({ready:true});const s=e.PRODUCTION_DO.get(e.PRODUCTION_DO.idFromName('football-edge-global'));const d=await s.notifyDiagnostics();return Response.json({provider:d.provider,quota:d.global_api_quota});}}`;
- const form=new FormData();form.append('metadata',new Blob([JSON.stringify({main_module:'read.mjs',compatibility_date:'2026-10-01',bindings:[{type:'durable_object_namespace',name:'PRODUCTION_DO',namespace_id:namespace},{type:'secret_text',name:'CHECK_AUTH',text:auth}]})],{type:'application/json'}));form.append('read.mjs',new Blob([source],{type:'application/javascript+module'}),'read.mjs');
- await cf('/workers/scripts/'+helper,{method:'PUT',body:form});created=true;await cf('/workers/scripts/'+helper+'/subdomain',json({enabled:true}));const domain=await cf('/workers/subdomain'),url='https://'+helper+'.'+domain.subdomain+'.workers.dev/';
- let ready=false;for(let i=0;i<10;i++){const r=await fetch(url+'?ready=1',{headers:{Authorization:'Bearer '+auth},signal:AbortSignal.timeout(10000)});if(r.ok){ready=true;break}await new Promise(r=>setTimeout(r,2000))}assert(ready);
- const r=await fetch(url,{headers:{Authorization:'Bearer '+auth},signal:AbortSignal.timeout(20000)});assert(r.ok);report.stored_diagnostics=await r.json();assert('error_detail' in report.stored_diagnostics.provider.last_failure);await health(sha);await clients();assert.equal(await version(worker),report.production_version);report.deployed=true;report.checks.stored_error_read='PASS';
+ // Read existing diagnostics through the production health path after DO rollout propagation.
+ let detailReady=false;
+ for(let i=0;i<30;i++){
+  const r=await fetch(origin+'/health',{signal:AbortSignal.timeout(15000)}),h=await r.json();
+  if(r.ok&&h.deploy_commit===sha&&h.notify_status?.provider?.last_failure&&'error_detail' in h.notify_status.provider.last_failure){
+   report.stored_diagnostics={provider:h.notify_status.provider,quota:h.notify_status.global_api_quota};detailReady=true;break;
+  }
+  await new Promise(r=>setTimeout(r,2000));
  }
-}catch(e){report.errors.push(String(e.message||e).slice(0,350));if(attempted){try{await cf('/workers/scripts/'+worker+'/deployments',json({strategy:'percentage',versions:[{version_id:original,percentage:100}],annotations:{'workers/message':'Restore exact backend after read-only detail diagnostic failure'}}));assert.equal(await version(worker),original);await health(baseline);report.rollback='PASS'}catch{report.rollback='UNCONFIRMED'}}process.exitCode=1}
+ assert(detailReady,'DO_DIAGNOSTIC_ROLLOUT_NOT_VISIBLE');await health(sha);await clients();assert.equal(await version(worker),report.production_version);report.deployed=true;report.checks.stored_error_read='PASS';
+ }
+}catch(e){report.errors.push(String(e.message||e).slice(0,350));if(attempted){try{await cf('/workers/scripts/'+worker+'/deployments',json({strategy:'percentage',versions:[{version_id:original,percentage:100}],annotations:{'workers/message':'Restore exact backend after read-only detail diagnostic failure'}}));assert.equal(await version(worker),original);let restored=false;for(let i=0;i<25;i++){try{await health(baseline);restored=true;break}catch{await new Promise(r=>setTimeout(r,2000))}}assert(restored);report.rollback='PASS'}catch{report.rollback='UNCONFIRMED'}}process.exitCode=1}
 finally{
  if(created){try{await cf('/workers/scripts/'+helper,{method:'DELETE'});report.helper_cleanup=true}catch{report.helper_cleanup=false;process.exitCode=1}}
  try{unlinkSync('.provider-detail-wrangler.json')}catch{}
