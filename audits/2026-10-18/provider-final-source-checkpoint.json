@@ -1,0 +1,32 @@
+[
+  {
+    "id": "PROVIDER-FINAL-1555512-1792317799169",
+    "fixture_id": 1555512,
+    "raw_fixture_id": 1555512,
+    "source": "PROVIDER_FINAL_REFRESH",
+    "status": "FT",
+    "raw_status": "FT",
+    "captured_at": 1792317799169,
+    "fulltime_home": 1,
+    "fulltime_away": 2,
+    "halftime_home": 0,
+    "halftime_away": 1,
+    "raw_goals_home": 1,
+    "raw_goals_away": 2
+  },
+  {
+    "id": "PROVIDER-FINAL-1507451-1792317803117",
+    "fixture_id": 1507451,
+    "raw_fixture_id": 1507451,
+    "source": "PROVIDER_FINAL_REFRESH",
+    "status": "FT",
+    "raw_status": "FT",
+    "captured_at": 1792317803117,
+    "fulltime_home": 1,
+    "fulltime_away": 3,
+    "halftime_home": 0,
+    "halftime_away": 2,
+    "raw_goals_home": 1,
+    "raw_goals_away": 3
+  }
+]

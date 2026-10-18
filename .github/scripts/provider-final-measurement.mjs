@@ -1,5 +1,5 @@
 import {randomBytes} from 'node:crypto';
-import {writeFileSync,readFileSync} from 'node:fs';
+import {writeFileSync,readFileSync,existsSync} from 'node:fs';
 import assert from 'node:assert/strict';
 import {measureCohort,summarize,SCHEMA_SQL,INSERT_SQL,ledgerValues} from '../../central-entry-measurement.mjs';
 const a=process.env.CLOUDFLARE_ACCOUNT_ID,t=process.env.CLOUDFLARE_API_TOKEN;
@@ -24,7 +24,8 @@ const source=`export default {async fetch(request,env){
  }catch(e){return Response.json({ok:false,error:String(e.message||e).slice(0,180),diagnostics:await diagnostics()},{status:502})}
 }};`;
 let created=false,before=null,entries=[],sources=[];
-if(process.env.FE_RESUME_SOURCES_PATH){sources=JSON.parse(readFileSync(process.env.FE_RESUME_SOURCES_PATH));if(!Array.isArray(sources))throw Error('Invalid resume sources')}
+const resumePath=process.env.FE_RESUME_SOURCES_PATH||(existsSync('audits/2026-10-18/provider-final-source-checkpoint.json')?'audits/2026-10-18/provider-final-source-checkpoint.json':null);
+if(resumePath){sources=JSON.parse(readFileSync(resumePath));if(!Array.isArray(sources))throw Error('Invalid resume sources');report.resumedSourceCount=sources.length}
 try{
  before=await deployments();report.versionsBefore=before;
  const settings=await cf('/workers/scripts/'+worker+'/settings');
@@ -52,7 +53,7 @@ try{
   if(i)await new Promise(r=>setTimeout(r,report.batchGapMs));
   if(report.providerBatchesAttempted>=report.providerBatchCap)throw Error('Provider batch cap');report.providerBatchesAttempted++;
   const response=await fetch(url,{method:'POST',headers:{Authorization:'Bearer '+auth,'Content-Type':'application/json'},body:JSON.stringify({ids:ids.slice(i,i+report.batchSize),basic:report.batchSize===1}),signal:AbortSignal.timeout(60000)});
-  const result=await response.json();report.batchDiagnostics.push({batch:report.providerBatchesAttempted,ok:result.ok===true,diagnostics:result.diagnostics||null});if(!response.ok||!result.ok)throw Error('Provider check failed: '+(result.error||response.status));
+  const result=await response.json();report.batchDiagnostics.push({batch:report.providerBatchesAttempted,fixture_ids:ids.slice(i,i+report.batchSize),ok:result.ok===true,diagnostics:result.diagnostics||null});if(!response.ok||!result.ok)throw Error('Provider check failed: '+(result.error||response.status));
   for(const f of result.rows||[]){const fid=f.fixture?.id,status=f.fixture?.status?.short;report.statuses??={};report.statuses[status]=(report.statuses[status]||0)+1;
    sources.push({id:'PROVIDER-FINAL-'+fid+'-'+result.at,fixture_id:fid,raw_fixture_id:fid,source:'PROVIDER_FINAL_REFRESH',status,raw_status:status,captured_at:result.at,fulltime_home:f.score?.fulltime?.home??null,fulltime_away:f.score?.fulltime?.away??null,halftime_home:f.score?.halftime?.home??null,halftime_away:f.score?.halftime?.away??null,raw_goals_home:f.goals?.home??null,raw_goals_away:f.goals?.away??null});
   }

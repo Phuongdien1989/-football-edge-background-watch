@@ -1,0 +1,611 @@
+{
+  "at": "2026-10-18T10:03:12.785Z",
+  "mode": "BOUNDED_PROVIDER_CHECK_STAGING_ONLY",
+  "productionD1Writes": 0,
+  "providerBatchesAttempted": 3,
+  "providerBatchCap": 160,
+  "requestShape": "BASIC_SINGLE_ID",
+  "cleanup": true,
+  "errors": [
+    "Provider check failed: API_PROVIDER_RATE_LIMIT"
+  ],
+  "versionsBefore": {
+    "football-edge-background-watch": [
+      {
+        "version_id": "2be01a61-cc5d-43c7-9c6d-13e581296453",
+        "percentage": 100
+      }
+    ],
+    "shiny-silence-d892": [
+      {
+        "version_id": "03c1d55d-358a-448b-96f3-f356704831df",
+        "percentage": 100
+      }
+    ],
+    "football-edge-desktop-b2-test": [
+      {
+        "version_id": "a332ee39-abb2-422d-a021-db78ef19cc10",
+        "percentage": 100
+      }
+    ]
+  },
+  "entrySamples": 145,
+  "uniqueFixtures": 124,
+  "diagnosticsBefore": {
+    "at": 1792317797305,
+    "quota": {
+      "ok": true,
+      "schema": "FE_API_QUOTA_50000_GLOBAL_V1",
+      "day": "2026-10-18",
+      "used": 128,
+      "limit": 50000,
+      "remaining": 49872,
+      "utilization_pct": 0.26,
+      "hard_cap": true,
+      "pacing": false,
+      "accounting": "PREPAID_BLOCK_UPPER_BOUND",
+      "usage_note": "used includes prepaid reservations that may not have been sent; unused reservations are forfeited on restart",
+      "block_size": 64
+    },
+    "provider": {
+      "classification": "V2",
+      "latest": {
+        "at": 1792317666712,
+        "http": 200,
+        "code": "API_PROVIDER_RATE_LIMIT",
+        "limits": {
+          "daily_limit": null,
+          "daily_remaining": null,
+          "minute_limit": null,
+          "minute_remaining": null
+        },
+        "retry_after_ms": 0,
+        "rate_scope": "MINUTE",
+        "request_kind": "OTHER_ENDPOINT",
+        "cooldown_scope": "OTHER_ENDPOINT",
+        "response_count": 0
+      },
+      "last_failure": {
+        "at": 1792317666712,
+        "http": 200,
+        "code": "API_PROVIDER_RATE_LIMIT",
+        "limits": {
+          "daily_limit": null,
+          "daily_remaining": null,
+          "minute_limit": null,
+          "minute_remaining": null
+        },
+        "retry_after_ms": 0,
+        "rate_scope": "MINUTE",
+        "request_kind": "OTHER_ENDPOINT",
+        "cooldown_scope": "OTHER_ENDPOINT",
+        "response_count": 0
+      },
+      "pacing": {
+        "configured_minute_limit": 450,
+        "effective_minute_limit": 450,
+        "start_gap_ms": 143,
+        "bootstrap": true,
+        "cooldown_until": 0,
+        "consecutive_rate_failures": 0,
+        "endpoint_cooldowns": [
+          {
+            "request_kind": "OTHER_ENDPOINT",
+            "until": 1792317726712,
+            "failures": 3
+          },
+          {
+            "request_kind": "ODDS",
+            "until": 1792249878718,
+            "failures": 3
+          },
+          {
+            "request_kind": "EVENTS",
+            "until": 0,
+            "failures": 0
+          },
+          {
+            "request_kind": "STATISTICS",
+            "until": 1792249886167,
+            "failures": 3
+          },
+          {
+            "request_kind": "LIVE_WITH_TIMEZONE",
+            "until": 1792249920655,
+            "failures": 3
+          }
+        ],
+        "instance_physical_attempts": 0,
+        "instance_max_starts_per_second": 0
+      },
+      "probe": null
+    }
+  },
+  "batchGapMs": 2000,
+  "batchSize": 1,
+  "batchDiagnostics": [
+    {
+      "batch": 1,
+      "ok": true,
+      "diagnostics": {
+        "at": 1792317799393,
+        "quota": {
+          "ok": true,
+          "schema": "FE_API_QUOTA_50000_GLOBAL_V1",
+          "day": "2026-10-18",
+          "used": 192,
+          "limit": 50000,
+          "remaining": 49808,
+          "utilization_pct": 0.38,
+          "hard_cap": true,
+          "pacing": false,
+          "accounting": "PREPAID_BLOCK_UPPER_BOUND",
+          "usage_note": "used includes prepaid reservations that may not have been sent; unused reservations are forfeited on restart",
+          "block_size": 64
+        },
+        "provider": {
+          "classification": "V2",
+          "latest": {
+            "at": 1792317798982,
+            "http": 200,
+            "code": "OK",
+            "limits": {
+              "daily_limit": 75000,
+              "daily_remaining": 53861,
+              "minute_limit": 450,
+              "minute_remaining": 449
+            },
+            "retry_after_ms": 0,
+            "rate_scope": "UNSPECIFIED",
+            "request_kind": "OTHER_ENDPOINT",
+            "cooldown_scope": null,
+            "response_count": 1
+          },
+          "last_failure": {
+            "at": 1792317797721,
+            "http": 200,
+            "code": "API_PROVIDER_RATE_LIMIT",
+            "limits": {
+              "daily_limit": null,
+              "daily_remaining": null,
+              "minute_limit": null,
+              "minute_remaining": null
+            },
+            "retry_after_ms": 0,
+            "rate_scope": "MINUTE",
+            "request_kind": "OTHER_ENDPOINT",
+            "cooldown_scope": "OTHER_ENDPOINT",
+            "response_count": 0
+          },
+          "pacing": {
+            "configured_minute_limit": 450,
+            "effective_minute_limit": 450,
+            "start_gap_ms": 143,
+            "bootstrap": true,
+            "cooldown_until": 0,
+            "consecutive_rate_failures": 0,
+            "endpoint_cooldowns": [
+              {
+                "request_kind": "OTHER_ENDPOINT",
+                "until": 0,
+                "failures": 0
+              },
+              {
+                "request_kind": "ODDS",
+                "until": 1792249878718,
+                "failures": 3
+              },
+              {
+                "request_kind": "EVENTS",
+                "until": 0,
+                "failures": 0
+              },
+              {
+                "request_kind": "STATISTICS",
+                "until": 1792249886167,
+                "failures": 3
+              },
+              {
+                "request_kind": "LIVE_WITH_TIMEZONE",
+                "until": 1792249920655,
+                "failures": 3
+              }
+            ],
+            "instance_physical_attempts": 2,
+            "instance_max_starts_per_second": 1
+          },
+          "probe": null
+        }
+      }
+    },
+    {
+      "batch": 2,
+      "ok": true,
+      "diagnostics": {
+        "at": 1792317803339,
+        "quota": {
+          "ok": true,
+          "schema": "FE_API_QUOTA_50000_GLOBAL_V1",
+          "day": "2026-10-18",
+          "used": 192,
+          "limit": 50000,
+          "remaining": 49808,
+          "utilization_pct": 0.38,
+          "hard_cap": true,
+          "pacing": false,
+          "accounting": "PREPAID_BLOCK_UPPER_BOUND",
+          "usage_note": "used includes prepaid reservations that may not have been sent; unused reservations are forfeited on restart",
+          "block_size": 64
+        },
+        "provider": {
+          "classification": "V2",
+          "latest": {
+            "at": 1792317802964,
+            "http": 200,
+            "code": "OK",
+            "limits": {
+              "daily_limit": 75000,
+              "daily_remaining": 53860,
+              "minute_limit": 450,
+              "minute_remaining": 448
+            },
+            "retry_after_ms": 0,
+            "rate_scope": "UNSPECIFIED",
+            "request_kind": "OTHER_ENDPOINT",
+            "cooldown_scope": null,
+            "response_count": 1
+          },
+          "last_failure": {
+            "at": 1792317797721,
+            "http": 200,
+            "code": "API_PROVIDER_RATE_LIMIT",
+            "limits": {
+              "daily_limit": null,
+              "daily_remaining": null,
+              "minute_limit": null,
+              "minute_remaining": null
+            },
+            "retry_after_ms": 0,
+            "rate_scope": "MINUTE",
+            "request_kind": "OTHER_ENDPOINT",
+            "cooldown_scope": "OTHER_ENDPOINT",
+            "response_count": 0
+          },
+          "pacing": {
+            "configured_minute_limit": 450,
+            "effective_minute_limit": 450,
+            "start_gap_ms": 143,
+            "bootstrap": true,
+            "cooldown_until": 0,
+            "consecutive_rate_failures": 0,
+            "endpoint_cooldowns": [
+              {
+                "request_kind": "OTHER_ENDPOINT",
+                "until": 0,
+                "failures": 0
+              },
+              {
+                "request_kind": "ODDS",
+                "until": 1792249878718,
+                "failures": 3
+              },
+              {
+                "request_kind": "EVENTS",
+                "until": 0,
+                "failures": 0
+              },
+              {
+                "request_kind": "STATISTICS",
+                "until": 1792249886167,
+                "failures": 3
+              },
+              {
+                "request_kind": "LIVE_WITH_TIMEZONE",
+                "until": 1792249920655,
+                "failures": 3
+              }
+            ],
+            "instance_physical_attempts": 4,
+            "instance_max_starts_per_second": 1
+          },
+          "probe": null
+        }
+      }
+    },
+    {
+      "batch": 3,
+      "ok": false,
+      "diagnostics": {
+        "at": 1792317807244,
+        "quota": {
+          "ok": true,
+          "schema": "FE_API_QUOTA_50000_GLOBAL_V1",
+          "day": "2026-10-18",
+          "used": 192,
+          "limit": 50000,
+          "remaining": 49808,
+          "utilization_pct": 0.38,
+          "hard_cap": true,
+          "pacing": false,
+          "accounting": "PREPAID_BLOCK_UPPER_BOUND",
+          "usage_note": "used includes prepaid reservations that may not have been sent; unused reservations are forfeited on restart",
+          "block_size": 64
+        },
+        "provider": {
+          "classification": "V2",
+          "latest": {
+            "at": 1792317806862,
+            "http": 200,
+            "code": "API_PROVIDER_RATE_LIMIT",
+            "limits": {
+              "daily_limit": null,
+              "daily_remaining": null,
+              "minute_limit": null,
+              "minute_remaining": null
+            },
+            "retry_after_ms": 0,
+            "rate_scope": "MINUTE",
+            "request_kind": "OTHER_ENDPOINT",
+            "cooldown_scope": "OTHER_ENDPOINT",
+            "response_count": 0
+          },
+          "last_failure": {
+            "at": 1792317797721,
+            "http": 200,
+            "code": "API_PROVIDER_RATE_LIMIT",
+            "limits": {
+              "daily_limit": null,
+              "daily_remaining": null,
+              "minute_limit": null,
+              "minute_remaining": null
+            },
+            "retry_after_ms": 0,
+            "rate_scope": "MINUTE",
+            "request_kind": "OTHER_ENDPOINT",
+            "cooldown_scope": "OTHER_ENDPOINT",
+            "response_count": 0
+          },
+          "pacing": {
+            "configured_minute_limit": 450,
+            "effective_minute_limit": 450,
+            "start_gap_ms": 143,
+            "bootstrap": true,
+            "cooldown_until": 0,
+            "consecutive_rate_failures": 0,
+            "endpoint_cooldowns": [
+              {
+                "request_kind": "OTHER_ENDPOINT",
+                "until": 1792317808862,
+                "failures": 2
+              },
+              {
+                "request_kind": "ODDS",
+                "until": 1792249878718,
+                "failures": 3
+              },
+              {
+                "request_kind": "EVENTS",
+                "until": 0,
+                "failures": 0
+              },
+              {
+                "request_kind": "STATISTICS",
+                "until": 1792249886167,
+                "failures": 3
+              },
+              {
+                "request_kind": "LIVE_WITH_TIMEZONE",
+                "until": 1792249920655,
+                "failures": 3
+              }
+            ],
+            "instance_physical_attempts": 6,
+            "instance_max_starts_per_second": 1
+          },
+          "probe": null
+        }
+      }
+    }
+  ],
+  "statuses": {
+    "FT": 2
+  },
+  "partialSummary": {
+    "algorithm_version": "CENTRAL_ENTRY_PAPER_V1",
+    "selection": "FIRST_CAPTURE_PER_FIXTURE_ENGINE",
+    "real_bet_roi": null,
+    "engines": {
+      "FT": {
+        "samples": 64,
+        "reconciled": 2,
+        "unknown": 62,
+        "positive": 0,
+        "negative": 2,
+        "push": 0,
+        "paper_unit_pl": -2,
+        "paper_roi_pct": -100,
+        "unknown_reasons": {
+          "NO_CONFIRMED_RAW_PERIOD_SCORE": 62
+        }
+      },
+      "H1": {
+        "samples": 81,
+        "reconciled": 0,
+        "unknown": 81,
+        "positive": 0,
+        "negative": 0,
+        "push": 0,
+        "paper_unit_pl": 0,
+        "paper_roi_pct": null,
+        "unknown_reasons": {
+          "NO_CONFIRMED_RAW_PERIOD_SCORE": 81
+        }
+      }
+    }
+  },
+  "pendingSampleKeys": [
+    "FT:1493170",
+    "H1:1549813",
+    "H1:1643168",
+    "FT:1492408",
+    "H1:1629935",
+    "H1:1629936",
+    "H1:1629934",
+    "H1:1585780",
+    "H1:1629938",
+    "H1:1629937",
+    "FT:1585780",
+    "FT:1629937",
+    "FT:1629938",
+    "FT:1612256",
+    "FT:1557272",
+    "H1:1557258",
+    "FT:1557268",
+    "H1:1629939",
+    "H1:1557265",
+    "FT:1557269",
+    "FT:1557265",
+    "FT:1557258",
+    "FT:1557262",
+    "H1:1600358",
+    "H1:1600356",
+    "H1:1557260",
+    "FT:1584027",
+    "H1:1588848",
+    "H1:1557273",
+    "H1:1557266",
+    "H1:1557267",
+    "FT:1600356",
+    "H1:1557259",
+    "FT:1588848",
+    "FT:1563192",
+    "FT:1563193",
+    "FT:1644212",
+    "H1:1520920",
+    "FT:1520920",
+    "FT:1549745",
+    "H1:1639863",
+    "H1:1630362",
+    "FT:1629942",
+    "H1:1637492",
+    "FT:1637492",
+    "H1:1630363",
+    "FT:1642172",
+    "FT:1549721",
+    "H1:1490527",
+    "H1:1490528",
+    "H1:1490530",
+    "H1:1490529",
+    "H1:1490526",
+    "H1:1490531",
+    "H1:1640020",
+    "FT:1490538",
+    "FT:1490540",
+    "FT:1490539",
+    "FT:1630370",
+    "H1:1630372",
+    "H1:1630374",
+    "H1:1630373",
+    "FT:1630372",
+    "FT:1630371",
+    "FT:1630373",
+    "FT:1630374",
+    "H1:1603046",
+    "H1:1585784",
+    "H1:1515897",
+    "FT:1603046",
+    "FT:1585784",
+    "H1:1603047",
+    "FT:1603049",
+    "FT:1636350",
+    "FT:1636338",
+    "FT:1636419",
+    "H1:1636423",
+    "H1:1636295",
+    "H1:1564359",
+    "H1:1636236",
+    "FT:1636260",
+    "FT:1493190",
+    "FT:1640555",
+    "H1:1593680",
+    "FT:1593680",
+    "FT:1565502",
+    "H1:1523275",
+    "H1:1598044",
+    "FT:1523275",
+    "H1:1603050",
+    "FT:1552496",
+    "FT:1551838",
+    "FT:1567931",
+    "FT:1492782",
+    "FT:1492781",
+    "FT:1563205",
+    "FT:1570415",
+    "FT:1492784",
+    "FT:1619328",
+    "H1:1639825",
+    "H1:1549515",
+    "FT:1639825",
+    "H1:1520936",
+    "FT:1644698",
+    "FT:1493186",
+    "FT:1632035",
+    "H1:1619329",
+    "H1:1493185",
+    "FT:1619329",
+    "FT:1493185",
+    "H1:1497722",
+    "H1:1557430",
+    "H1:1548543",
+    "H1:1567928",
+    "H1:1575190",
+    "H1:1575188",
+    "H1:1557431",
+    "H1:1565275",
+    "H1:1552190",
+    "H1:1597941",
+    "H1:1638108",
+    "H1:1561942",
+    "H1:1560259",
+    "H1:1601558",
+    "H1:1567927",
+    "H1:1555523",
+    "H1:1600357",
+    "H1:1603052",
+    "H1:1639010",
+    "FT:1601558",
+    "H1:1555526",
+    "H1:1557434",
+    "FT:1553192",
+    "FT:1567927",
+    "H1:1553887",
+    "H1:1517368",
+    "H1:1561943",
+    "H1:1603045",
+    "H1:1493183",
+    "H1:1553191",
+    "H1:1576200",
+    "H1:1641299",
+    "H1:1508575"
+  ],
+  "versionsAfter": {
+    "football-edge-background-watch": [
+      {
+        "version_id": "2be01a61-cc5d-43c7-9c6d-13e581296453",
+        "percentage": 100
+      }
+    ],
+    "shiny-silence-d892": [
+      {
+        "version_id": "03c1d55d-358a-448b-96f3-f356704831df",
+        "percentage": 100
+      }
+    ],
+    "football-edge-desktop-b2-test": [
+      {
+        "version_id": "a332ee39-abb2-422d-a021-db78ef19cc10",
+        "percentage": 100
+      }
+    ]
+  }
+}
