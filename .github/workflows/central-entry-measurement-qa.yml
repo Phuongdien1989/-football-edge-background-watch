@@ -9,6 +9,11 @@ on:
       - '.github/scripts/provider-final-measurement.mjs'
       - '.github/workflows/central-entry-measurement-qa.yml'
   workflow_dispatch:
+    inputs:
+      verify_provider_finals:
+        description: Explicit bounded provider final-score refresh, respecting existing quota and cooldown
+        type: boolean
+        default: false
 jobs:
   verify:
     runs-on: ubuntu-latest
@@ -31,6 +36,7 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: node .github/scripts/central-entry-measurement-staging.mjs
       - name: Independently refresh final fixture scores in at most eight quota-controlled batches
+        if: github.event_name == 'workflow_dispatch' && inputs.verify_provider_finals
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
