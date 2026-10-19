@@ -1,4 +1,4 @@
-name: Read-only provider routing, bundle and historical versions audit
+name: Read-only routing and paused-alarm caller audit
 on:
   push:
     branches: [diag/provider-error-detail-20261018]
