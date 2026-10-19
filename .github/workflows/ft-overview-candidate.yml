@@ -5,6 +5,7 @@ on:
     paths: ['ft-overview/**', '.github/workflows/ft-overview-candidate.yml']
 jobs:
   qa:
+    if: "!contains(github.event.head_commit.message, '[opt-in-release]')"
     runs-on: ubuntu-latest
     timeout-minutes: 12
     permissions: {contents: read}
