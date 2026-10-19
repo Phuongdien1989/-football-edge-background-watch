@@ -53,4 +53,4 @@ export function mount(root,{demo=false,bridge=window.FEUIReadBridge,bundleBridge
   return Object.freeze({read:()=>store.export(),refresh:render,get refreshCount(){return refreshCount;},destroy:()=>{clearInterval(timer);root.removeEventListener('click',click);window.removeEventListener('fe-notify-sync-updated',render);document.removeEventListener('visibilitychange',render);}});
 }
 const root=document.querySelector('[data-ft-overview]');
-if(root)window.FTOverviewPreview=mount(root,{demo:document.documentElement.dataset.foDemo==='true'});
+if(root)window.FTOverviewPreview=mount(root,{demo:document.documentElement.dataset.foDemo==='true'&&new URLSearchParams(location.search).get('source')!=='bridge'});

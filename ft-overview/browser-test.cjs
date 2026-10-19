@@ -32,11 +32,10 @@ const assert=require('node:assert/strict');
   await page.locator('#ftOverviewCard').scrollIntoViewIfNeeded();await page.screenshot({path:'ft-overview/qa/integrated-390.png',fullPage:false});
   // Isolated adapter UI using a real-shaped bridge; expired stats cannot recommend.
   const live=await context.newPage();await live.addInitScript(()=>{
-    document.addEventListener('DOMContentLoaded',()=>document.documentElement.dataset.foDemo='false');
     const now=Date.now(),item={id:51,home:'<img src=x onerror=alert(1)>',away:'B',latest:{captured_at:now,minute:35,status:'1H',goals:{home:0,away:0},metrics:{total:{shots:7,sot:2}},stats_presence:{shots:true,sot:true}},eval:{score:80,scoreMode:'FULL'},history:[]};
     window.__fixture=item;window.FEUIReadBridge={read:()=>({h1WatchState:{items:[window.__fixture]},watchState:{items:[]},handicapWatchState:{pool:[]}})};
   });
-  await live.goto(origin+'/ft-overview/');await live.waitForSelector('.fo-card');
+  await live.goto(origin+'/ft-overview/?source=bridge');await live.waitForSelector('.fo-card');
   assert.equal(await live.locator('.fo-match img').count(),0);
   assert.ok((await live.locator('.fo-recommend').innerText()).includes('WAIT PRICE'));
   await live.evaluate(()=>{window.__fixture.latest.captured_at=Date.now()-120000;window.__fixture.id=52;FTOverviewPreview.refresh();});

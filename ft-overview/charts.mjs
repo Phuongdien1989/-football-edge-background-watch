@@ -10,7 +10,8 @@ export function trendChart(points,key) {
     for(const q of p){if(q.gap||q.key!==key||q[k]===null){flush();continue;}segment.push(q);}flush();
   }
   const labels=p.filter((_,i)=>i===0||i===p.length-1).map(q=>`<text x="${x(q.at)}" y="${h-5}" text-anchor="middle" font-size="10">${esc(q.minute)}′</text>`).join('');
-  return `<svg viewBox="0 0 ${w} ${h}" role="img" aria-label="Xác suất cùng kèo theo thời gian, từ 0 đến 100 phần trăm">${grid}${paths}${labels}</svg>`;
+  const events=p.filter((q,i)=>i>0&&q.goals&&p[i-1].goals&&(q.goals.home!==p[i-1].goals.home||q.goals.away!==p[i-1].goals.away)).map(q=>`<line x1="${x(q.at)}" x2="${x(q.at)}" y1="15" y2="${h-24}" stroke="#668099" stroke-dasharray="3 3"/><text x="${x(q.at)}" y="10" text-anchor="middle" font-size="9">${esc(q.goals.home)}–${esc(q.goals.away)}</text>`).join('');
+  return `<svg viewBox="0 0 ${w} ${h}" role="img" aria-label="Xác suất cùng kèo theo thời gian, từ 0 đến 100 phần trăm">${grid}${paths}${events}${labels}</svg>`;
 }
 export function barsChart(pmf,goals,line) {
   if(!pmf)return '<div class="fo-empty">Chờ phân phối bàn độc lập.</div>';
