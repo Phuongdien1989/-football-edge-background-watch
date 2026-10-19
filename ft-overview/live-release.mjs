@@ -33,7 +33,8 @@ try{
  report.original_shape={content_type:content.headers.get('content-type'),entry,bytes:main.bytes.length,module_names:modules.map(m=>m.name),asset_bindings:assetBindings.map(b=>b.name),default_export:/export\s*(?:default|\{[^}]*default)/.test(code),classic_fetch:/addEventListener\s*\(\s*['"]fetch/.test(code),json_keys:(()=>{try{return Object.keys(JSON.parse(code));}catch{return null;}})()};
  if(!report.original_shape.default_export){
   const stripped=code.replace(/\/\*[\s\S]*?\*\//g,'').replace(/^\s*\/\/.*$/gm,'').trim();
-  assert(stripped===''&&assetBindings.length===1,'UNSUPPORTED_ORIGINAL_HANDLER_SHAPE');
+  assert(stripped===''&&assetBindings.length<=1,'UNSUPPORTED_ORIGINAL_HANDLER_SHAPE');
+  if(!assetBindings.length)assetBindings.push({type:'assets',name:'FE_OVERVIEW_ORIGINAL_ASSETS'});
   main.bytes=new TextEncoder().encode('export default {fetch(request,env){return env['+JSON.stringify(assetBindings[0].name)+'].fetch(request)}};');
   main.type='application/javascript+module';report.original_shape.assets_only_adapter=true;
  }
@@ -48,7 +49,7 @@ try{
  files['index.html']=files['index.html'].replaceAll('./ft-overview/','/ft-overview/');
  const worker=liveWrapper(files,entry),form=new FormData();
  const config={...(settings.assets?.config||{})};const oldFirst=config.run_worker_first;config.run_worker_first=oldFirst===true?true:[...new Set([...(Array.isArray(oldFirst)?oldFirst:[]),'/ft-overview-live','/ft-overview-live/','/ft-overview/*'])];
- const metadata={main_module:'fe-overview-entry.mjs',compatibility_date:settings.compatibility_date||'2026-10-01',compatibility_flags:settings.compatibility_flags||[],keep_assets:true,assets:{config},keep_bindings:['plain_text','secret_text'],bindings:(settings.bindings||[]).filter(b=>b.type==='assets').map(b=>({name:b.name,type:'assets'})),tags:settings.tags||[]};
+ const metadata={main_module:'fe-overview-entry.mjs',compatibility_date:settings.compatibility_date||'2026-10-01',compatibility_flags:settings.compatibility_flags||[],keep_assets:true,assets:{config},keep_bindings:['plain_text','secret_text'],bindings:assetBindings.map(b=>({name:b.name,type:'assets'})),tags:settings.tags||[]};
  form.append('metadata',new Blob([JSON.stringify(metadata)],{type:'application/json'}));
  for(const m of modules)form.append(m.name,new Blob([m.bytes],{type:m.type}),m.name);
  form.append('fe-overview-entry.mjs',new Blob([worker],{type:'application/javascript+module'}),'fe-overview-entry.mjs');
