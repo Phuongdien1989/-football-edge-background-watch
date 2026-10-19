@@ -20,7 +20,7 @@ try{
  report.version_metadata=[];
  for(const id of [report.versions_before[worker]?.[0]?.version_id,'0ce2f6fb-7bbb-4a92-9e6c-10a5caf78127']){
   if(!id)continue;const v=await get('/workers/scripts/'+worker+'/versions/'+id);
-  report.version_metadata.push({id,keys:Object.keys(v),metadata:v.metadata,resources_keys:Object.keys(v.resources||{}),script:v.resources?.script,do_bindings:(v.resources?.bindings||[]).filter(x=>x.type==='durable_object_namespace')});
+  report.version_metadata.push({id,keys:Object.keys(v),metadata:{created_on:v.metadata?.created_on,source:v.metadata?.source},resources_keys:Object.keys(v.resources||{}),script:v.resources?.script,do_bindings:(v.resources?.bindings||[]).filter(x=>x.type==='durable_object_namespace')});
  }
  const cr=await fetch(root+'/workers/scripts/'+worker+'/content/v2',{headers:{Authorization:'Bearer '+t},signal:AbortSignal.timeout(25000)});
  if(!cr.ok)throw Error('SCRIPT_CONTENT_'+cr.status);const source=await cr.text();report.latest_uploaded_content=signature(source);
@@ -29,6 +29,11 @@ try{
  report.local_bundles=readdirSync('.routing-bundle').filter(x=>/\.m?js$/.test(x)).map(n=>({file:n,...signature(readFileSync('.routing-bundle/'+n,'utf8'))}));
  const h=await fetch('https://'+worker+'.ngophuonghuy.workers.dev/health',{signal:AbortSignal.timeout(20000)});const b=await h.json();
  report.health={status:h.status,commit:b.deploy_commit,scanner:b.peak_status?.enabled,manual:b.peak_status?.manualEnabled,alarm:b.next_alarm,has_error_detail:'error_detail' in (b.notify_status?.provider?.last_failure||{}),provider:b.notify_status?.provider,quota:b.notify_status?.global_api_quota};
+ // Historical observability query only; never invokes the football provider.
+ const from=Date.parse('2026-10-18T10:19:30Z'),to=Date.parse('2026-10-18T10:25:30Z');
+ const lr=await fetch(root+'/workers/observability/telemetry/query',{method:'POST',headers:{Authorization:'Bearer '+t,'Content-Type':'application/json'},body:JSON.stringify({queryId:'fe-readonly-rollout-version-audit',timeframe:{from,to},view:'events',parameters:{datasets:[],needle:{value:worker}},limit:300,dry:true}),signal:AbortSignal.timeout(25000)});
+ const lj=await lr.json();
+ report.historical_logs={http:lr.status,status:lj.result?.run?.status,count:lj.result?.events?.count,events:(lj.result?.events?.events||[]).map(e=>{const m=e['$metadata']||{},w=e['$workers']||{};return {at:e.timestamp||m.timestamp,metadata_keys:Object.keys(m),workers_keys:Object.keys(w),service:m.service,scriptName:m.scriptName,scriptVersion:w.scriptVersion,version:m.version,trigger:w.event?.request?.url?new URL(w.event.request.url).pathname:null,type:w.eventType,outcome:w.outcome}})};
  report.versions_after={};for(const n of Object.keys(report.versions_before))report.versions_after[n]=await active(n);
  assert.deepEqual(report.versions_after,report.versions_before);report.versions_unchanged=true;
 }catch(e){report.errors.push(String(e.message||e).slice(0,300));process.exitCode=1}
