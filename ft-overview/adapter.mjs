@@ -14,7 +14,7 @@ export function marketFromRows(rows, s) {
     const updated=r.update==null?null:time(r.update);
     if(r.update!=null&&(updated===null||updated>s.at+5000))continue;
     const candidates=[...groups.values()].sort((a,b)=>Number(b.line===number(r.main_line))-Number(a.line===number(r.main_line)));
-    for(const g of candidates) if(g.over>1&&g.under>1) return {...g,period:'FT',basis:'FULL_MATCH',bookmaker:r.bookmaker?.name || (typeof r.bookmaker==='string'?r.bookmaker:null) || 'API_FOOTBALL_LIVE_FEED',at:updated??s.at,score:{...s.goals},timestampBasis:updated===null?'SNAPSHOT_RECEIPT':'PROVIDER_UPDATE',settlementAssumption:'STANDARD_FULL_MATCH_TOTAL_90_MIN'};
+    for(const g of candidates) if(g.over>1&&g.under>1&&Number.isInteger(s.goals?.home)&&Number.isInteger(s.goals?.away)&&g.line>s.goals.home+s.goals.away) return {...g,period:'FT',basis:'FULL_MATCH',bookmaker:r.bookmaker?.name || (typeof r.bookmaker==='string'?r.bookmaker:null) || 'API_FOOTBALL_LIVE_FEED',at:updated??s.at,score:{...s.goals},timestampBasis:updated===null?'SNAPSHOT_RECEIPT':'PROVIDER_UPDATE',settlementAssumption:'STANDARD_FULL_MATCH_TOTAL_90_MIN'};
   }
   return null;
 }

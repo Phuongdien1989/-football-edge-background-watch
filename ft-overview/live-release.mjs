@@ -6,7 +6,7 @@ const a=process.env.CLOUDFLARE_ACCOUNT_ID,t=process.env.CLOUDFLARE_API_TOKEN;
 assert(a&&t,'CLOUDFLARE_AUTH_MISSING');
 const name='shiny-silence-d892',base='https://'+name+'.ngophuonghuy.workers.dev',api='https://api.cloudflare.com/client/v4/accounts/'+encodeURIComponent(a)+'/workers/scripts/';
 const rollback='ac8c0da2-551c-4561-a554-efd4c09339ad',originalHash='aa4f0f6318cd52c14ff62b195c5ea04c5267107455924da44c9aa78169fe7f28';
-const expected={[name]:rollback,'football-edge-background-watch':'04cc044d-412f-4844-9b83-c7c786eedd13','football-edge-desktop-b2-test':'a332ee39-abb2-422d-a021-db78ef19cc10'},hash=x=>createHash('sha256').update(x).digest('hex');
+const expected={[name]:'2accc746-978b-4758-bc4d-e13c1f78fc68','football-edge-background-watch':'04cc044d-412f-4844-9b83-c7c786eedd13','football-edge-desktop-b2-test':'a332ee39-abb2-422d-a021-db78ef19cc10'},hash=x=>createHash('sha256').update(x).digest('hex');
 async function cf(path,options={}){const r=await fetch(api+path,{...options,headers:{Authorization:'Bearer '+t,...options.headers},signal:AbortSignal.timeout(30000)}),j=await r.json();assert(r.ok&&j.success,'CF_'+r.status+'_'+(j.errors||[]).map(x=>x.code).join(','));return j.result;}
 async function active(n){const v=(await cf(n+'/deployments')).deployments?.[0]?.versions;assert(v?.length===1&&v[0].percentage===100,'SPLIT_DEPLOYMENT');return v[0].version_id;}
 async function versions(){const out={};for(const n of Object.keys(expected))out[n]=await active(n);return out;}

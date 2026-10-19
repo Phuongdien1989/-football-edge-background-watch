@@ -86,7 +86,7 @@ export function assess(snapshot, now,{trialRecommendations=false}={}) {
   const terminal = ['FT','AET','PEN','CANC','ABD','AWD','WO'].includes(snapshot.status);
   const fresh = valid && now - at <= (snapshot.status === 'NS' ? 15 * 60000 : 60000);
   const blocked = !valid || terminal || !fresh || ['ET','BT','P','INT','SUSP'].includes(snapshot.status) || snapshot.statsError || snapshot.cooldownUntil > now;
-  const market = snapshot.market, marketFresh = !!market && validTime(market.at, now) && now - market.at <= (snapshot.status === 'NS' ? 15 * 60000 : 60000) && market.at >= (snapshot.eventAt || 0) && market.score?.home === goals.home && market.score?.away === goals.away && market.period === 'FT' && market.basis === 'FULL_MATCH';
+  const market = snapshot.market, marketFresh = valid && !!market && number(market.line)!==null && market.line>goals.home+goals.away && validTime(market.at, now) && now - market.at <= (snapshot.status === 'NS' ? 15 * 60000 : 60000) && market.at >= (snapshot.eventAt || 0) && market.score?.home === goals.home && market.score?.away === goals.away && market.period === 'FT' && market.basis === 'FULL_MATCH';
   const model = snapshot.model, modelOK = !!model?.independent && !!model.version && model.at === at && validatePMF(model.pmf);
   const quote = modelOK && marketFresh ? priceOver(model.pmf, goals.home + goals.away, market.line, market.over) : null;
   const binary = marketFresh ? noVig(market) : null;
