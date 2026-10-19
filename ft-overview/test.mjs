@@ -5,6 +5,7 @@ import {readLegacy,marketFromRows} from './adapter.mjs';
 import {demoSnapshots} from './demo.mjs';
 import {trendChart} from './charts.mjs';
 import {runInNewContext} from 'node:vm';
+import {storedRowsToInputs,auditStoredInputs} from './stored-replay.mjs';
 let tests=0;const test=(name,fn)=>{fn();tests++;console.log('PASS '+name);};
 const now=Date.UTC(2026,9,19,10,0),sample=()=>demoSnapshots(now)[0];
 test('Missing data and booleans never become numeric zero',()=>{for(const v of [null,undefined,'',false,true])assert.equal(number(v),null);assert.equal(number(0),0);});
@@ -76,6 +77,14 @@ test('Read bridge caches multiple DEEP fixtures, bounded, detached and without t
  const context={state:{lastBundle:null},window:{},watchState:{items:[]},h1WatchState:{items:[]},handicapWatchState:{pool:[]},feUICopy:x=>JSON.parse(JSON.stringify(x)),Date:{now:()=>now}};
  runInNewContext(bridge+';for(let id=1;id<=55;id++){const b={meta:{fixture_id:id},normalized:{home_recent:[],away_recent:[]}};state.lastBundle=b;foRemember(b);}',context);
  const rows=context.window.FEOverviewInputBridge.read();assert.equal(rows.length,50);assert.equal(rows[0].meta.fixture_id,6);assert.equal(rows.at(-1).meta.fixture_id,55);rows[0].meta.fixture_id=999;assert.equal(context.window.FEOverviewInputBridge.read()[0].meta.fixture_id,6);context.Date.now=()=>now+500000;assert.equal(context.window.FEOverviewInputBridge.read()[0].observed_at,now);
+});
+test('Production stored replay exports football whitelist only and never renews old timestamps',()=>{
+ const s=sample(),item={id:s.id,token:'DO_NOT_EXPORT',devices:{secret:'DO_NOT_EXPORT'},last:{sourceHealth:{stats:'OK',events:'OK'}},ui:{captured_at:now,fixture:{fixture:{id:s.id,status:{short:'2H',elapsed:60}},teams:{home:{name:'A'},away:{name:'B'}},goals:s.goals},snapshot:{captured_at:now,goals:s.goals,metrics:{total:{sot:0}},stats_presence:{sot:true},apiKey:'DO_NOT_EXPORT'}}};
+ const p=storedRowsToInputs([{fixture_id:s.id,payload:JSON.stringify(item)}]);assert.equal(p.inputs[0].metrics.sot,0);assert.equal(p.inputs[0].model,null);assert.equal(p.inputs[0].at,now);assert.ok(!JSON.stringify(p).includes('DO_NOT_EXPORT'));
+ const r=auditStoredInputs(p,now+120000);assert.equal(r.matches[0].entry_now,'STALE');assert.equal(r.top.length,0);assert.equal(r.matches[0].live_action,'NO_LIVE_RECOMMENDATION');assert.equal(r.provider_calls,0);
+});
+test('Stored tombstones, invalid snapshots and fixture mismatch do not reappear as matches',()=>{
+ const p=storedRowsToInputs([{fixture_id:1,payload:'{"__fe_deleted":true}'},{fixture_id:2,payload:'bad'},{fixture_id:3,payload:JSON.stringify({id:3,ui:{captured_at:now,fixture:{fixture:{id:4}}}})}]);assert.equal(p.inputs.length,0);assert.equal(p.rejected.length,2);
 });
 test('Module integration cannot write legacy store or send notifications',()=>{
   for(const p of ['core.mjs','adapter.mjs','charts.mjs','ui.mjs']){

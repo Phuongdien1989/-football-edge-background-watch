@@ -4,10 +4,10 @@ import {trendChart,barsChart,priceChart} from './charts.mjs';
 import {demoSnapshots} from './demo.mjs';
 const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const pct=x=>typeof x==='number'&&Number.isFinite(x)?`${(100*x).toFixed(1)}%`:'—';
-export function mount(root,{demo=false,bridge=window.FEUIReadBridge,bundleBridge=window.FEOverviewInputBridge}={}) {
+export function mount(root,{demo=false,bridge=window.FEUIReadBridge,bundleBridge=window.FEOverviewInputBridge,inputSource=null,controlSource=null,archive=false}={}) {
   const store=createStore();let selected=null,lastHTML='',demoTime=Date.now(),refreshCount=0;
   const storageKey='FE_FT_OVERVIEW_RESEARCH_V1';let lastSaved='';
-  if(!demo)try{const saved=sessionStorage.getItem(storageKey);if(saved)store.restore(JSON.parse(saved));}catch{}
+  if(!demo&&!archive)try{const saved=sessionStorage.getItem(storageKey);if(saved)store.restore(JSON.parse(saved));}catch{}
   const snapshots=demo?demoSnapshots(demoTime):[];
   if(demo) {
     // Seed genuine, explicitly fictional per-contract historical observations.
@@ -21,11 +21,11 @@ export function mount(root,{demo=false,bridge=window.FEUIReadBridge,bundleBridge
   function render() {
     if(document.visibilityState==='hidden')return;
     const now=demo?demoTime:Date.now();
-    if(!demo)for(const row of readLegacy(bridge,bundleBridge))store.ingest(row);
-    const rows=store.read(now,{controls:demo?[]:bundleBridge?.readControls?.()||[]}),top=rows.filter(r=>r.rank&&r.rank<=5);
+    if(!demo)for(const row of inputSource?inputSource():readLegacy(bridge,bundleBridge))store.ingest(row);
+    const rows=store.read(now,{controls:demo?[]:controlSource?controlSource():bundleBridge?.readControls?.()||[]}),top=rows.filter(r=>r.rank&&r.rank<=5);
     if(!rows.some(r=>r.id===selected))selected=top[0]?.id||rows[0]?.id;
     const r=rows.find(x=>x.id===selected),s=r?.snapshot,m=s?.market;
-    let html=`<header class="fo-header"><div><small>FOOTBALL EDGE · ${demo?'DỮ LIỆU MINH HỌA':'BẢN THỬ ĐỌC DỮ LIỆU'}</small><h2>FT OVERVIEW</h2></div><span class="fo-chip">${demo?'DEMO':'SHADOW'}</span></header>`;
+    let html=`<header class="fo-header"><div><small>FOOTBALL EDGE · ${demo?'DỮ LIỆU MINH HỌA':archive?'DỮ LIỆU THẬT ĐÃ LƯU':'BẢN THỬ ĐỌC DỮ LIỆU'}</small><h2>FT OVERVIEW</h2></div><span class="fo-chip">${demo?'DEMO':archive?'ARCHIVE':'SHADOW'}</span></header>`;
     html+=`<nav class="fo-top" aria-label="TOP theo dõi">${top.map(x=>`<button data-select="${x.id}" title="${esc(x.snapshot.home+' – '+x.snapshot.away)}" aria-label="TOP ${x.rank}: ${esc(x.snapshot.home+' – '+x.snapshot.away)}" aria-pressed="${x.id===selected}">TOP ${x.rank}<small>${esc(x.snapshot.home)}</small></button>`).join('') || '<span>Chưa có trận đang cập nhật</span>'}</nav>`;
     if(!r)html+='<div class="fo-card fo-empty"><h3>Đang chờ dữ liệu app</h3><p>Mở một trận có dữ liệu trong HT / FT / HC. Overview dùng snapshot sẵn có; không tự gọi API.</p></div>';
     else {
@@ -42,7 +42,7 @@ export function mount(root,{demo=false,bridge=window.FEUIReadBridge,bundleBridge
     }
     html+='<p class="fo-note">Bản thử riêng · HT / FT / HC và TOP gốc vẫn giữ nguyên · '+esc(VERSION)+'</p>';
     if(html!==lastHTML){const open=[...root.querySelectorAll('details')].map(x=>x.open),focus=root.contains(document.activeElement)?document.activeElement?.dataset.select:null;root.innerHTML=html;root.querySelectorAll('details').forEach((x,i)=>{x.open=!!open[i];});if(focus)root.querySelector('[data-select="'+Number(focus)+'"]')?.focus({preventScroll:true});lastHTML=html;}
-    if(!demo)try{const saved=JSON.stringify(store.export());if(saved!==lastSaved&&saved.length<1500000){sessionStorage.setItem(storageKey,saved);lastSaved=saved;}}catch{}
+    if(!demo&&!archive)try{const saved=JSON.stringify(store.export());if(saved!==lastSaved&&saved.length<1500000){sessionStorage.setItem(storageKey,saved);lastSaved=saved;}}catch{}
     refreshCount++;
   }
   const click=e=>{const b=e.target.closest('[data-select]');if(b){selected=Number(b.dataset.select);render();}if(e.target.closest('[data-export]')){
@@ -51,9 +51,9 @@ export function mount(root,{demo=false,bridge=window.FEUIReadBridge,bundleBridge
   }};
   root.addEventListener('click',click);window.addEventListener('fe-notify-sync-updated',render);document.addEventListener('visibilitychange',render);
   render();const timer=setInterval(render,3000);
-  return Object.freeze({read:()=>store.export(),refresh:render,get refreshCount(){return refreshCount;},destroy:()=>{clearInterval(timer);root.removeEventListener('click',click);window.removeEventListener('fe-notify-sync-updated',render);document.removeEventListener('visibilitychange',render);}});
+  return Object.freeze({read:()=>store.export(),refresh:render,select:id=>{selected=Number(id);render();},get refreshCount(){return refreshCount;},destroy:()=>{clearInterval(timer);root.removeEventListener('click',click);window.removeEventListener('fe-notify-sync-updated',render);document.removeEventListener('visibilitychange',render);}});
 }
 const root=document.querySelector('[data-ft-overview]');
-if(root)window.FTOverviewPreview=mount(root,{demo:document.documentElement.dataset.foDemo==='true'&&new URLSearchParams(location.search).get('source')!=='bridge'});
+if(root&&!root.hasAttribute('data-fo-manual'))window.FTOverviewPreview=mount(root,{demo:document.documentElement.dataset.foDemo==='true'&&new URLSearchParams(location.search).get('source')!=='bridge'});
 const native=document.querySelector('#ftOverviewCard');
 if(native){const label=native.querySelector('.fo-native-toggle');const sync=()=>{if(label)label.textContent=native.open?'CLOSE':'OPEN';};native.addEventListener('toggle',sync);sync();}

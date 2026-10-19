@@ -21,6 +21,7 @@ if(exists.status!==404){
  if(!exists.ok||!existing.success||!existing.result?.tags?.includes('ft-overview-demo-only-20261019')||(existing.result.bindings||[]).length)throw Error('PREVIEW_TARGET_NOT_OWNED_ISOLATED_DEMO_'+exists.status);
 }
 const files={};for(const p of ['index.html','style.css','core.mjs','adapter.mjs','charts.mjs','demo.mjs','ui.mjs'])files['/'+p]=readFileSync('ft-overview/'+p,'utf8');
+for(const p of ['replay.html','replay-ui.mjs','replay-data.mjs'])files['/'+p]=readFileSync('ft-overview/'+p,'utf8');
 // Render the actual pinned original app at a separate, read-only layout route.
 const original=await fetch('https://shiny-silence-d892.ngophuonghuy.workers.dev/',{signal:AbortSignal.timeout(30000)});
 if(!original.ok)throw Error('ORIGINAL_HTML_UNAVAILABLE');writeFileSync('/tmp/fo-preview-original.html',await original.text());

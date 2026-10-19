@@ -50,10 +50,30 @@ model, settlement-aware market inversion for quarter lines, confidence intervals
 ranking validation, outcome-ledger integration and combined Push remain to be built
 and accepted before production. Existing upstream statistics failure is unchanged.
 
-The isolated published preview serves only DEMO assets, has zero bindings and a
+The isolated published preview serves DEMO, layout and sanitized stored replay assets, has zero bindings and a
 `connect-src 'none'` CSP. It cannot contact backend/provider or alter production.
 
 No claim of production release, restored statistics or proven betting performance.
+
+## Real stored-input audit
+
+`capture-stored.mjs` performs one bounded SELECT of at most 50 production
+`fe_notify_live_state` rows through the authenticated D1 query API. It requires
+`meta.rows_written === 0`, checks all original deployment versions before/after,
+and never calls a DO/scanner/provider or changes production configuration.
+`stored-replay.mjs` explicitly whitelists football fields; stored tokens, devices,
+subscriptions and preferences are never written into the report or preview.
+
+The replay at `/replay.html` displays original source times with actual current
+freshness. STALE records remain STALE; the clock is not rewound to make TOP fill.
+It has an explicit archive label and a selector for inspecting all retained
+fixtures even if none can enter current TOP. It does not share session storage
+with the live-input candidate. The independent model is absent unless a separate
+valid source supplies one; old scores never become invented probabilities.
+
+The workflow report distinguishes technical read/replay PASS from unproven live
+model/recommendation acceptance. A successful capture is not a successful LIVE
+scan, a restored upstream endpoint, or evidence of forecasting profitability.
 
 ## Input compatibility hardening
 
