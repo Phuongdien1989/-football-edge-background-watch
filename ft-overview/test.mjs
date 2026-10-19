@@ -5,7 +5,7 @@ import {readLegacy,marketFromRows} from './adapter.mjs';
 import {demoSnapshots} from './demo.mjs';
 import {trendChart} from './charts.mjs';
 import {runInNewContext} from 'node:vm';
-import {storedRowsToInputs,auditStoredInputs} from './stored-replay.mjs';
+import {storedRowsToInputs,auditStoredInputs,sourceDetailRowsToInputs} from './stored-replay.mjs';
 let tests=0;const test=(name,fn)=>{fn();tests++;console.log('PASS '+name);};
 const now=Date.UTC(2026,9,19,10,0),sample=()=>demoSnapshots(now)[0];
 test('Missing data and booleans never become numeric zero',()=>{for(const v of [null,undefined,'',false,true])assert.equal(number(v),null);assert.equal(number(0),0);});
@@ -85,6 +85,12 @@ test('Production stored replay exports football whitelist only and never renews 
 });
 test('Stored tombstones, invalid snapshots and fixture mismatch do not reappear as matches',()=>{
  const p=storedRowsToInputs([{fixture_id:1,payload:'{"__fe_deleted":true}'},{fixture_id:2,payload:'bad'},{fixture_id:3,payload:JSON.stringify({id:3,ui:{captured_at:now,fixture:{fixture:{id:4}}}})}]);assert.equal(p.inputs.length,0);assert.equal(p.rejected.length,2);
+});
+test('Source-detail replay uses existing normalization and groups observations without inventing a model',()=>{
+ const f={fixture:{id:55,status:{short:'2H',elapsed:60}},teams:{home:{name:'A'},away:{name:'B'}},goals:{home:0,away:1}},engine={statMap:()=>({}),watchStatsPresence:()=>({core:true,sot:true}),watchAggregate:()=>({total:{sot:0}}),normalizeLiveMarkets:()=>[]};
+ const row={fixture_id:55,captured_at:now,score_home:0,score_away:1,payload_json:JSON.stringify({fixture:f,stats_raw:[],secret:'DO_NOT_EXPORT'})};
+ const p=sourceDetailRowsToInputs([row,{...row,captured_at:now-180000}],engine);assert.equal(p.inputs.length,1);assert.equal(p.inputs[0].history.length,1);assert.equal(p.inputs[0].sourceKind,'STORED_SOURCE_DETAIL_NORMALIZED');assert.equal(p.inputs[0].metrics.sot,0);assert.equal(p.inputs[0].model,null);assert.ok(!JSON.stringify(p).includes('DO_NOT_EXPORT'));
+ const bad=sourceDetailRowsToInputs([{...row,score_home:2}],engine);assert.equal(bad.inputs[0].sourceMismatch,true);assert.equal(bad.inputs[0].statsError,true);
 });
 test('Module integration cannot write legacy store or send notifications',()=>{
   for(const p of ['core.mjs','adapter.mjs','charts.mjs','ui.mjs']){

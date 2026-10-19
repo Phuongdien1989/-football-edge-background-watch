@@ -26,7 +26,23 @@ export function storedRowsToInputs(rows){
  }
  return {inputs,controls,rejected};
 }
+export function sourceDetailRowsToInputs(rows,engine){
+ const packet={inputs:[],controls:[],rejected:[]},byId=new Map();
+ for(const row of rows){try{
+  const p=JSON.parse(row.payload_json),f=p.fixture;
+  if(number(f?.fixture?.id)!==number(row.fixture_id)){packet.rejected.push({fixture_id:number(row.fixture_id),reason:'SOURCE_FIXTURE_MISMATCH'});continue;}
+  const sm=engine.statMap(p.stats_raw||[]),presence=engine.watchStatsPresence(sm,f),at=number(row.captured_at);
+  const normalized=engine.normalizeLiveMarkets(p.odds_raw||[],{homeName:f.teams?.home?.name,awayName:f.teams?.away?.name});
+  const item={id:number(row.fixture_id),last:{sourceHealth:{stats:p.source_health?.stats??(presence.core===true?'OK':'UNAVAILABLE'),events:p.source_health?.events}},ui:{captured_at:at,fixture:f,snapshot:{captured_at:at,goals:f.goals,metrics:engine.watchAggregate(sm,f),stats_presence:presence,market_rows:normalized}}};
+  const parsed=storedRowsToInputs([{fixture_id:row.fixture_id,payload:item}]);packet.rejected.push(...parsed.rejected);
+  for(const s of parsed.inputs){s.sourceKind='STORED_SOURCE_DETAIL_NORMALIZED';s.sourceHealthBasis=p.source_health?'STORED_HEALTH':'STORED_STATS_PRESENCE';
+   if((number(row.score_home)!==null&&number(row.score_home)!==s.goals.home)||(number(row.score_away)!==null&&number(row.score_away)!==s.goals.away)){s.sourceMismatch=true;s.statsError=true;}
+   const old=byId.get(s.id);if(!old)byId.set(s.id,s);else if(s.at>old.at){s.history=[...old.history,{at:old.at,goals:old.goals,metrics:old.metrics}];byId.set(s.id,s);}else old.history.push({at:s.at,goals:s.goals,metrics:s.metrics});
+  }
+ }catch{packet.rejected.push({fixture_id:number(row.fixture_id),reason:'SOURCE_NORMALIZATION_FAILED'});}}
+ packet.inputs=[...byId.values()];return packet;
+}
 export function auditStoredInputs(packet,now){
  const store=createStore();packet.inputs.forEach(s=>store.ingest(s));const rows=store.read(now,{controls:packet.controls});
- return {schema:'FT_OVERVIEW_REAL_INPUT_AUDIT_V1',captured_at:now,source:'PRODUCTION_D1_STORED_ONLY',provider_calls:0,production_writes:0,rows:packet.inputs.length,unique_fixtures:new Set(packet.inputs.map(s=>s.id)).size,top:rows.filter(r=>r.rank&&r.rank<=5).map(r=>({fixture_id:r.id,rank:r.rank,reason:'INPUT_COMPLETENESS_ATTENTION_ONLY'})),matches:rows.map(r=>({fixture_id:r.id,home:r.snapshot.home,away:r.snapshot.away,source_at:r.at,status:r.snapshot.status,minute:r.minute,goals:r.snapshot.goals,metrics:r.snapshot.metrics,source_health:r.snapshot.sourceHealth,source_mismatch:r.snapshot.sourceMismatch,market:r.snapshot.market,entry_now:r.entry,reason:r.reason,model_present:r.modelOK,at_source_time:assess(r.snapshot,r.at).entry,live_action:r.recommendation.action})),rejected:packet.rejected,limits:['STORED_ROWS_MAY_BE_STALE','NO_NEW_PROVIDER_REQUEST','NO_DEEP_HISTORY_IN_THIS_CAPTURE','NO_CALIBRATED_MODEL','NO_LIVE_RECOMMENDATION']};
+ return {schema:'FT_OVERVIEW_REAL_INPUT_AUDIT_V1',captured_at:now,source:'PRODUCTION_D1_STORED_ONLY',provider_calls:0,production_writes:0,rows:packet.inputs.length,unique_fixtures:new Set(packet.inputs.map(s=>s.id)).size,top:rows.filter(r=>r.rank&&r.rank<=5).map(r=>({fixture_id:r.id,rank:r.rank,reason:'INPUT_COMPLETENESS_ATTENTION_ONLY'})),matches:rows.map(r=>({fixture_id:r.id,home:r.snapshot.home,away:r.snapshot.away,source_at:r.at,source_kind:r.snapshot.sourceKind,source_health_basis:r.snapshot.sourceHealthBasis||'STORED_HEALTH',status:r.snapshot.status,minute:r.minute,goals:r.snapshot.goals,metrics:r.snapshot.metrics,source_health:r.snapshot.sourceHealth,source_mismatch:r.snapshot.sourceMismatch,market:r.snapshot.market,entry_now:r.entry,reason:r.reason,model_present:r.modelOK,at_source_time:assess(r.snapshot,r.at).entry,live_action:r.recommendation.action})),rejected:packet.rejected,limits:['STORED_ROWS_MAY_BE_STALE','NO_NEW_PROVIDER_REQUEST','NO_DEEP_HISTORY_IN_THIS_CAPTURE','NO_CALIBRATED_MODEL','NO_LIVE_RECOMMENDATION']};
 }

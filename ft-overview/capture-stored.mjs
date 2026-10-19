@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import {writeFileSync} from 'node:fs';
-import {storedRowsToInputs,auditStoredInputs} from './stored-replay.mjs';
+import {storedRowsToInputs,auditStoredInputs,sourceDetailRowsToInputs} from './stored-replay.mjs';
+import {createEngine} from '../notify-core.js';
 const account=process.env.CLOUDFLARE_ACCOUNT_ID,token=process.env.CLOUDFLARE_API_TOKEN;
 assert(account&&token,'CLOUDFLARE_CREDENTIALS_MISSING');
 const base='https://api.cloudflare.com/client/v4/accounts/'+encodeURIComponent(account);
@@ -11,8 +12,13 @@ const before=await versions();
 // One bounded SELECT only. No DO helper, CREATE, UPDATE, provider or scan route.
 const result=await cf('/d1/database/0d12a7cc-12a9-4c71-b55b-61dfd2dac4d4/query',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sql:"SELECT fixture_id,payload FROM fe_notify_live_state WHERE json_type(payload,'$.ui')='object' AND json_extract(payload,'$.ui.captured_at')>0 ORDER BY updated_at DESC LIMIT 50",params:[]})});
 assert(result.length===1&&result[0].success,'D1_SELECT_FAILED');assert.equal(result[0].meta?.rows_written,0,'D1_WRITE_NOT_ZERO');
-const packet=storedRowsToInputs(result[0].results||[]),report=auditStoredInputs(packet,Date.now());
-report.d1={rows_read:result[0].meta?.rows_read,rows_written:result[0].meta?.rows_written,stored_rows_selected:result[0].results.length};report.versions_before=before;report.versions_after=await versions();assert.deepEqual(report.versions_after,before);
+let packet=storedRowsToInputs(result[0].results||[]),fallback=null;
+if(!packet.inputs.length){
+ const r=await cf('/d1/database/0d12a7cc-12a9-4c71-b55b-61dfd2dac4d4/query',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sql:"SELECT fixture_id,captured_at,score_home,score_away,payload_json FROM live_snapshots WHERE snapshot_kind='SOURCE_DETAIL' ORDER BY captured_at DESC LIMIT 50",params:[]})});
+ assert(r.length===1&&r[0].success,'SOURCE_HISTORY_READ_FAILED');assert.equal(r[0].meta?.rows_written,0);fallback=r[0];packet=sourceDetailRowsToInputs(fallback.results||[],createEngine());
+}
+const report=auditStoredInputs(packet,Date.now());
+report.d1={rows_read:(result[0].meta?.rows_read||0)+(fallback?.meta?.rows_read||0),rows_written:0,published_rows_selected:result[0].results.length,source_detail_rows_selected:fallback?.results?.length||0,read_queries:fallback?2:1};report.versions_before=before;report.versions_after=await versions();assert.deepEqual(report.versions_after,before);
 report.source_commit=process.env.GITHUB_SHA;report.technical_status='PASS';report.real_model_acceptance='NOT_PROVEN';
 writeFileSync('ft-overview/real-input-report.json',JSON.stringify(report,null,2));
 writeFileSync('ft-overview/replay-data.mjs','export default '+JSON.stringify({captured_at:report.captured_at,...packet,report})+';\n');

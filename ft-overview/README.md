@@ -57,10 +57,13 @@ No claim of production release, restored statistics or proven betting performanc
 
 ## Real stored-input audit
 
-`capture-stored.mjs` performs one bounded SELECT of at most 50 production
+`capture-stored.mjs` first performs a bounded SELECT of at most 50 published production
 `fe_notify_live_state` rows through the authenticated D1 query API. It requires
 `meta.rows_written === 0`, checks all original deployment versions before/after,
 and never calls a DO/scanner/provider or changes production configuration.
+If no published UI snapshot exists, it reads up to 50 saved SOURCE_DETAIL rows
+and uses unchanged backend normalization functions, without evaluating old engines.
+These normalized historical sources remain explicitly identified as such.
 `stored-replay.mjs` explicitly whitelists football fields; stored tokens, devices,
 subscriptions and preferences are never written into the report or preview.
 
