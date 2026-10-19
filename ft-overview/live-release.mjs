@@ -29,7 +29,14 @@ try{
  }else{entry=entry||'original.mjs';modules.push({name:entry,type:'application/javascript+module',bytes:new Uint8Array(await content.arrayBuffer())});}
  if(!entry&&modules.length===1)entry=modules[0].name;
  assert(entry&&modules.some(m=>m.name===entry),'ORIGINAL_ENTRYPOINT_UNKNOWN');
- const main=modules.find(m=>m.name===entry);assert(/export\s*(?:default|\{[^}]*default)/.test(new TextDecoder().decode(main.bytes)),'ORIGINAL_NOT_MODULE_HANDLER');
+ const main=modules.find(m=>m.name===entry),code=new TextDecoder().decode(main.bytes),assetBindings=(settings.bindings||[]).filter(b=>b.type==='assets');
+ report.original_shape={content_type:content.headers.get('content-type'),entry,bytes:main.bytes.length,module_names:modules.map(m=>m.name),asset_bindings:assetBindings.map(b=>b.name),default_export:/export\s*(?:default|\{[^}]*default)/.test(code),classic_fetch:/addEventListener\s*\(\s*['"]fetch/.test(code),json_keys:(()=>{try{return Object.keys(JSON.parse(code));}catch{return null;}})()};
+ if(!report.original_shape.default_export){
+  const stripped=code.replace(/\/\*[\s\S]*?\*\//g,'').replace(/^\s*\/\/.*$/gm,'').trim();
+  assert(stripped===''&&assetBindings.length===1,'UNSUPPORTED_ORIGINAL_HANDLER_SHAPE');
+  main.bytes=new TextEncoder().encode('export default {fetch(request,env){return env['+JSON.stringify(assetBindings[0].name)+'].fetch(request)}};');
+  main.type='application/javascript+module';report.original_shape.assets_only_adapter=true;
+ }
  report.original_modules=modules.map(m=>({name:m.name,sha256:hash(m.bytes)}));
  const original=await bytes('/');assert.equal(hash(original),'aa4f0f6318cd52c14ff62b195c5ea04c5267107455924da44c9aa78169fe7f28','ORIGINAL_HTML_DRIFT');
  const staticHashes={};for(const path of ['/push-sw.js','/manifest.webmanifest','/icons/icon-180.png','/icons/icon-192.png'])staticHashes[path]=hash(await bytes(path));
