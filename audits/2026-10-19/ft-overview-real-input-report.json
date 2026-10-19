@@ -1,0 +1,699 @@
+{
+  "schema": "FT_OVERVIEW_REAL_INPUT_AUDIT_V1",
+  "captured_at": 1792415088857,
+  "source": "PRODUCTION_D1_STORED_ONLY",
+  "provider_calls": 0,
+  "production_writes": 0,
+  "rows": 19,
+  "unique_fixtures": 19,
+  "top": [],
+  "matches": [
+    {
+      "fixture_id": 1494780,
+      "home": "Ham-Kam",
+      "away": "Bodo/Glimt",
+      "source_at": 1792245346822,
+      "source_kind": "STORED_SOURCE_DETAIL_NORMALIZED",
+      "source_health_basis": "STORED_STATS_PRESENCE",
+      "status": "2H",
+      "minute": 90,
+      "goals": {
+        "home": 0,
+        "away": 2
+      },
+      "metrics": {
+        "shots": null,
+        "sot": null,
+        "inbox": null,
+        "xg": null
+      },
+      "source_health": {
+        "stats": "UNAVAILABLE",
+        "events": "UNKNOWN"
+      },
+      "source_mismatch": false,
+      "market": null,
+      "entry_now": "STALE",
+      "reason": "Nguồn thống kê lỗi; giữ lịch sử để xem lại",
+      "model_present": false,
+      "at_source_time": "DATA WAIT",
+      "live_action": "NO_LIVE_RECOMMENDATION"
+    },
+    {
+      "fixture_id": 1496182,
+      "home": "Sandviken",
+      "away": "Mjondalen",
+      "source_at": 1792244671740,
+      "source_kind": "STORED_SOURCE_DETAIL_NORMALIZED",
+      "source_health_basis": "STORED_STATS_PRESENCE",
+      "status": "2H",
+      "minute": 89,
+      "goals": {
+        "home": 1,
+        "away": 3
+      },
+      "metrics": {
+        "shots": null,
+        "sot": null,
+        "inbox": null,
+        "xg": null
+      },
+      "source_health": {
+        "stats": "UNAVAILABLE",
+        "events": "UNKNOWN"
+      },
+      "source_mismatch": false,
+      "market": {
+        "line": 4.5,
+        "over": 3,
+        "under": 1.375,
+        "period": "FT",
+        "basis": "FULL_MATCH",
+        "bookmaker": "API_FOOTBALL_LIVE_FEED",
+        "at": 1792244631000,
+        "score": {
+          "home": 1,
+          "away": 3
+        },
+        "timestampBasis": "PROVIDER_UPDATE",
+        "settlementAssumption": "STANDARD_FULL_MATCH_TOTAL_90_MIN"
+      },
+      "entry_now": "STALE",
+      "reason": "Nguồn thống kê lỗi; giữ lịch sử để xem lại",
+      "model_present": false,
+      "at_source_time": "DATA WAIT",
+      "live_action": "NO_LIVE_RECOMMENDATION"
+    },
+    {
+      "fixture_id": 1496543,
+      "home": "Konnerud",
+      "away": "Asker",
+      "source_at": 1792241931393,
+      "source_kind": "STORED_SOURCE_DETAIL_NORMALIZED",
+      "source_health_basis": "STORED_STATS_PRESENCE",
+      "status": "2H",
+      "minute": 69,
+      "goals": {
+        "home": 2,
+        "away": 3
+      },
+      "metrics": {
+        "shots": null,
+        "sot": null,
+        "inbox": null,
+        "xg": null
+      },
+      "source_health": {
+        "stats": "UNAVAILABLE",
+        "events": "UNKNOWN"
+      },
+      "source_mismatch": false,
+      "market": {
+        "line": 6.5,
+        "over": 1.925,
+        "under": 1.875,
+        "period": "FT",
+        "basis": "FULL_MATCH",
+        "bookmaker": "API_FOOTBALL_LIVE_FEED",
+        "at": 1792241902000,
+        "score": {
+          "home": 2,
+          "away": 3
+        },
+        "timestampBasis": "PROVIDER_UPDATE",
+        "settlementAssumption": "STANDARD_FULL_MATCH_TOTAL_90_MIN"
+      },
+      "entry_now": "STALE",
+      "reason": "Nguồn thống kê lỗi; giữ lịch sử để xem lại",
+      "model_present": false,
+      "at_source_time": "DATA WAIT",
+      "live_action": "NO_LIVE_RECOMMENDATION"
+    },
+    {
+      "fixture_id": 1506684,
+      "home": "HB II",
+      "away": "EB / Streymur II",
+      "source_at": 1792241690152,
+      "source_kind": "STORED_SOURCE_DETAIL_NORMALIZED",
+      "source_health_basis": "STORED_STATS_PRESENCE",
+      "status": "2H",
+      "minute": 90,
+      "goals": {
+        "home": 2,
+        "away": 0
+      },
+      "metrics": {
+        "shots": null,
+        "sot": null,
+        "inbox": null,
+        "xg": null
+      },
+      "source_health": {
+        "stats": "UNAVAILABLE",
+        "events": "UNKNOWN"
+      },
+      "source_mismatch": false,
+      "market": null,
+      "entry_now": "STALE",
+      "reason": "Nguồn thống kê lỗi; giữ lịch sử để xem lại",
+      "model_present": false,
+      "at_source_time": "DATA WAIT",
+      "live_action": "NO_LIVE_RECOMMENDATION"
+    },
+    {
+      "fixture_id": 1507237,
+      "home": "Merani Martvili",
+      "away": "Shturmi",
+      "source_at": 1792242896626,
+      "source_kind": "STORED_SOURCE_DETAIL_NORMALIZED",
+      "source_health_basis": "STORED_STATS_PRESENCE",
+      "status": "2H",
+      "minute": 84,
+      "goals": {
+        "home": 3,
+        "away": 1
+      },
+      "metrics": {
+        "shots": null,
+        "sot": null,
+        "inbox": null,
+        "xg": null
+      },
+      "source_health": {
+        "stats": "UNAVAILABLE",
+        "events": "UNKNOWN"
+      },
+      "source_mismatch": false,
+      "market": null,
+      "entry_now": "STALE",
+      "reason": "Nguồn thống kê lỗi; giữ lịch sử để xem lại",
+      "model_present": false,
+      "at_source_time": "DATA WAIT",
+      "live_action": "NO_LIVE_RECOMMENDATION"
+    },
+    {
+      "fixture_id": 1528738,
+      "home": "Guangxi Hengchen",
+      "away": "Changchun Yatai",
+      "source_at": 1792243477163,
+      "source_kind": "STORED_SOURCE_DETAIL_NORMALIZED",
+      "source_health_basis": "STORED_STATS_PRESENCE",
+      "status": "2H",
+      "minute": 90,
+      "goals": {
+        "home": 2,
+        "away": 2
+      },
+      "metrics": {
+        "shots": null,
+        "sot": null,
+        "inbox": null,
+        "xg": null
+      },
+      "source_health": {
+        "stats": "UNAVAILABLE",
+        "events": "UNKNOWN"
+      },
+      "source_mismatch": false,
+      "market": null,
+      "entry_now": "STALE",
+      "reason": "Nguồn thống kê lỗi; giữ lịch sử để xem lại",
+      "model_present": false,
+      "at_source_time": "DATA WAIT",
+      "live_action": "NO_LIVE_RECOMMENDATION"
+    },
+    {
+      "fixture_id": 1548543,
+      "home": "NK Lokomotiva Zagreb",
+      "away": "Istra 1961",
+      "source_at": 1792248979770,
+      "source_kind": "STORED_SOURCE_DETAIL_NORMALIZED",
+      "source_health_basis": "STORED_STATS_PRESENCE",
+      "status": "2H",
+      "minute": 90,
+      "goals": {
+        "home": 2,
+        "away": 0
+      },
+      "metrics": {
+        "shots": null,
+        "sot": null,
+        "inbox": null,
+        "xg": null
+      },
+      "source_health": {
+        "stats": "UNAVAILABLE",
+        "events": "UNKNOWN"
+      },
+      "source_mismatch": false,
+      "market": null,
+      "entry_now": "STALE",
+      "reason": "Nguồn thống kê lỗi; giữ lịch sử để xem lại",
+      "model_present": false,
+      "at_source_time": "DATA WAIT",
+      "live_action": "NO_LIVE_RECOMMENDATION"
+    },
+    {
+      "fixture_id": 1553195,
+      "home": "Motor Lublin",
+      "away": "Slask Wroclaw",
+      "source_at": 1792248796772,
+      "source_kind": "STORED_SOURCE_DETAIL_NORMALIZED",
+      "source_health_basis": "STORED_HEALTH",
+      "status": "FT",
+      "minute": 90,
+      "goals": {
+        "home": 3,
+        "away": 2
+      },
+      "metrics": {
+        "shots": null,
+        "sot": null,
+        "inbox": null,
+        "xg": null
+      },
+      "source_health": {
+        "stats": "ERROR",
+        "events": "OK"
+      },
+      "source_mismatch": false,
+      "market": null,
+      "entry_now": "ENDED",
+      "reason": "Trận đã kết thúc",
+      "model_present": false,
+      "at_source_time": "ENDED",
+      "live_action": "NO_LIVE_RECOMMENDATION"
+    },
+    {
+      "fixture_id": 1557428,
+      "home": "Brentford",
+      "away": "Liverpool",
+      "source_at": 1792249438988,
+      "source_kind": "STORED_SOURCE_DETAIL_NORMALIZED",
+      "source_health_basis": "STORED_STATS_PRESENCE",
+      "status": "HT",
+      "minute": 45,
+      "goals": {
+        "home": 1,
+        "away": 0
+      },
+      "metrics": {
+        "shots": null,
+        "sot": null,
+        "inbox": null,
+        "xg": null
+      },
+      "source_health": {
+        "stats": "UNAVAILABLE",
+        "events": "UNKNOWN"
+      },
+      "source_mismatch": false,
+      "market": null,
+      "entry_now": "STALE",
+      "reason": "Nguồn thống kê lỗi; giữ lịch sử để xem lại",
+      "model_present": false,
+      "at_source_time": "DATA WAIT",
+      "live_action": "NO_LIVE_RECOMMENDATION"
+    },
+    {
+      "fixture_id": 1557430,
+      "home": "Everton",
+      "away": "Chelsea",
+      "source_at": 1792244854585,
+      "source_kind": "STORED_SOURCE_DETAIL_NORMALIZED",
+      "source_health_basis": "STORED_HEALTH",
+      "status": "FT",
+      "minute": 90,
+      "goals": {
+        "home": 0,
+        "away": 2
+      },
+      "metrics": {
+        "shots": null,
+        "sot": null,
+        "inbox": null,
+        "xg": null
+      },
+      "source_health": {
+        "stats": "ERROR",
+        "events": "OK"
+      },
+      "source_mismatch": false,
+      "market": null,
+      "entry_now": "ENDED",
+      "reason": "Trận đã kết thúc",
+      "model_present": false,
+      "at_source_time": "ENDED",
+      "live_action": "NO_LIVE_RECOMMENDATION"
+    },
+    {
+      "fixture_id": 1557431,
+      "home": "Fulham",
+      "away": "Hull City",
+      "source_at": 1792248332048,
+      "source_kind": "STORED_SOURCE_DETAIL_NORMALIZED",
+      "source_health_basis": "STORED_STATS_PRESENCE",
+      "status": "1H",
+      "minute": 45,
+      "goals": {
+        "home": 1,
+        "away": 0
+      },
+      "metrics": {
+        "shots": null,
+        "sot": null,
+        "inbox": null,
+        "xg": null
+      },
+      "source_health": {
+        "stats": "UNAVAILABLE",
+        "events": "UNKNOWN"
+      },
+      "source_mismatch": false,
+      "market": {
+        "line": 2.5,
+        "over": 1.85,
+        "under": 2,
+        "period": "FT",
+        "basis": "FULL_MATCH",
+        "bookmaker": "API_FOOTBALL_LIVE_FEED",
+        "at": 1792248297000,
+        "score": {
+          "home": 1,
+          "away": 0
+        },
+        "timestampBasis": "PROVIDER_UPDATE",
+        "settlementAssumption": "STANDARD_FULL_MATCH_TOTAL_90_MIN"
+      },
+      "entry_now": "STALE",
+      "reason": "Nguồn thống kê lỗi; giữ lịch sử để xem lại",
+      "model_present": false,
+      "at_source_time": "DATA WAIT",
+      "live_action": "NO_LIVE_RECOMMENDATION"
+    },
+    {
+      "fixture_id": 1558241,
+      "home": "Miedz Legnica",
+      "away": "Stal Mielec",
+      "source_at": 1792249781324,
+      "source_kind": "STORED_SOURCE_DETAIL_NORMALIZED",
+      "source_health_basis": "STORED_STATS_PRESENCE",
+      "status": "2H",
+      "minute": 82,
+      "goals": {
+        "home": 2,
+        "away": 0
+      },
+      "metrics": {
+        "shots": null,
+        "sot": null,
+        "inbox": null,
+        "xg": null
+      },
+      "source_health": {
+        "stats": "UNAVAILABLE",
+        "events": "UNKNOWN"
+      },
+      "source_mismatch": false,
+      "market": {
+        "line": 2.5,
+        "over": 1.95,
+        "under": 1.85,
+        "period": "FT",
+        "basis": "FULL_MATCH",
+        "bookmaker": "API_FOOTBALL_LIVE_FEED",
+        "at": 1792249710000,
+        "score": {
+          "home": 2,
+          "away": 0
+        },
+        "timestampBasis": "PROVIDER_UPDATE",
+        "settlementAssumption": "STANDARD_FULL_MATCH_TOTAL_90_MIN"
+      },
+      "entry_now": "STALE",
+      "reason": "Nguồn thống kê lỗi; giữ lịch sử để xem lại",
+      "model_present": false,
+      "at_source_time": "DATA WAIT",
+      "live_action": "NO_LIVE_RECOMMENDATION"
+    },
+    {
+      "fixture_id": 1558244,
+      "home": "Polonia Bytom",
+      "away": "Chrobry Głogów",
+      "source_at": 1792249781324,
+      "source_kind": "STORED_SOURCE_DETAIL_NORMALIZED",
+      "source_health_basis": "STORED_STATS_PRESENCE",
+      "status": "2H",
+      "minute": 77,
+      "goals": {
+        "home": 3,
+        "away": 2
+      },
+      "metrics": {
+        "shots": null,
+        "sot": null,
+        "inbox": null,
+        "xg": null
+      },
+      "source_health": {
+        "stats": "UNAVAILABLE",
+        "events": "UNKNOWN"
+      },
+      "source_mismatch": false,
+      "market": {
+        "line": 5.5,
+        "over": 2.15,
+        "under": 1.675,
+        "period": "FT",
+        "basis": "FULL_MATCH",
+        "bookmaker": "API_FOOTBALL_LIVE_FEED",
+        "at": 1792249731000,
+        "score": {
+          "home": 3,
+          "away": 2
+        },
+        "timestampBasis": "PROVIDER_UPDATE",
+        "settlementAssumption": "STANDARD_FULL_MATCH_TOTAL_90_MIN"
+      },
+      "entry_now": "STALE",
+      "reason": "Nguồn thống kê lỗi; giữ lịch sử để xem lại",
+      "model_present": false,
+      "at_source_time": "DATA WAIT",
+      "live_action": "NO_LIVE_RECOMMENDATION"
+    },
+    {
+      "fixture_id": 1561414,
+      "home": "Krylia Sovetov",
+      "away": "Fakel",
+      "source_at": 1792241690152,
+      "source_kind": "STORED_SOURCE_DETAIL_NORMALIZED",
+      "source_health_basis": "STORED_STATS_PRESENCE",
+      "status": "2H",
+      "minute": 90,
+      "goals": {
+        "home": 1,
+        "away": 2
+      },
+      "metrics": {
+        "shots": 31,
+        "sot": 10,
+        "inbox": 20,
+        "xg": 2.45
+      },
+      "source_health": {
+        "stats": "OK",
+        "events": "UNKNOWN"
+      },
+      "source_mismatch": false,
+      "market": null,
+      "entry_now": "STALE",
+      "reason": "Dữ liệu hoặc trạng thái chưa phù hợp để nhận định mới",
+      "model_present": false,
+      "at_source_time": "WAIT PRICE",
+      "live_action": "NO_LIVE_RECOMMENDATION"
+    },
+    {
+      "fixture_id": 1568525,
+      "home": "Goczałkowice Zdrój",
+      "away": "Barycz Sułów",
+      "source_at": 1792241690152,
+      "source_kind": "STORED_SOURCE_DETAIL_NORMALIZED",
+      "source_health_basis": "STORED_STATS_PRESENCE",
+      "status": "2H",
+      "minute": 89,
+      "goals": {
+        "home": 2,
+        "away": 1
+      },
+      "metrics": {
+        "shots": null,
+        "sot": null,
+        "inbox": null,
+        "xg": null
+      },
+      "source_health": {
+        "stats": "UNAVAILABLE",
+        "events": "UNKNOWN"
+      },
+      "source_mismatch": false,
+      "market": null,
+      "entry_now": "STALE",
+      "reason": "Nguồn thống kê lỗi; giữ lịch sử để xem lại",
+      "model_present": false,
+      "at_source_time": "DATA WAIT",
+      "live_action": "NO_LIVE_RECOMMENDATION"
+    },
+    {
+      "fixture_id": 1568836,
+      "home": "Unia Swarzędz",
+      "away": "Victoria Września",
+      "source_at": 1792241690152,
+      "source_kind": "STORED_SOURCE_DETAIL_NORMALIZED",
+      "source_health_basis": "STORED_STATS_PRESENCE",
+      "status": "2H",
+      "minute": 90,
+      "goals": {
+        "home": 0,
+        "away": 0
+      },
+      "metrics": {
+        "shots": null,
+        "sot": null,
+        "inbox": null,
+        "xg": null
+      },
+      "source_health": {
+        "stats": "UNAVAILABLE",
+        "events": "UNKNOWN"
+      },
+      "source_mismatch": false,
+      "market": null,
+      "entry_now": "STALE",
+      "reason": "Nguồn thống kê lỗi; giữ lịch sử để xem lại",
+      "model_present": false,
+      "at_source_time": "DATA WAIT",
+      "live_action": "NO_LIVE_RECOMMENDATION"
+    },
+    {
+      "fixture_id": 1569136,
+      "home": "ŁKS Łódź II",
+      "away": "Olimpia Elbląg",
+      "source_at": 1792241690152,
+      "source_kind": "STORED_SOURCE_DETAIL_NORMALIZED",
+      "source_health_basis": "STORED_STATS_PRESENCE",
+      "status": "2H",
+      "minute": 88,
+      "goals": {
+        "home": 1,
+        "away": 1
+      },
+      "metrics": {
+        "shots": null,
+        "sot": null,
+        "inbox": null,
+        "xg": null
+      },
+      "source_health": {
+        "stats": "UNAVAILABLE",
+        "events": "UNKNOWN"
+      },
+      "source_mismatch": false,
+      "market": null,
+      "entry_now": "STALE",
+      "reason": "Nguồn thống kê lỗi; giữ lịch sử để xem lại",
+      "model_present": false,
+      "at_source_time": "DATA WAIT",
+      "live_action": "NO_LIVE_RECOMMENDATION"
+    },
+    {
+      "fixture_id": 1576202,
+      "home": "1. FC Kaiserslautern",
+      "away": "VfL Bochum",
+      "source_at": 1792241741360,
+      "source_kind": "STORED_SOURCE_DETAIL_NORMALIZED",
+      "source_health_basis": "STORED_HEALTH",
+      "status": "FT",
+      "minute": 90,
+      "goals": {
+        "home": 2,
+        "away": 0
+      },
+      "metrics": {
+        "shots": null,
+        "sot": null,
+        "inbox": null,
+        "xg": null
+      },
+      "source_health": {
+        "stats": "ERROR",
+        "events": "OK"
+      },
+      "source_mismatch": false,
+      "market": null,
+      "entry_now": "ENDED",
+      "reason": "Trận đã kết thúc",
+      "model_present": false,
+      "at_source_time": "ENDED",
+      "live_action": "NO_LIVE_RECOMMENDATION"
+    },
+    {
+      "fixture_id": 1576205,
+      "home": "VfL Wolfsburg",
+      "away": "1. FC Heidenheim",
+      "source_at": 1792242756384,
+      "source_kind": "STORED_SOURCE_DETAIL_NORMALIZED",
+      "source_health_basis": "STORED_HEALTH",
+      "status": "FT",
+      "minute": 90,
+      "goals": {
+        "home": 3,
+        "away": 1
+      },
+      "metrics": {
+        "shots": null,
+        "sot": null,
+        "inbox": null,
+        "xg": null
+      },
+      "source_health": {
+        "stats": "ERROR",
+        "events": "OK"
+      },
+      "source_mismatch": false,
+      "market": null,
+      "entry_now": "ENDED",
+      "reason": "Trận đã kết thúc",
+      "model_present": false,
+      "at_source_time": "ENDED",
+      "live_action": "NO_LIVE_RECOMMENDATION"
+    }
+  ],
+  "rejected": [],
+  "limits": [
+    "STORED_ROWS_MAY_BE_STALE",
+    "NO_NEW_PROVIDER_REQUEST",
+    "NO_DEEP_HISTORY_IN_THIS_CAPTURE",
+    "NO_CALIBRATED_MODEL",
+    "NO_LIVE_RECOMMENDATION"
+  ],
+  "d1": {
+    "rows_read": 32265,
+    "rows_written": 0,
+    "published_rows_selected": 0,
+    "source_detail_rows_selected": 50,
+    "read_queries": 2
+  },
+  "versions_before": {
+    "football-edge-background-watch": "04cc044d-412f-4844-9b83-c7c786eedd13",
+    "shiny-silence-d892": "03c1d55d-358a-448b-96f3-f356704831df",
+    "football-edge-desktop-b2-test": "a332ee39-abb2-422d-a021-db78ef19cc10"
+  },
+  "versions_after": {
+    "football-edge-background-watch": "04cc044d-412f-4844-9b83-c7c786eedd13",
+    "shiny-silence-d892": "03c1d55d-358a-448b-96f3-f356704831df",
+    "football-edge-desktop-b2-test": "a332ee39-abb2-422d-a021-db78ef19cc10"
+  },
+  "source_commit": "cc73ae302c27db7dade5d42842f176564545bc1d",
+  "technical_status": "PASS",
+  "real_model_acceptance": "NOT_PROVEN"
+}
