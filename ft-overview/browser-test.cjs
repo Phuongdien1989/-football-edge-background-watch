@@ -38,7 +38,7 @@ const assert=require('node:assert/strict');
   await live.goto(origin+'/ft-overview/?source=bridge');await live.waitForSelector('.fo-card');
   assert.equal(await live.locator('.fo-match img').count(),0);
   assert.ok((await live.locator('.fo-recommend').innerText()).includes('WAIT PRICE'));
-  await live.evaluate(()=>{window.__fixture.latest.captured_at=Date.now()-120000;window.__fixture.id=52;FTOverviewPreview.refresh();});
+  await live.evaluate(()=>{const actualNow=Date.now;Date.now=()=>actualNow()+120000;FTOverviewPreview.refresh();});
   assert.ok((await live.locator('[data-ft-overview]').innerText()).includes('STALE'));
   console.log(JSON.stringify({status:'PASS',viewports:[390,1280],integrated_bridges:bridge,external_requests_sent:0,external_requests_blocked:blocked,live_fake_bridge:'PASS',top_selection:'PASS',xss:'PASS'}));
  }finally{await context.close();await browser.close();await new Promise(r=>server.close(r));}
