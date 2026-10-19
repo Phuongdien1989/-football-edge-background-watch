@@ -85,7 +85,8 @@ export function assess(snapshot, now,{trialRecommendations=false}={}) {
   const valid = validTime(at, now) && minute !== null && Number.isInteger(goals.home) && Number.isInteger(goals.away) && goals.home >= 0 && goals.away >= 0;
   const terminal = ['FT','AET','PEN','CANC','ABD','AWD','WO'].includes(snapshot.status);
   const fresh = valid && now - at <= (snapshot.status === 'NS' ? 15 * 60000 : 60000);
-  const blocked = !valid || terminal || !fresh || ['ET','BT','P','INT','SUSP'].includes(snapshot.status) || snapshot.statsError || snapshot.cooldownUntil > now;
+  const liveStatsMissing=trialRecommendations&&snapshot.status!=='NS'&&!['shots','sot','inbox','xg'].some(k=>number(snapshot.metrics?.[k])!==null&&number(snapshot.metrics[k])>=0);
+  const blocked = !valid || terminal || !fresh || ['ET','BT','P','INT','SUSP'].includes(snapshot.status) || snapshot.statsError || snapshot.cooldownUntil > now || liveStatsMissing;
   const market = snapshot.market, marketFresh = valid && !!market && number(market.line)!==null && market.line>goals.home+goals.away && validTime(market.at, now) && now - market.at <= (snapshot.status === 'NS' ? 15 * 60000 : 60000) && market.at >= (snapshot.eventAt || 0) && market.score?.home === goals.home && market.score?.away === goals.away && market.period === 'FT' && market.basis === 'FULL_MATCH';
   const model = snapshot.model, modelOK = !!model?.independent && !!model.version && model.at === at && validatePMF(model.pmf);
   const quote = modelOK && marketFresh ? priceOver(model.pmf, goals.home + goals.away, market.line, market.over) : null;
@@ -94,7 +95,7 @@ export function assess(snapshot, now,{trialRecommendations=false}={}) {
   const data = footballView(snapshot.history, snapshot);
   let entry = 'MODEL WAIT',reason = 'Chưa có phân phối bàn độc lập; không chuyển điểm HT/FT thành xác suất';
   if (terminal) { entry = 'ENDED'; reason = 'Trận đã kết thúc'; }
-  else if (blocked) { entry = fresh ? 'DATA WAIT' : 'STALE'; reason = snapshot.cooldownUntil > now ? 'Đang cooldown sau biến động trận; chờ dữ liệu và giá xác nhận lại' : snapshot.statsError ? 'Nguồn thống kê lỗi; giữ lịch sử để xem lại' : 'Dữ liệu hoặc trạng thái chưa phù hợp để nhận định mới'; }
+  else if (blocked) { entry = fresh ? 'DATA WAIT' : 'STALE'; reason = snapshot.cooldownUntil > now ? 'Đang cooldown sau biến động trận; chờ dữ liệu và giá xác nhận lại' : snapshot.statsError ? 'Nguồn thống kê thiếu hoặc lỗi; giữ lịch sử để xem lại' : liveStatsMissing?'Chưa có thống kê LIVE dùng được; không phát khuyến nghị từ dữ liệu trống.':'Dữ liệu hoặc trạng thái chưa phù hợp để nhận định mới'; }
   else if (!marketFresh) { entry = 'WAIT PRICE';reason = 'Cần giá FT mới, đúng tỷ số và quy tắc thanh toán'; }
   else if (!modelOK) { /* preserve model-wait explanation */ }
   else if (trialRecommendations&&model.kind==='RESEARCH'&&quote) { entry=quote.ev>0?'TRIAL OVER':'WAIT PRICE';reason=quote.ev>0?'Khuyến nghị thử nghiệm: cân nhắc Tài theo mô hình nền, tại đúng line và giá đang hiển thị.':'Khuyến nghị: chờ giá; giá hiện tại chưa tạo lợi thế theo mô hình nền.'; }

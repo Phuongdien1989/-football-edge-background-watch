@@ -15,7 +15,9 @@ try{
  });
  assert.ok((await page.locator('.fo-recommend h3').innerText()).includes('CÂN NHẮC TÀI'));assert.ok((await page.locator('.fo-recommend').innerText()).includes('KHUYẾN NGHỊ THỬ NGHIỆM'));
  await page.evaluate(()=>{__qaItem.latest.captured_at++;__qaItem.latest.market_rows[0].values[0].odd=1.1;FTOverviewPreview.refresh();});assert.ok((await page.locator('.fo-recommend').innerText()).includes('chờ giá'));
+ await page.evaluate(()=>{__qaItem.latest.captured_at++;__qaItem.latest.market_rows[0].values[0].odd=1.5;__qaItem.latest.metrics={total:{}};__qaItem.latest.stats_presence={};FTOverviewPreview.refresh();});assert.ok((await page.locator('.fo-recommend').innerText()).includes('thống kê LIVE'));
+ await page.evaluate(()=>{__qaItem.latest.captured_at++;__qaItem.latest.metrics={total:{shots:0}};__qaItem.latest.stats_presence={shots:true};FTOverviewPreview.refresh();});assert.ok((await page.locator('.fo-recommend h3').innerText()).includes('CÂN NHẮC TÀI'));
  await page.evaluate(()=>{__qaControls=[{id:990081,cooldownUntil:Date.now()+30000}];FTOverviewPreview.refresh();});assert.equal(await page.locator('.fo-top button').count(),0);assert.equal(await page.locator('.fo-recommend h3').innerText(),'CHỜ DỮ LIỆU XÁC NHẬN');
  await page.goto('https://shiny-silence-d892.ngophuonghuy.workers.dev/original/');assert.equal(await page.locator('#ftOverviewCard').count(),0);assert.equal(await page.locator('#h1WatchCard').count(),1);
- console.log(JSON.stringify({status:'PASS',main_app:true,trial_recommendation_render:'PASS',negative_ev_wait:'PASS',cooldown_blocks:'PASS',original_view_preserved:true,real_provider_calls_sent:0,external_requests_blocked:blocked}));
+ console.log(JSON.stringify({status:'PASS',main_app:true,trial_recommendation_render:'PASS',negative_ev_wait:'PASS',missing_live_stats_wait:'PASS',genuine_zero_accepted:'PASS',cooldown_blocks:'PASS',original_view_preserved:true,real_provider_calls_sent:0,external_requests_blocked:blocked}));
 }finally{await context.close();await browser.close();}})().catch(e=>{console.error(e);process.exitCode=1;});
