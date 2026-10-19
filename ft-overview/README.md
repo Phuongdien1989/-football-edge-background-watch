@@ -1,5 +1,24 @@
 # FT OVERVIEW — isolated research candidate
 
+## Owner-authorized main-app trial (19 October, evening)
+
+The owner explicitly authorized the main-app card and experimental recommendations
+while observing outcomes. The main HTML opts in with `data-fo-trial="true"`.
+No calibrated-model claim is made. The independent recent-rate/time-only baseline
+can issue `TRIAL_OVER` when the current matched full-time quote has positive model
+EV; otherwise it waits. Missing/stale/error/cooldown input still blocks. DEMO and
+archive remain non-recommending. Original HT/FT/HC and their TOP/Push stay intact.
+
+In trial mode only, Overview TOP prioritizes positive estimated EV, then estimated
+EV within the fully priced/modelled group, with stable ties and unique fixtures.
+This experimental ordering is logged with policy `FT_OVERVIEW_TRIAL_EV_V1`; it is
+not validated investment performance. No bookmaker-agreement cutoff or arbitrary
+minimum EV margin is added. Quotes and current goals use the same settlement math.
+
+Earlier notes below describe prior shadow-only checkpoints. They do not override
+the owner's later authorization. `/original/` retains the old Mobile view, and the
+immediate rollback version is `ac8c0da2-551c-4561-a554-efd4c09339ad`.
+
 This additive candidate preserves the original Mobile SHA256
 `aa4f0f6318cd52c14ff62b195c5ea04c5267107455924da44c9aa78169fe7f28`.
 No HT/FT/HC scoring, threshold, TOP, Push, backend, D1, scanner or deployment

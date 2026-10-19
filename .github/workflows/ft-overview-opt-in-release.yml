@@ -1,4 +1,4 @@
-name: FT Overview — same-origin opt-in release
+name: FT Overview — main app trial release
 on:
   push:
     branches: [feature/ft-overview-shadow-20261019]
@@ -20,12 +20,12 @@ jobs:
       - run: node ft-overview/test.mjs
       - run: npm install --no-save playwright@1.58.2
       - run: npx playwright install --with-deps chromium
-      - name: Publish exact frozen original assets and opt-in page
+      - name: Publish main app trial and retain original view
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: node ft-overview/live-release.mjs
-      - name: Check opt-in page without sending provider or scan requests
+      - name: Check main trial recommendation UI without provider or scan requests
         run: node ft-overview/live-smoke.cjs
       - name: Restore original version if acceptance fails
         if: failure()

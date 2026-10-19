@@ -26,6 +26,18 @@ test('Out-of-order and same-revision conflicts preserve newest data',()=>{const 
 test('Freshness expires without another server update',()=>{const st=createStore();st.ingest(sample());assert.equal(st.read(now+61000)[0].entry,'STALE');assert.equal(st.read(now+61000)[0].rank,null);});
 test('Stats errors and post-goal stale price cannot issue recommendation',()=>{let s=sample();s.statsError=true;assert.equal(assess(s,now).entry,'DATA WAIT');s=sample();s.eventAt=now+1;assert.equal(assess(s,now).entry,'WAIT PRICE');s=sample();s.market.score={home:0,away:0};assert.equal(assess(s,now).marketFresh,false);});
 test('Demo and research are explicitly gated from live recommendations',()=>{let s=sample();assert.equal(assess(s,now).entry,'DEMO');assert.equal(assess(s,now).recommendation.action,'NO_LIVE_RECOMMENDATION');s.model.kind='RESEARCH';assert.equal(assess(s,now).entry,'RESEARCH');});
+test('Owner-enabled trial gives a research recommendation at positive EV and waits at non-positive EV',()=>{
+ const s=sample();s.model.kind='RESEARCH';const r=assess(s,now,{trialRecommendations:true});assert.equal(r.entry,'TRIAL OVER');assert.equal(r.recommendation.action,'TRIAL_OVER');assert.equal(r.recommendation.experimental,true);assert.equal(r.recommendation.line,2.5);assert.equal(r.recommendation.odds,2.4);
+ s.market.over=2;assert.equal(assess(s,now,{trialRecommendations:true}).recommendation.action,'WAIT_PRICE');assert.equal(assess(s,now).recommendation.action,'NO_LIVE_RECOMMENDATION');
+});
+test('Trial activation cannot recommend on missing/stale/model-free/error/demo/cooldown data',()=>{
+ const base=sample();base.model.kind='RESEARCH';for(const mutate of [s=>s.model=null,s=>s.market=null,s=>s.statsError=true,s=>s.cooldownUntil=now+30000,s=>s.model.kind='DEMO',s=>s.market.score={home:0,away:0}]){const s=structuredClone(base);mutate(s);assert.notEqual(assess(s,now,{trialRecommendations:true}).recommendation.action,'TRIAL_OVER');}assert.notEqual(assess(base,now+61000,{trialRecommendations:true}).recommendation.action,'TRIAL_OVER');
+});
+test('Trial TOP competes on estimated EV for distinct fixtures and records its experimental policy',()=>{
+ const st=createStore({trialRecommendations:true}),a=sample(),b=sample();a.model.kind=b.model.kind='RESEARCH';b.id++;b.market.over=2.7;st.ingest(a);st.ingest(b);assert.equal(st.read(now)[0].id,b.id);assert.equal(st.export().ledger[0].policy,'FT_OVERVIEW_TRIAL_EV_V1');
+ const newer=structuredClone(a);newer.at++;newer.revision++;newer.model.at++;newer.market.at++;newer.market.over=3;st.ingest(newer);assert.equal(st.read(now+1)[0].id,a.id);assert.equal(new Set(st.read(now+1).map(r=>r.id)).size,2);
+});
+test('Invalid quarter contract cannot crash trial ranking or produce a recommendation',()=>{const st=createStore({trialRecommendations:true}),s=sample();s.model.kind='RESEARCH';s.market.line=2.3;st.ingest(s);assert.doesNotThrow(()=>st.read(now));assert.notEqual(st.read(now)[0].recommendation.action,'TRIAL_OVER');});
 test('Agreement or model above market is not automatically a good entry price',()=>{const s=demoSnapshots(now)[2],r=assess(s,now);assert.ok(r.delta>0);assert.ok(r.quote.ev<0);assert.ok(r.synthesis.includes('chưa cho lợi thế'));});
 test('Independent model cannot be substituted with legacy score or wrong observation',()=>{const s=sample();s.model=null;s.legacy={score:99};assert.equal(assess(s,now).modelOK,false);s.model=sample().model;s.model.at--;assert.equal(assess(s,now).modelOK,false);});
 test('Missing historical goals, future and duplicate matches not learned as evidence',()=>{

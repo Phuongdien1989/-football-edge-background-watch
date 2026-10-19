@@ -80,7 +80,7 @@ export function footballView(history, current) {
   const label = quality.some(x => x > 0) ? 'CHANCES ADDED' : quality.length ? 'NO NEW QUALITY SIGNAL' : 'PARTIAL';
   return {label,reason:label === 'CHANCES ADDED' ? 'Có thêm chỉ dấu cơ hội; chưa suy ra xác suất' : 'Chưa xác nhận thêm cơ hội rõ từ dữ liệu đang có',minutes,changes};
 }
-export function assess(snapshot, now) {
+export function assess(snapshot, now,{trialRecommendations=false}={}) {
   const at = number(snapshot.at), minute = number(snapshot.minute), goals = snapshot.goals || {};
   const valid = validTime(at, now) && minute !== null && Number.isInteger(goals.home) && Number.isInteger(goals.away) && goals.home >= 0 && goals.away >= 0;
   const terminal = ['FT','AET','PEN','CANC','ABD','AWD','WO'].includes(snapshot.status);
@@ -97,15 +97,16 @@ export function assess(snapshot, now) {
   else if (blocked) { entry = fresh ? 'DATA WAIT' : 'STALE'; reason = snapshot.cooldownUntil > now ? 'Đang cooldown sau biến động trận; chờ dữ liệu và giá xác nhận lại' : snapshot.statsError ? 'Nguồn thống kê lỗi; giữ lịch sử để xem lại' : 'Dữ liệu hoặc trạng thái chưa phù hợp để nhận định mới'; }
   else if (!marketFresh) { entry = 'WAIT PRICE';reason = 'Cần giá FT mới, đúng tỷ số và quy tắc thanh toán'; }
   else if (!modelOK) { /* preserve model-wait explanation */ }
+  else if (trialRecommendations&&model.kind==='RESEARCH'&&quote) { entry=quote.ev>0?'TRIAL OVER':'WAIT PRICE';reason=quote.ev>0?'Khuyến nghị thử nghiệm: cân nhắc Tài theo mô hình nền, tại đúng line và giá đang hiển thị.':'Khuyến nghị: chờ giá; giá hiện tại chưa tạo lợi thế theo mô hình nền.'; }
   else if (model.validated !== true) { entry = model.kind === 'DEMO' ? 'DEMO' : 'RESEARCH';reason = 'Định giá thử nghiệm; chưa đủ bằng chứng để phát khuyến nghị thật'; }
   else { entry = 'REVIEW';reason = 'Đã có định giá; cần nghiệm thu cơ chế ra quyết định trước khi bật khuyến nghị'; }
   const reconciliation = !binary ? 'MARKET INCOMPLETE' : delta === null ? 'MODEL WAIT' : Math.abs(delta) < 1e-9 ? 'ALIGNED' : delta > 0 ? 'MODEL ABOVE MARKET' : 'MODEL BELOW MARKET';
   const synthesis=blocked?'Dữ liệu hiện tại chưa dùng để đưa ra nhận định mới.':!quote?'Giữ nhận định diễn biến; chờ đủ phân phối bàn và giá cùng trạng thái.':quote.ev<=0?'Ở giá đang trả, model chưa cho lợi thế. Dù có thể cao hơn thị trường, giá vẫn chưa vượt mức hòa vốn theo model.':'Giá đang trả cao hơn giá công bằng ước tính. Cần kiểm chứng giả định model và lý do khác biệt trước khi coi đây là lợi thế thực.';
   return {id:snapshot.id,snapshot,at,minute,fresh,blocked:!!blocked,entry,reason,synthesis,data,quote,binary,delta,reconciliation,modelOK,marketFresh,modelVersion:modelOK?model.version:null,
-    recommendation:{selection:'OVER',period:'FT',line:marketFresh?market.line:null,odds:marketFresh?market.over:null,action:'NO_LIVE_RECOMMENDATION'},
+    recommendation:{selection:'OVER',period:'FT',line:marketFresh?market.line:null,odds:marketFresh?market.over:null,action:entry==='TRIAL OVER'?'TRIAL_OVER':trialRecommendations&&entry==='WAIT PRICE'?'WAIT_PRICE':'NO_LIVE_RECOMMENDATION',experimental:trialRecommendations,policy:trialRecommendations?'FT_OVERVIEW_TRIAL_EV_V1':'SHADOW_ONLY'},
     whyChange:'Đối chiếu dữ liệu, trạng thái và giá cùng thời điểm'};
 }
-export function createStore({maxFixtures=100,maxPoints=120,maxLedger=500} = {}) {
+export function createStore({maxFixtures=100,maxPoints=120,maxLedger=500,trialRecommendations=false} = {}) {
   const snapshots = new Map(), ledger = [], ranks = new Map(); let sequence = 0;
   function ingest(input) {
     const s = structuredClone(input);
@@ -127,11 +128,11 @@ export function createStore({maxFixtures=100,maxPoints=120,maxLedger=500} = {}) 
   function read(now,{controls=[]}={}) {
     const controlById=new Map();
     for(const c of controls){const id=number(c.id),old=controlById.get(id)||{};controlById.set(id,{cooldownUntil:Math.max(number(old.cooldownUntil)||0,number(c.cooldownUntil)||0),eventAt:Math.max(number(old.eventAt)||0,number(c.resetAt)||0)});}
-    const rows = [...snapshots.values()].map(v => {const c=controlById.get(v.snapshot.id);return assess(c?{...v.snapshot,cooldownUntil:Math.max(number(v.snapshot.cooldownUntil)||0,c.cooldownUntil),eventAt:Math.max(number(v.snapshot.eventAt)||0,c.eventAt)}:v.snapshot, now);});
+    const rows = [...snapshots.values()].map(v => {const c=controlById.get(v.snapshot.id);return assess(c?{...v.snapshot,cooldownUntil:Math.max(number(v.snapshot.cooldownUntil)||0,c.cooldownUntil),eventAt:Math.max(number(v.snapshot.eventAt)||0,c.eventAt)}:v.snapshot, now,{trialRecommendations});});
     // Attention order only; no unvalidated EV weighting or forced bet promotion.
     // Stable insertion order inside equal completeness/freshness classes.
-    const bucket = r => r.blocked ? 0 : r.modelOK && r.marketFresh ? 3 : r.marketFresh ? 2 : 1;
-    rows.sort((a,b) => bucket(b)-bucket(a) || (ranks.get(a.id) || 999)-(ranks.get(b.id) || 999) || a.id-b.id);
+    const bucket = r => r.blocked ? 0 : r.recommendation.action==='TRIAL_OVER'?4:r.modelOK && r.marketFresh && r.quote ? 3 : r.marketFresh ? 2 : 1;
+    rows.sort((a,b) => bucket(b)-bucket(a) || (trialRecommendations&&bucket(a)>=3&&bucket(b)>=3?b.quote.ev-a.quote.ev:0) || (ranks.get(a.id) || 999)-(ranks.get(b.id) || 999) || a.id-b.id);
     const previousRanks = new Map(ranks); ranks.clear(); let rank = 0;
     for (const r of rows) {
       r.rank = r.blocked ? null : ++rank; r.move = r.rank && previousRanks.has(r.id) ? previousRanks.get(r.id)-r.rank : null;
@@ -145,7 +146,7 @@ export function createStore({maxFixtures=100,maxPoints=120,maxLedger=500} = {}) 
         v.points = v.points.slice(-maxPoints);
       } else v.points[v.points.length-1]=point;
       r.points = structuredClone(v.points);
-      const record = {id:r.id,version:VERSION,model:r.modelVersion,at:r.at,revision:r.snapshot.revision,entry:r.entry,line:m?.line,odds:m?.over,goals:r.snapshot.goals};
+      const record = {id:r.id,version:VERSION,model:r.modelVersion,at:r.at,revision:r.snapshot.revision,entry:r.entry,line:m?.line,odds:m?.over,goals:r.snapshot.goals,action:r.recommendation.action,policy:r.recommendation.policy,estimated_ev:r.quote?.ev??null,fair_odds:r.quote?.fairOdds??null};
       const last = [...ledger].reverse().find(x => x.id === r.id);
       if (!last || fingerprint(last) !== fingerprint(record)) { ledger.push(record); if (ledger.length > maxLedger) ledger.shift(); }
     }
