@@ -50,6 +50,13 @@ test('Non-statistical legacy veto does not masquerade as a provider statistics e
  const item={id:5,latest:{captured_at:now,minute:70,status:'2H',goals:{home:0,away:0}},eval:{hardVeto:true,dataIncomplete:false}};
  const rows=readLegacy({read:()=>({watchState:{items:[item]}})});assert.equal(rows[0].statsError,false);
  item.latest.data_health={level:'NO_STATS'};assert.equal(readLegacy({read:()=>({watchState:{items:[item]}})})[0].statsError,true);
+ delete item.latest.data_health;item.eval={dataIncomplete:true,scoreMode:'BASELINE'};assert.equal(readLegacy({read:()=>({watchState:{items:[item]}})})[0].statsError,false);
+});
+test('Foreground to server synchronization cannot mix revision domains and freeze updates',()=>{
+ const item={id:5,latest:{captured_at:now,minute:70,status:'2H',goals:{home:0,away:0}},eval:{}};
+ const bridge={read:()=>({watchState:{items:[item]}})},st=createStore();st.ingest(readLegacy(bridge)[0]);
+ item.serverRow={revision:7};item.latest.captured_at=now+1000;item.latest.goals.home=1;
+ assert.equal(st.ingest(readLegacy(bridge)[0]).accepted,true);assert.equal(st.read(now+1000)[0].snapshot.goals.home,1);
 });
 test('New DEEP context enriches one observation without refreshing source time or duplicating charts',()=>{
  const st=createStore(),s=sample();s.model=null;st.ingest(s);st.read(now);

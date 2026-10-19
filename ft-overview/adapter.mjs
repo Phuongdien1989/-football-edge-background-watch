@@ -29,8 +29,10 @@ export function readLegacy(bridge, bundleBridge) {
   for(const [engine,items] of [['H1',d.h1WatchState?.items],['FT',d.watchState?.items],['HC',d.handicapWatchState?.pool]])for(const it of items || []){
     const id=number(it.id),s=it.latest || {},at=number(s.captured_at);if(!id||!at)continue;
     const old=map.get(id);if(old&&old.at>at)continue;
-    const source=metricSnapshot(it),snapshot={id,revision:number(it.serverRow?.revision) ?? at,at,minute:number(s.minute),status:s.status,goals:source.goals,home:it.home || '',away:it.away || '',league:it.league || '',metrics:source.metrics,
-      history:(it.history||[]).map(r=>metricSnapshot({latest:r})),statsError:!!it.eval?.dataIncomplete || s.data_health?.level==='NO_STATS',
+    // The store's local revision domain is observation time. Server revisions
+    // and browser millisecond timestamps cannot be ordered against each other.
+    const source=metricSnapshot(it),snapshot={id,revision:at,at,minute:number(s.minute),status:s.status,goals:source.goals,home:it.home || '',away:it.away || '',league:it.league || '',metrics:source.metrics,
+      history:(it.history||[]).map(r=>metricSnapshot({latest:r})),statsError:(!!it.eval?.dataIncomplete&&it.eval?.scoreMode!=='BASELINE') || s.data_health?.level==='NO_STATS',
       cooldownUntil:number(it.cooldownUntil),legacy:{engine,score:number(it.eval?.score),state:it.state,independent:false},model:null,market:null};
     // HC metrics have no total. Retain separately observed goal-engine metrics
     // only when their observation timestamp is identical.
