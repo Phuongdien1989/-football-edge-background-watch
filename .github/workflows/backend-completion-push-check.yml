@@ -1,0 +1,26 @@
+name: Production single-Apple Push transport verification
+on:
+  push:
+    branches: [fix/paused-watch-alarm-20261019]
+    paths: ['.github/workflows/backend-completion-push-check.yml']
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: football-edge-production
+    permissions: {contents: read}
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: No provider calls, one test only if exactly one enabled Apple subscription
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node .github/scripts/backend-completion-push-check.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: backend-completion-push-result
+          path: backend-completion-push-result.json
