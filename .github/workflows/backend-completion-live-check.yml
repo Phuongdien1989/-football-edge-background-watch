@@ -1,0 +1,26 @@
+name: Production LIVE and statistics bounded verification
+on:
+  push:
+    branches: [fix/paused-watch-alarm-20261019]
+    paths: ['.github/workflows/backend-completion-live-check.yml']
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: football-edge-production
+    permissions: {contents: read}
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: No scan enable, maximum two logical provider calls, no Push send
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node .github/scripts/backend-completion-live-check.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: backend-completion-live-result
+          path: backend-completion-live-result.json
