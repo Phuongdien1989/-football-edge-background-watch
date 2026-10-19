@@ -15,7 +15,8 @@ export function storedRowsToInputs(rows){
   let item;try{item=typeof row.payload==='string'?JSON.parse(row.payload):row.payload;}catch{rejected.push({reason:'INVALID_JSON'});continue;}
   if(item?.__fe_deleted===true)continue;
   const u=item?.ui,f=u?.fixture,id=number(row.fixture_id),at=number(u?.captured_at);
-  if(!Number.isSafeInteger(id)||id<=0||number(item?.id)!==id||number(f?.fixture?.id)!==id||at===null||at<=0){rejected.push({fixture_id:id,reason:'NO_PUBLISHED_MATCHING_SNAPSHOT'});continue;}
+  const invalid=!Number.isSafeInteger(id)||id<=0?'INVALID_FIXTURE_ID':!u?'NO_PUBLISHED_SNAPSHOT':number(item?.id)!==id?'STORED_ID_MISMATCH':number(f?.fixture?.id)!==id?'PUBLISHED_FIXTURE_MISMATCH':at===null||at<=0?'NO_SOURCE_TIMESTAMP':null;
+  if(invalid){rejected.push({fixture_id:id,reason:invalid});continue;}
   const raw=u.snapshot||{},source=observed(raw),goals={home:number(f.goals?.home),away:number(f.goals?.away)};
   const mismatch=(source.goals.home!==null&&source.goals.home!==goals.home)||(source.goals.away!==null&&source.goals.away!==goals.away);
   const sourceHealth={stats:health(item.last?.sourceHealth?.stats),events:health(item.last?.sourceHealth?.events)};

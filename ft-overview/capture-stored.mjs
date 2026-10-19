@@ -9,7 +9,7 @@ async function cf(path,options={}){const r=await fetch(base+path,{...options,hea
 async function versions(){const out={};for(const [name,id]of Object.entries(expected)){const v=(await cf('/workers/scripts/'+name+'/deployments')).deployments?.[0]?.versions;assert.deepEqual(v,[{version_id:id,percentage:100}]);out[name]=id;}return out;}
 const before=await versions();
 // One bounded SELECT only. No DO helper, CREATE, UPDATE, provider or scan route.
-const result=await cf('/d1/database/0d12a7cc-12a9-4c71-b55b-61dfd2dac4d4/query',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sql:'SELECT fixture_id,payload FROM fe_notify_live_state ORDER BY updated_at DESC LIMIT 50',params:[]})});
+const result=await cf('/d1/database/0d12a7cc-12a9-4c71-b55b-61dfd2dac4d4/query',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sql:"SELECT fixture_id,payload FROM fe_notify_live_state WHERE json_type(payload,'$.ui')='object' AND json_extract(payload,'$.ui.captured_at')>0 ORDER BY updated_at DESC LIMIT 50",params:[]})});
 assert(result.length===1&&result[0].success,'D1_SELECT_FAILED');assert.equal(result[0].meta?.rows_written,0,'D1_WRITE_NOT_ZERO');
 const packet=storedRowsToInputs(result[0].results||[]),report=auditStoredInputs(packet,Date.now());
 report.d1={rows_read:result[0].meta?.rows_read,rows_written:result[0].meta?.rows_written,stored_rows_selected:result[0].results.length};report.versions_before=before;report.versions_after=await versions();assert.deepEqual(report.versions_after,before);
