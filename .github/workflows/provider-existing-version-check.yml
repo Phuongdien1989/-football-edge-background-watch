@@ -1,0 +1,32 @@
+name: Guarded existing diagnostic version convergence check
+on:
+  push:
+    branches: [diag/provider-error-detail-20261018]
+    paths: ['.github/workflows/provider-existing-version-check.yml']
+jobs:
+  diagnostic-convergence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 9
+    environment: football-edge-production
+    concurrency:
+      group: football-edge-backend-production
+      cancel-in-progress: false
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Enforce scanner OFF, exact settings and bounded diagnostic window
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node .github/scripts/provider-existing-version-check.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: provider-existing-version-result
+          path: provider-existing-version-result.json
