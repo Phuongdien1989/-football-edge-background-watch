@@ -10,6 +10,13 @@ const reply=(data,status=200)=>new Response(JSON.stringify(data),{status,headers
 }});
 
 export class BackgroundWatcher extends NativeWatcher{
+  async ensureAlarm(delayMs=null){
+    const control=typeof this.scanControl==='function'?await this.scanControl():{enabled:true};
+    // Registering Smart Follow/Evidence must not wake a manually paused scanner.
+    if(control?.enabled===false)return null;
+    return super.ensureAlarm(delayMs);
+  }
+
   async alarm(){
     const control=typeof this.scanControl==='function'?await this.scanControl():{enabled:true,updated:0};
     if(control?.enabled===false){
