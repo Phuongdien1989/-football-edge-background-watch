@@ -1,0 +1,51 @@
+name: Central ENTRY paper measurement — production read-only, staging ledger
+on:
+  push:
+    branches: [fix/central-entry-measurement-20261018]
+    paths:
+      - 'central-entry-measurement.mjs'
+      - 'tests/test-central-entry-measurement.mjs'
+      - '.github/scripts/central-entry-measurement-staging.mjs'
+      - '.github/scripts/provider-final-measurement.mjs'
+      - '.github/workflows/central-entry-measurement-qa.yml'
+  workflow_dispatch:
+    inputs:
+      verify_provider_finals:
+        description: Explicit bounded provider final-score refresh, respecting existing quota and cooldown
+        type: boolean
+        default: false
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    environment: football-edge-production
+    permissions: {contents: read}
+    steps:
+      - uses: actions/checkout@v4
+        with: {fetch-depth: 0, persist-credentials: false}
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Confirm production runtime source remains byte-identical
+        run: |
+          git diff --exit-code 3c97629e51251c56f9edeb8d0f67a7a0dad957a2 HEAD -- 'worker*.js' wrangler.toml d1-production-meter.mjs
+          node --check central-entry-measurement.mjs
+          node tests/test-central-entry-measurement.mjs
+      - name: Measure global D1 cohort without writes and verify append-only ledger on staging
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node .github/scripts/central-entry-measurement-staging.mjs
+      - name: Independently refresh final fixture scores in at most eight quota-controlled batches
+        if: github.event_name == 'workflow_dispatch' && inputs.verify_provider_finals
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node .github/scripts/provider-final-measurement.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: central-entry-measurement-staging
+          path: |
+            central-entry-measurement-staging.json
+            central-entry-measurements.json
+            provider-final-*.json

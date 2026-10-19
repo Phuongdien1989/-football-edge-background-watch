@@ -1,0 +1,53 @@
+{
+  "at": "2026-10-18T09:54:49.546Z",
+  "sourceCommit": "cd19eb6e115b3ec368915039f4a70a9c4bebe13e",
+  "mode": "PRODUCTION_READ_ONLY_STAGING_LEDGER",
+  "productionWrites": 0,
+  "productionRowsRead": 175760,
+  "providerCalls": 0,
+  "stageDatabase": "7d503048-9118-4b29-b662-4e1ba6e32167",
+  "stageRowsWritten": 0,
+  "firstReplayRowsWritten": 0,
+  "secondReplayRowsWritten": 0,
+  "appendOnlyLifecycle": "PASS",
+  "productionDeploymentsUnchanged": true,
+  "summary": {
+    "algorithm_version": "CENTRAL_ENTRY_PAPER_V1",
+    "selection": "FIRST_CAPTURE_PER_FIXTURE_ENGINE",
+    "real_bet_roi": null,
+    "engines": {
+      "FT": {
+        "samples": 64,
+        "reconciled": 7,
+        "unknown": 57,
+        "positive": 3,
+        "negative": 4,
+        "push": 0,
+        "paper_unit_pl": -1.275,
+        "paper_roi_pct": -18.214285714,
+        "unknown_reasons": {
+          "NO_CONFIRMED_RAW_PERIOD_SCORE": 57
+        }
+      },
+      "H1": {
+        "samples": 81,
+        "reconciled": 22,
+        "unknown": 59,
+        "positive": 10,
+        "negative": 12,
+        "push": 0,
+        "paper_unit_pl": 8.9,
+        "paper_roi_pct": 40.454545455,
+        "unknown_reasons": {
+          "NO_CONFIRMED_RAW_PERIOD_SCORE": 59
+        }
+      }
+    }
+  },
+  "limits": [
+    "Whole-period paper settlement only; bookmaker execution and settlement basis not verified.",
+    "Raw scores were already stored by app; no independent provider refresh.",
+    "Unknown samples remain in denominator and are reported separately.",
+    "No production ledger table or backend route was installed."
+  ]
+}
