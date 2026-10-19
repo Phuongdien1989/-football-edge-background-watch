@@ -1,0 +1,31 @@
+name: Read-only provider routing and bundle audit
+on:
+  push:
+    branches: [diag/provider-error-detail-20261018]
+    paths: ['.github/workflows/provider-routing-readonly.yml']
+jobs:
+  routing-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    environment: football-edge-production
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --no-save wrangler@4
+      - name: GET metadata and latest upload, compare local dry-run bundle
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node .github/scripts/provider-routing-readonly.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: provider-routing-readonly
+          path: provider-routing-readonly.json
