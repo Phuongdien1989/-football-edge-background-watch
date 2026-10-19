@@ -1,3 +1,4 @@
+import {providerDiagnosticDetail} from './provider-diagnostic-detail.mjs';
 import base,{BackgroundWatcher as QuotaWatcher} from './worker_notify_v137_quota50000.js';
 import {providerRateScope} from './provider_errors.mjs';
 import {instrumentD1Env} from './d1-production-meter.mjs';
@@ -48,7 +49,7 @@ export class BackgroundWatcher extends QuotaWatcher{
     const budget=await this.notifyBudgetView(),status=await this.ctx.storage.get('notify:status');
     const devices=(await this.devices()).filter(d=>d?.prefs?.enabled&&(d.prefs.h1||d.prefs.goal||d.prefs.gap));
     const lastCycleAt=Number(status?.startedAt||0);
-    const publicObservation=o=>o?{at:o.at,http:o.http,code:o.code,limits:o.limits,retry_after_ms:o.retry_after_ms,rate_scope:providerRateScope(o.detail),request_kind:o.request_kind||null,cooldown_scope:o.cooldown_scope||null,response_count:o.response_count??null}:null;
+    const publicObservation=o=>o?{at:o.at,http:o.http,code:o.code,limits:o.limits,retry_after_ms:o.retry_after_ms,rate_scope:providerRateScope(o.detail),request_kind:o.request_kind||null,cooldown_scope:o.cooldown_scope||null,response_count:o.response_count??null,error_detail:providerDiagnosticDetail(o,this.env.APISPORTS_KEY),cache:o.cache||null}:null;
     const probeKey='api:provider-probe:v1:'+this.env.FE_PROVIDER_PROBE_RUN_ID;
     const lastSuccess=await this.ctx.storage.get('api:last-provider-success:v1');
     const lastFailure=await this.ctx.storage.get('api:last-provider-error:v1');
@@ -57,7 +58,7 @@ export class BackgroundWatcher extends QuotaWatcher{
     const globalQuota=await this.quotaStatus();
     const globalCooldown=await this.ctx.storage.get('api:provider-cooldown:global:v1');
     const endpointCooldowns=await this.ctx.storage.get('api:provider-cooldown:scoped:v1')||{};
-    return {diagnostics_version:'PACING_COOLDOWN_QUOTA_V6_UI_SYNC',budget,global_api_quota:globalQuota,enabled_devices:devices.length,last_cycle_at:lastCycleAt,last_cycle_current_day:lastCycleAt>0&&new Date(lastCycleAt).toISOString().slice(0,10)===budget.day,live:Number(status?.live||0),scanned:Number(status?.scanned||0),error_count:(status?.errors||[]).length,cycle_errors:cycleErrors,provider:{classification:'V2',latest:publicObservation(latest),last_failure:publicObservation(lastFailure),pacing:{...this.providerPacingCfg(),cooldown_until:Math.max(Number(this._providerRetryAt||0),Number(globalCooldown?.until||0)),consecutive_rate_failures:this._providerRateFailures||globalCooldown?.failures||0,endpoint_cooldowns:Object.entries(endpointCooldowns).map(([request_kind,s])=>({request_kind,until:Number(s.until||0),failures:Number(s.failures||0)})),instance_physical_attempts:this._providerPhysicalAttempts||0,instance_max_starts_per_second:this._providerMaxStartsPerSecond||0},probe:this.env.FE_PROVIDER_PROBE_RUN_ID?await this.ctx.storage.get(probeKey)||null:null}};
+    return {diagnostics_version:'PACING_COOLDOWN_QUOTA_V7_PAUSE_MINUTE',budget,global_api_quota:globalQuota,enabled_devices:devices.length,last_cycle_at:lastCycleAt,last_cycle_current_day:lastCycleAt>0&&new Date(lastCycleAt).toISOString().slice(0,10)===budget.day,live:Number(status?.live||0),scanned:Number(status?.scanned||0),error_count:(status?.errors||[]).length,cycle_errors:cycleErrors,provider:{classification:'V2',latest:publicObservation(latest),last_failure:publicObservation(lastFailure),pacing:{...this.providerPacingCfg(),cooldown_until:Math.max(Number(this._providerRetryAt||0),Number(globalCooldown?.until||0)),consecutive_rate_failures:this._providerRateFailures||globalCooldown?.failures||0,endpoint_cooldowns:Object.entries(endpointCooldowns).map(([request_kind,s])=>({request_kind,until:Number(s.until||0),failures:Number(s.failures||0)})),instance_physical_attempts:this._providerPhysicalAttempts||0,instance_max_starts_per_second:this._providerMaxStartsPerSecond||0},probe:this.env.FE_PROVIDER_PROBE_RUN_ID?await this.ctx.storage.get(probeKey)||null:null}};
   }
   async maybeStartProviderProbe(){
     const runId=this.env.FE_PROVIDER_PROBE_RUN_ID;

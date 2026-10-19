@@ -159,8 +159,9 @@ export class BackgroundWatcher extends HotPriorityWatcher{
     this._providerScopedCooldowns ||= {};
     if(observation.code==='API_PROVIDER_RATE_LIMIT'){
       // A soft HTTP 200 feed error must not mute unrelated discovery.
-      // Hard protocol, minute exhaustion and Retry-After remain global.
-      const hard=observation.http===429||observation.limits.minute_remaining===0||observation.retry_after_ms>0;
+      // Explicit subscription-wide minute errors are global even when HTTP 200 omits headers.
+      const subscriptionMinute=/per[ ._-]*minute/i.test(observation.detail||'')&&/subscription/i.test(observation.detail||'');
+      const hard=observation.http===429||observation.limits.minute_remaining===0||observation.retry_after_ms>0||subscriptionMinute;
       const state=hard?{until:this._providerRetryAt||0,failures:this._providerRateFailures||0}:{...(this._providerScopedCooldowns[kind]||{until:0,failures:0})};
       const active=state.until>Date.now();
       if(!active){

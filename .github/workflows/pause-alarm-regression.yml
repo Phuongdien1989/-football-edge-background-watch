@@ -1,0 +1,24 @@
+name: Paused Smart Follow alarm regression (no deploy)
+on:
+  push:
+    branches: [fix/paused-watch-alarm-20261019]
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node --check worker_notify_v135_full_pause.js
+      - run: node tests/test-paused-watch-register-alarm.mjs
+      - run: node tests/test-do-free-pause-no-rewrite.mjs
+      - run: node tests/test-do-free-scan-control-runtime.mjs
+      - run: node tests/test-do-free-peak-window.mjs
+      - run: npm install --no-save wrangler@4
+      - run: npx wrangler deploy --dry-run

@@ -49,7 +49,7 @@ export class BackgroundWatcher extends ExistingWatcher{
           for(const key of Object.keys(cal))cal[key]=(Array.isArray(b.calibration?.[key])?b.calibration[key]:[]).slice(-5000).map(r=>({score:r.score,minute:r.minute,level:r.level,tier:r.tier,goal_ft:r.goal_ft}));
           for(const key of Object.keys(cal))for(let i=0;i<5;i++)await this.ctx.storage.put(`notify:cal:${id}:${key}:${i}`,cal[key].slice(i*1000,(i+1)*1000));
           await this.ctx.storage.put('notify:device:'+id,{id,subscription:b.subscription,prefs:preferences(b.prefs),updated:Date.now()});
-          await this.ctx.storage.setAlarm(Date.now()+10000);return reply({ok:true,id});
+          await this.armBackgroundAlarm(Date.now()+10000);return reply({ok:true,id});
         }
         if(!/^[a-f0-9]{64}$/.test(b.id||''))return reply({error:'DEVICE_REQUIRED'},400);
         const d=await this.ctx.storage.get('notify:device:'+b.id);if(!d)return reply({error:'DEVICE_NOT_FOUND'},404);
@@ -58,7 +58,7 @@ export class BackgroundWatcher extends ExistingWatcher{
           for(const key of ['FT','legacyFT'])for(let i=0;i<5;i++)await this.ctx.storage.delete(`notify:cal:${b.id}:${key}:${i}`);
           return reply({ok:true});
         }
-        if(path==='/api/notify/settings'){d.prefs=preferences(b.prefs);d.updated=Date.now();await this.ctx.storage.put('notify:device:'+d.id,d);if(d.prefs.enabled)await this.ctx.storage.setAlarm(Date.now()+10000);return reply({ok:true})}
+        if(path==='/api/notify/settings'){d.prefs=preferences(b.prefs);d.updated=Date.now();await this.ctx.storage.put('notify:device:'+d.id,d);if(d.prefs.enabled)await this.armBackgroundAlarm(Date.now()+10000);return reply({ok:true})}
         if(path==='/api/notify/test')return reply({ok:await this.send(d,{title:'Football Edge • Thông báo thử',body:'Điện thoại đã nhận được thông báo Football Edge.',url:APP+'/#connectCard',tag:'fe-test',created_at:Date.now()})});
         return reply({error:'NOT_FOUND'},404);
       }catch(e){return reply({error:String(e.message||e).slice(0,160)},500)}
@@ -138,7 +138,7 @@ export class BackgroundWatcher extends ExistingWatcher{
   async alarm(){
     const results=await Promise.allSettled([super.alarm(),this.notifyWork(()=>this.notifyTick())]);
     for(const r of results)if(r.status==='rejected')console.log('Background task failed',String(r.reason?.message||r.reason));
-    if((await this.devices()).some(d=>d.prefs.enabled&&(d.prefs.goal||d.prefs.gap)))await this.ctx.storage.setAlarm(Date.now()+30000);
+    if((await this.devices()).some(d=>d.prefs.enabled&&(d.prefs.goal||d.prefs.gap)))await this.armBackgroundAlarm(Date.now()+30000);
   }
 }
 export default base;

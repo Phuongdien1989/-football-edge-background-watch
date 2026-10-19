@@ -1,0 +1,282 @@
+{
+  "run": "39206358168",
+  "production_source": "da5242bb41b2401271f52dda17b0e2208e7e3819",
+  "production_version": "04cc044d-412f-4844-9b83-c7c786eedd13",
+  "logical_provider_call_cap": 2,
+  "scanner_enabled_by_test": false,
+  "push_sent": false,
+  "production_D1_writes_requested": 0,
+  "cleanup": true,
+  "errors": [
+    "API_PROVIDER_RATE_LIMIT"
+  ],
+  "versions_before": {
+    "football-edge-background-watch": [
+      {
+        "version_id": "04cc044d-412f-4844-9b83-c7c786eedd13",
+        "percentage": 100
+      }
+    ],
+    "shiny-silence-d892": [
+      {
+        "version_id": "03c1d55d-358a-448b-96f3-f356704831df",
+        "percentage": 100
+      }
+    ],
+    "football-edge-desktop-b2-test": [
+      {
+        "version_id": "a332ee39-abb2-422d-a021-db78ef19cc10",
+        "percentage": 100
+      }
+    ]
+  },
+  "live_check": {
+    "diagnostics_before": {
+      "provider": {
+        "classification": "V2",
+        "latest": {
+          "at": 1792371417288,
+          "http": 200,
+          "code": "API_PROVIDER_RATE_LIMIT",
+          "limits": {
+            "daily_limit": null,
+            "daily_remaining": null,
+            "minute_limit": null,
+            "minute_remaining": null
+          },
+          "retry_after_ms": 0,
+          "rate_scope": "MINUTE",
+          "request_kind": "OTHER_ENDPOINT",
+          "cooldown_scope": "OTHER_ENDPOINT",
+          "response_count": 0,
+          "error_detail": "{\"rateLimit\":\"Too many requests. You have exceeded the limit of requests per minute of your subscription.\"}",
+          "cache": null
+        },
+        "last_failure": {
+          "at": 1792371417288,
+          "http": 200,
+          "code": "API_PROVIDER_RATE_LIMIT",
+          "limits": {
+            "daily_limit": null,
+            "daily_remaining": null,
+            "minute_limit": null,
+            "minute_remaining": null
+          },
+          "retry_after_ms": 0,
+          "rate_scope": "MINUTE",
+          "request_kind": "OTHER_ENDPOINT",
+          "cooldown_scope": "OTHER_ENDPOINT",
+          "response_count": 0,
+          "error_detail": "{\"rateLimit\":\"Too many requests. You have exceeded the limit of requests per minute of your subscription.\"}",
+          "cache": null
+        },
+        "pacing": {
+          "configured_minute_limit": 450,
+          "effective_minute_limit": 450,
+          "start_gap_ms": 143,
+          "bootstrap": true,
+          "cooldown_until": 0,
+          "consecutive_rate_failures": 0,
+          "endpoint_cooldowns": [
+            {
+              "request_kind": "OTHER_ENDPOINT",
+              "until": 1792371448612,
+              "failures": 2
+            },
+            {
+              "request_kind": "ODDS",
+              "until": 1792249878718,
+              "failures": 3
+            },
+            {
+              "request_kind": "EVENTS",
+              "until": 0,
+              "failures": 0
+            },
+            {
+              "request_kind": "STATISTICS",
+              "until": 1792249886167,
+              "failures": 3
+            },
+            {
+              "request_kind": "LIVE_WITH_TIMEZONE",
+              "until": 1792249920655,
+              "failures": 3
+            }
+          ],
+          "instance_physical_attempts": 0,
+          "instance_max_starts_per_second": 0
+        },
+        "probe": null
+      },
+      "quota": {
+        "ok": true,
+        "schema": "FE_API_QUOTA_50000_GLOBAL_V1",
+        "day": "2026-10-19",
+        "used": 64,
+        "limit": 50000,
+        "remaining": 49936,
+        "utilization_pct": 0.13,
+        "hard_cap": true,
+        "pacing": false,
+        "accounting": "PREPAID_BLOCK_UPPER_BOUND",
+        "usage_note": "used includes prepaid reservations that may not have been sent; unused reservations are forfeited on restart",
+        "block_size": 64
+      }
+    },
+    "attempts": [
+      {
+        "kind": "LIVE",
+        "ok": true,
+        "count": 1
+      }
+    ],
+    "devices": {
+      "total": 2,
+      "enabled": 2,
+      "settings": [
+        {
+          "transport": "web",
+          "h1_threshold": 72,
+          "goal_threshold": 70,
+          "gap_threshold": 70
+        },
+        {
+          "transport": "web",
+          "h1_threshold": 72,
+          "goal_threshold": 60,
+          "gap_threshold": 60
+        }
+      ]
+    },
+    "error": "API_PROVIDER_RATE_LIMIT",
+    "diagnostics_after": {
+      "provider": {
+        "classification": "V2",
+        "latest": {
+          "at": 1792388858981,
+          "http": 200,
+          "code": "API_PROVIDER_RATE_LIMIT",
+          "limits": {
+            "daily_limit": null,
+            "daily_remaining": null,
+            "minute_limit": null,
+            "minute_remaining": null
+          },
+          "retry_after_ms": 0,
+          "rate_scope": "MINUTE",
+          "request_kind": "STATISTICS",
+          "cooldown_scope": "GLOBAL",
+          "response_count": 0,
+          "error_detail": "{\"rateLimit\":\"Too many requests. You have exceeded the limit of requests per minute of your subscription.\"}",
+          "cache": {
+            "age_seconds": null,
+            "status": "DYNAMIC",
+            "response_date": "2026-10-19T05:47:38.000Z"
+          }
+        },
+        "last_failure": {
+          "at": 1792388858981,
+          "http": 200,
+          "code": "API_PROVIDER_RATE_LIMIT",
+          "limits": {
+            "daily_limit": null,
+            "daily_remaining": null,
+            "minute_limit": null,
+            "minute_remaining": null
+          },
+          "retry_after_ms": 0,
+          "rate_scope": "MINUTE",
+          "request_kind": "STATISTICS",
+          "cooldown_scope": "GLOBAL",
+          "response_count": 0,
+          "error_detail": "{\"rateLimit\":\"Too many requests. You have exceeded the limit of requests per minute of your subscription.\"}",
+          "cache": {
+            "age_seconds": null,
+            "status": "DYNAMIC",
+            "response_date": "2026-10-19T05:47:38.000Z"
+          }
+        },
+        "pacing": {
+          "configured_minute_limit": 450,
+          "effective_minute_limit": 450,
+          "start_gap_ms": 143,
+          "bootstrap": true,
+          "cooldown_until": 1792388918981,
+          "consecutive_rate_failures": 1,
+          "endpoint_cooldowns": [
+            {
+              "request_kind": "OTHER_ENDPOINT",
+              "until": 1792371448612,
+              "failures": 2
+            },
+            {
+              "request_kind": "ODDS",
+              "until": 1792249878718,
+              "failures": 3
+            },
+            {
+              "request_kind": "EVENTS",
+              "until": 0,
+              "failures": 0
+            },
+            {
+              "request_kind": "STATISTICS",
+              "until": 1792249886167,
+              "failures": 3
+            },
+            {
+              "request_kind": "LIVE_WITH_TIMEZONE",
+              "until": 0,
+              "failures": 0
+            }
+          ],
+          "instance_physical_attempts": 2,
+          "instance_max_starts_per_second": 2
+        },
+        "probe": null
+      },
+      "quota": {
+        "ok": true,
+        "schema": "FE_API_QUOTA_50000_GLOBAL_V1",
+        "day": "2026-10-19",
+        "used": 128,
+        "limit": 50000,
+        "remaining": 49872,
+        "utilization_pct": 0.26,
+        "hard_cap": true,
+        "pacing": false,
+        "accounting": "PREPAID_BLOCK_UPPER_BOUND",
+        "usage_note": "used includes prepaid reservations that may not have been sent; unused reservations are forfeited on restart",
+        "block_size": 64
+      }
+    }
+  },
+  "health_after": {
+    "commit": "da5242bb41b2401271f52dda17b0e2208e7e3819",
+    "scanner": false,
+    "alarm": null,
+    "diagnostics": "PACING_COOLDOWN_QUOTA_V7_PAUSE_MINUTE"
+  },
+  "versions_after": {
+    "football-edge-background-watch": [
+      {
+        "version_id": "04cc044d-412f-4844-9b83-c7c786eedd13",
+        "percentage": 100
+      }
+    ],
+    "shiny-silence-d892": [
+      {
+        "version_id": "03c1d55d-358a-448b-96f3-f356704831df",
+        "percentage": 100
+      }
+    ],
+    "football-edge-desktop-b2-test": [
+      {
+        "version_id": "a332ee39-abb2-422d-a021-db78ef19cc10",
+        "percentage": 100
+      }
+    ]
+  },
+  "versions_unchanged": true
+}

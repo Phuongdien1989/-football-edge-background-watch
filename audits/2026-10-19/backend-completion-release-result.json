@@ -1,0 +1,62 @@
+{
+  "source": "da5242bb41b2401271f52dda17b0e2208e7e3819",
+  "original_version": "2be01a61-cc5d-43c7-9c6d-13e581296453",
+  "original_source": "3c97629e51251c56f9edeb8d0f67a7a0dad957a2",
+  "deployment": "DEPLOYED_VERIFIED",
+  "provider_requests_requested": 0,
+  "checks": {
+    "rollback_versions": "PASS",
+    "preflight": "PASS",
+    "runtime_settings_and_clients": "PASS",
+    "new_DO_version": "PASS",
+    "off_no_alarm_window": "PASS"
+  },
+  "errors": [],
+  "scan_before": {
+    "enabled": false,
+    "manual": false,
+    "alarm": null
+  },
+  "production_version": "04cc044d-412f-4844-9b83-c7c786eedd13",
+  "observations": [
+    {
+      "elapsed": 529,
+      "edge_source": "da5242bb41b2401271f52dda17b0e2208e7e3819",
+      "do_current": true,
+      "alarm": null
+    }
+  ],
+  "pause_observation": [
+    {
+      "at": 1792388718964,
+      "alarm": null,
+      "quota_used": 64,
+      "diagnostics": "PACING_COOLDOWN_QUOTA_V7_PAUSE_MINUTE"
+    },
+    {
+      "at": 1792388729316,
+      "alarm": null,
+      "quota_used": 64,
+      "diagnostics": "PACING_COOLDOWN_QUOTA_V7_PAUSE_MINUTE"
+    },
+    {
+      "at": 1792388739716,
+      "alarm": null,
+      "quota_used": 64,
+      "diagnostics": "PACING_COOLDOWN_QUOTA_V7_PAUSE_MINUTE"
+    },
+    {
+      "at": 1792388750102,
+      "alarm": null,
+      "quota_used": 64,
+      "diagnostics": "PACING_COOLDOWN_QUOTA_V7_PAUSE_MINUTE"
+    },
+    {
+      "at": 1792388760471,
+      "alarm": null,
+      "quota_used": 64,
+      "diagnostics": "PACING_COOLDOWN_QUOTA_V7_PAUSE_MINUTE"
+    }
+  ],
+  "rollback": "AVAILABLE_VERIFIED"
+}
