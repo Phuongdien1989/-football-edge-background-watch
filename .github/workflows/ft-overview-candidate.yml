@@ -62,3 +62,4 @@ jobs:
           path: |
             ft-overview/preview-release-result.json
             ft-overview/qa/published-390.png
+            ft-overview/qa/published-integrated-*.png

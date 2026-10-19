@@ -54,3 +54,13 @@ The isolated published preview serves only DEMO assets, has zero bindings and a
 `connect-src 'none'` CSP. It cannot contact backend/provider or alter production.
 
 No claim of production release, restored statistics or proven betting performance.
+
+## Native layout integration (follow-up)
+
+The new section is a native styled collapsible card immediately before H1/FT/HC.
+It starts folded, preserves the existing navigation and shows the Overview charts
+only when opened. Its CSS is scoped to its own card; no global legacy styles change.
+The separate preview `/app/#ftOverviewCard` displays the exact pinned original
+Mobile layout with this addition. This *layout-only* route blocks API, Push and
+Worker connections by CSP and never contains demo fixtures. The standalone `/`
+route remains explicitly fictional DEMO. Production integration is not deployed.

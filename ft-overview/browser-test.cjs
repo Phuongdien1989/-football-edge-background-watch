@@ -25,11 +25,15 @@ const assert=require('node:assert/strict');
    await page.screenshot({path:`ft-overview/qa/demo-${width}.png`,fullPage:true});
   }
   // Actual legacy page + additive module. Block all external traffic before load.
-  await page.setViewportSize({width:390,height:900});await page.goto(origin+'/ft-overview/build/');await page.waitForSelector('#ftOverviewCard .fo-empty');
+  await page.setViewportSize({width:390,height:900});await page.goto(origin+'/ft-overview/build/');await page.waitForSelector('#ftOverviewCard .fo-empty',{state:'attached'});
+  assert.equal(await page.locator('#ftOverviewCard').getAttribute('open'),null);
+  await page.locator('#ftOverviewCard summary').first().click();await page.waitForSelector('#ftOverviewCard .fo-empty');
+  assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));
   assert.equal(await page.locator('#liveWatchCard').count(),1);assert.equal(await page.locator('#h1WatchCard').count(),1);assert.equal(await page.locator('#handicapWatchCard').count(),1);
   const bridge=await page.evaluate(()=>({original:typeof FEUIReadBridge?.read,overview:typeof FEOverviewInputBridge?.read,preview:!!FTOverviewPreview}));
   assert.deepEqual(bridge,{original:'function',overview:'function',preview:true});
   await page.locator('#ftOverviewCard').scrollIntoViewIfNeeded();await page.screenshot({path:'ft-overview/qa/integrated-390.png',fullPage:false});
+  await page.locator('#ftOverviewCard summary').first().click();await page.screenshot({path:'ft-overview/qa/integrated-collapsed-390.png',fullPage:false});
   // Isolated adapter UI using a real-shaped bridge; expired stats cannot recommend.
   const live=await context.newPage();await live.addInitScript(()=>{
     const now=Date.now(),item={id:51,home:'<img src=x onerror=alert(1)>',away:'B',latest:{captured_at:now,minute:35,status:'1H',goals:{home:0,away:0},metrics:{total:{shots:7,sot:2}},stats_presence:{shots:true,sot:true}},eval:{score:80,scoreMode:'FULL'},history:[]};

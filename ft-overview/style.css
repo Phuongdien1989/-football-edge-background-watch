@@ -6,3 +6,12 @@
 @media(min-width:768px){.fo-grid{grid-template-columns:1fr 1fr;gap:12px}.fo-card{padding:24px}.fo-recommend h3{font-size:28px}.fo-match strong{font-size:45px}}
 @media(max-width:360px){.fo-card{padding:12px}.fo-recommend h3{font-size:20px}.fo-match strong{font-size:29px}}
 .fo-negative{color:#ac6416}.fo-assessment details{margin-top:7px;font-size:10px}.fo-assessment summary{cursor:pointer;color:#648074}
+/* Additive integration: same rounded native card, own scoped selectors only. */
+#ftOverviewCard.fo-native{margin-top:16px;margin-bottom:16px;padding:16px;border:1px solid #dce9f5;border-radius:26px;background:linear-gradient(125deg,#f4faff,#fff);box-shadow:0 12px 30px #16365907;scroll-margin-top:70px}
+#ftOverviewCard>.fo-native-head{display:flex;align-items:center;gap:12px;cursor:pointer;list-style:none;color:#143464;min-height:44px;text-align:left}
+#ftOverviewCard>.fo-native-head::-webkit-details-marker{display:none}
+.fo-native-icon{display:grid;place-items:center;background:linear-gradient(145deg,#178eff,#0667db);color:#fff;border-radius:13px;min-width:39px;height:39px;font:800 22px system-ui;box-shadow:0 6px 16px #1683f530}
+.fo-native-head strong{font:800 14px system-ui;letter-spacing:.3px}.fo-native-head small{display:block;font:10px system-ui;color:#718cae;margin-top:4px}.fo-native-toggle{margin-left:auto;border-radius:20px;padding:9px 11px;background:white;border:1px solid #e0ebf5;font:800 9px system-ui;color:#395d83}
+#ftOverviewCard[open]>.fo-native-head{margin-bottom:15px}.fo-native[open] .fo-native-toggle{color:#008360;background:#e5fbf2}
+.fo-native [data-ft-overview]{margin:0;padding:0;max-width:none}.fo-native .fo-header{display:none}.fo-native .fo-card{border:0;background:transparent;padding:0;box-shadow:none}.fo-native .fo-note{margin-bottom:0!important}.fo-native .fo-top{margin-top:6px}
+.fo-preview-link{display:block;margin:12px 0;color:#087bff;font:600 12px system-ui;text-decoration:none}.fo-preview-banner{position:sticky;top:0;z-index:9999;background:#e9f6ff;border-bottom:1px solid #c9dff1;padding:9px 14px;text-align:center;font:600 11px system-ui;color:#244c77}.fo-preview-banner a{color:#087bff;margin-left:10px}
