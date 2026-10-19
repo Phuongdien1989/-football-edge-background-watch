@@ -1,0 +1,67 @@
+{
+  "run": "39206708894",
+  "production_source": "da5242bb41b2401271f52dda17b0e2208e7e3819",
+  "production_version": "04cc044d-412f-4844-9b83-c7c786eedd13",
+  "provider_requests": 0,
+  "push_call_cap": 1,
+  "scanner_enabled_by_test": false,
+  "push_sent": true,
+  "production_D1_writes_requested": 0,
+  "cleanup": true,
+  "errors": [],
+  "versions_before": {
+    "football-edge-background-watch": [
+      {
+        "version_id": "04cc044d-412f-4844-9b83-c7c786eedd13",
+        "percentage": 100
+      }
+    ],
+    "shiny-silence-d892": [
+      {
+        "version_id": "03c1d55d-358a-448b-96f3-f356704831df",
+        "percentage": 100
+      }
+    ],
+    "football-edge-desktop-b2-test": [
+      {
+        "version_id": "a332ee39-abb2-422d-a021-db78ef19cc10",
+        "percentage": 100
+      }
+    ]
+  },
+  "push_check": {
+    "enabled_web_subscriptions": 2,
+    "apple_subscriptions": 1,
+    "sent": true,
+    "started_at": 1792389108584,
+    "accepted": true,
+    "completed_at": 1792389109533
+  },
+  "health_after": {
+    "commit": "da5242bb41b2401271f52dda17b0e2208e7e3819",
+    "scanner": false,
+    "alarm": null,
+    "diagnostics": "PACING_COOLDOWN_QUOTA_V7_PAUSE_MINUTE"
+  },
+  "versions_after": {
+    "football-edge-background-watch": [
+      {
+        "version_id": "04cc044d-412f-4844-9b83-c7c786eedd13",
+        "percentage": 100
+      }
+    ],
+    "shiny-silence-d892": [
+      {
+        "version_id": "03c1d55d-358a-448b-96f3-f356704831df",
+        "percentage": 100
+      }
+    ],
+    "football-edge-desktop-b2-test": [
+      {
+        "version_id": "a332ee39-abb2-422d-a021-db78ef19cc10",
+        "percentage": 100
+      }
+    ]
+  },
+  "versions_unchanged": true
+}
