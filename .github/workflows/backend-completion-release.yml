@@ -1,0 +1,49 @@
+name: Backend pause and subscription-minute fixes — regression and guarded release
+on:
+  push:
+    branches: [fix/paused-watch-alarm-20261019]
+    paths: ['.github/workflows/backend-completion-release.yml']
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    permissions: {contents: read}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Verify complete alarm, provider, scheduler and quota regressions
+        run: |
+          set -e
+          for f in tests/test-do-free-*.mjs tests/test-provider-errors.mjs tests/test-notify-statistics-errors.mjs tests/test-notify-ui-state.mjs tests/test-complete-paused-alarms.mjs tests/test-subscription-minute-cooldown.mjs tests/test-provider-diagnostic-detail.mjs tests/test-paused-watch-register-alarm.mjs; do node "$f"; done
+      - run: npm install --no-save wrangler@4
+      - run: npx wrangler deploy --dry-run
+  release:
+    needs: regression
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    environment: football-edge-production
+    concurrency:
+      group: football-edge-backend-production
+      cancel-in-progress: false
+    permissions: {contents: read}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - run: npm install --no-save wrangler@4
+      - name: Exact rollback and configuration guards, deploy and verify OFF invariants
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node .github/scripts/backend-completion-release.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: backend-completion-release-result
+          path: backend-completion-release-result.json

@@ -110,7 +110,7 @@ export class BackgroundWatcher extends ValidationWatcher{
         if(!validNative(platform,token))return reply({error:'INVALID_NATIVE_TOKEN'},400);
         const id=await sha256Id('native:'+platform+':'+token),devices=await this.devices();if(devices.length>=10&&!devices.some(d=>d.id===id))return reply({error:'DEVICE_LIMIT_10'},409);
         const d={id,transport:'native',platform,token,prefs:nativePrefs(b.prefs),updated:Date.now(),app_version:String(b.app_version||'').slice(0,40)||null,native_version:String(b.native_version||'').slice(0,40)||null,apns_env:platform==='ios'?String(b.apns_env||this.env.APNS_ENV||'sandbox').toLowerCase():null};
-        await this.ctx.storage.put('notify:device:'+id,d);await this.ctx.storage.setAlarm(Date.now()+1000);
+        await this.ctx.storage.put('notify:device:'+id,d);await this.armBackgroundAlarm(Date.now()+1000);
         const caps=await this.nativeCapabilities();return reply({ok:true,id,platform,transport:'native',sender_ready:platform==='android'?caps.fcm_configured:caps.apns_configured});
       }catch(e){return reply({error:'NATIVE_SUBSCRIBE_FAILED',message:text(e)},500)}
     }

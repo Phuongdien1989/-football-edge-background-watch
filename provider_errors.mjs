@@ -20,5 +20,8 @@ export function providerObservation(response,data,secret='',now=Date.now()){
  else if(!Array.isArray(data?.response))code='EVIDENCE_PROVIDER_INVALID_RESPONSE';
  const retry=response.headers.get('retry-after');
  const retryAfterMs=retry===null?0:/^\d+(\.\d+)?$/.test(retry)?Number(retry)*1000:Math.max(0,Date.parse(retry)-now)||0;
- return {at:now,http:response.status,code,limits,retry_after_ms:retryAfterMs,detail:code==='OK'?null:detail};
+ const cacheStatus=String(response.headers.get('cf-cache-status')||'').toUpperCase();
+ const responseDate=Date.parse(response.headers.get('date')||'');
+ const cache={age_seconds:number('age'),status:/^[A-Z_-]{1,32}$/.test(cacheStatus)?cacheStatus:null,response_date:Number.isFinite(responseDate)?new Date(responseDate).toISOString():null};
+ return {at:now,http:response.status,code,limits,cache,retry_after_ms:retryAfterMs,detail:code==='OK'?null:detail};
 }

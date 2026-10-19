@@ -1,0 +1,25 @@
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+import vm from 'node:vm';
+import {providerObservation} from '../provider_errors.mjs';
+const quota=readFileSync('worker_notify_v137_quota50000.js','utf8');
+const start=quota.indexOf('  providerPacingCfg(){'),end=quota.indexOf('  async fetch(request)',start);
+const code=quota.slice(start,end).replace(/\n  (async )?(beforeProviderRequest|recordProviderObservation)/g,',\n  $1$2');
+let now=100000,paid=0,physical=0;const saved=new Map();
+const opts={Date:{now:()=>now},Number,Math,Promise,Error,RegExp,n:(v,d=0)=>Number.isFinite(Number(v))?Number(v):d,setTimeout:(fn,ms)=>{now+=ms;fn()}};
+const make=()=>{const w=vm.runInNewContext('({'+code+'})',opts);w.env={API_PROVIDER_MINUTE_LIMIT:'450'};w.ctx={storage:{get:async k=>saved.get(k),put:async(k,v)=>saved.set(k,structuredClone(v))}};w.reserveApiCall=async()=>paid++;return w};
+const w=make();
+const obs=providerObservation(new Response('{}',{status:200}),{errors:{rateLimit:'Too many requests. You have exceeded the limit of requests per minute of your subscription.'},response:[]},'',now);obs.request_kind='STATISTICS';
+await w.recordProviderObservation(obs);assert.equal(obs.cooldown_scope,'GLOBAL');assert.equal(w._providerRetryAt,now+60000);
+for(const kind of ['LIVE_WITH_TIMEZONE','OTHER_ENDPOINT','EVENTS','STATISTICS','ODDS'])await assert.rejects(w.beforeProviderRequest(kind),e=>e.message==='API_PROVIDER_COOLDOWN'&&e.cooldownScope==='GLOBAL'&&!e.retryable);
+assert.equal(paid,0);
+const restarted=make();await assert.rejects(restarted.beforeProviderRequest('LIVE_WITH_TIMEZONE'),/API_PROVIDER_COOLDOWN/);assert.equal(paid,0,'restart cannot bypass persisted subscription cooldown');
+now+=60000;await restarted.beforeProviderRequest('LIVE_WITH_TIMEZONE');assert.equal(paid,1,'calls resume when actual cooldown expires');
+const base=readFileSync('worker.js','utf8'),b=base.indexOf('  async api(path,params={},strict=false){'),e=base.indexOf('  async listWatches(){',b);
+const api=vm.runInNewContext('({'+base.slice(b,e)+'})',{URL,AbortController,Error,Object,JSON,Number,Math,Date:{now:()=>now},providerObservation,setTimeout:()=>0,clearTimeout:()=>{},fetch:async()=>{physical++;return new Response(JSON.stringify({errors:{rateLimit:'Too many requests. You have exceeded the limit of requests per minute of your subscription.'},response:[]}))}});
+const combined=make();combined.api=api.api;combined.env.APISPORTS_KEY='FAKE_TEST_KEY';
+combined._providerScopedCooldowns={STATISTICS:{until:now-2000,failures:1}};combined._providerCooldownLoaded=true;
+for(const strict of [false,true]){combined._providerRetryAt=0;combined._providerRateFailures=0;await assert.rejects(combined.api('/fixtures/statistics',{fixture:1},strict),e=>e.message==='API_PROVIDER_RATE_LIMIT'&&e.cooldownScope==='GLOBAL'&&e.retryAfterMs>=60000&&e.retryable===false)}
+assert.equal(physical,2,'one physical response per explicit test; global error never becomes empty-valid for tolerant caller');
+const cached=providerObservation(new Response('{}',{headers:{age:'123','cf-cache-status':'HIT',date:'Mon, 19 Oct 2026 00:00:00 GMT'}}),{errors:[],response:[]});assert.deepEqual(cached.cache,{age_seconds:123,status:'HIT',response_date:'2026-10-19T00:00:00.000Z'});
+console.log('SUBSCRIPTION_MINUTE_PASS: HTTP200 exact provider body -> persisted global 60s cooldown; all endpoints/restart; recovery; strict+tolerant errors; no stale scoped timer masking; cache headers read only');

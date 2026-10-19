@@ -375,11 +375,12 @@ export class BackgroundWatcher extends DurableObject {
       observation.request_kind=requestKind;
       observation.response_count=Array.isArray(data?.response)?data.response.length:null;
       if(typeof this.recordProviderObservation==='function')await this.recordProviderObservation(observation);
-      if(observation.code!=='OK'&&(strict||!r.ok)){
+      if(observation.code!=='OK'&&(strict||!r.ok||observation.cooldown_scope==='GLOBAL')){
         const error=new Error(observation.code);
         error.http=observation.http;
-        const softRate=observation.code==='API_PROVIDER_RATE_LIMIT'&&r.status===200&&observation.limits.minute_remaining!==0;
-        error.retryAfterMs=observation.retry_after_ms||(softRate?Math.max(1000,Number(this._providerScopedCooldowns?.[requestKind]?.until||this._providerRetryAt||0)-Date.now()):0);
+        const softRate=observation.code==='API_PROVIDER_RATE_LIMIT'&&r.status===200&&observation.limits.minute_remaining!==0&&observation.cooldown_scope!=='GLOBAL';
+        error.cooldownScope=observation.cooldown_scope||null;
+        error.retryAfterMs=observation.retry_after_ms||(observation.code==='API_PROVIDER_RATE_LIMIT'?Math.max(1000,Math.max(Number(this._providerScopedCooldowns?.[requestKind]?.until||0),Number(this._providerRetryAt||0))-Date.now()):0);
         error.retryable=observation.code==='API_PROVIDER_SERVER_ERROR'||softRate&&error.retryAfterMs<=10000;
         throw error;
       }
@@ -493,6 +494,11 @@ export class BackgroundWatcher extends DurableObject {
     out.sort((a,b)=>Number(a.captured_at)-Number(b.captured_at));
     return out.slice(-lim);
   }
+  async armBackgroundAlarm(at){
+    const control=typeof this.scanControl==='function'?await this.scanControl():{enabled:true};
+    if(control?.enabled===false)return null;
+    await this.ctx.storage.setAlarm(at);return at;
+  }
   async ensureAlarm(delayMs=null){
     const current=await this.ctx.storage.getAlarm();
     if(current!=null)return current;
@@ -502,7 +508,7 @@ export class BackgroundWatcher extends DurableObject {
     const focus=active.some(x=>x.level==="focus");
     const delay=delayMs??(focus?this.cfg("FOCUS_INTERVAL_MS",30000):this.cfg("SCREEN_INTERVAL_MS",60000));
     const at=Date.now()+Math.max(10000,delay);
-    await this.ctx.storage.setAlarm(at);return at;
+    return this.armBackgroundAlarm(at);
   }
   async register(body){
     const now=Date.now(),input=Array.isArray(body?.fixtures)?body.fixtures:[],

@@ -79,7 +79,7 @@ export class BackgroundWatcher extends DeepLinkWatcher{
         const raw=await request.text();if(raw.length>2000000)return reply({error:'REQUEST_TOO_LARGE'},413);const b=JSON.parse(raw||'{}');
         if(!/^[a-f0-9]{64}$/.test(b.id||''))return reply({error:'DEVICE_REQUIRED'},400);
         const d=await this.ctx.storage.get('notify:device:'+b.id);if(!d)return reply({error:'DEVICE_NOT_FOUND'},404);
-        d.prefs=prefs(b.prefs);d.updated=Date.now();await this.ctx.storage.put('notify:device:'+d.id,d);if(d.prefs.enabled)await this.ctx.storage.setAlarm(Date.now()+1000);return reply({ok:true});
+        d.prefs=prefs(b.prefs);d.updated=Date.now();await this.ctx.storage.put('notify:device:'+d.id,d);if(d.prefs.enabled)await this.armBackgroundAlarm(Date.now()+1000);return reply({ok:true});
       }catch(e){return reply({error:String(e.message||e).slice(0,160)},500)}
     }
     if(path==='/api/notify/status'&&request.method==='GET'){
@@ -210,7 +210,7 @@ export class BackgroundWatcher extends DeepLinkWatcher{
       const devices=(await this.devices()).filter(d=>d?.prefs?.enabled&&(d?.prefs?.h1||d?.prefs?.goal||d?.prefs?.gap));
       if(control?.enabled!==false&&devices.length){
         const nextAt=Math.max(Date.now()+1000,alarmStarted+SCAN_TARGET_MS);
-        await this.ctx.storage.setAlarm(nextAt);
+        await this.armBackgroundAlarm(nextAt);
       }
     }catch(e){console.log('Notify cadence reschedule failed',errText(e))}
   }
