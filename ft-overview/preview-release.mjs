@@ -15,12 +15,17 @@ async function readVersions(){const out={};for(const [name,version]of Object.ent
 const before=await readVersions();
 const name='football-edge-ft-overview-preview';
 const exists=await fetch(root+name+'/settings',{headers,signal:AbortSignal.timeout(20000)});
-if(exists.status!==404)throw Error('PREVIEW_TARGET_ALREADY_EXISTS_OR_NOT_AUTHORIZED_'+exists.status);
+if(exists.status!==404){
+ const existing=await exists.json();
+ if(!exists.ok||!existing.success||!existing.result?.tags?.includes('ft-overview-demo-only-20261019')||(existing.result.bindings||[]).length)throw Error('PREVIEW_TARGET_NOT_OWNED_ISOLATED_DEMO_'+exists.status);
+}
 const files={};for(const p of ['index.html','style.css','core.mjs','adapter.mjs','charts.mjs','demo.mjs','ui.mjs'])files['/'+p]=readFileSync('ft-overview/'+p,'utf8');
 const module=`const files=${JSON.stringify(files)};export default {async fetch(request){const u=new URL(request.url);const p=u.pathname==='/'?'/index.html':u.pathname;if(!(p in files))return new Response('Not found',{status:404});return new Response(files[p],{headers:{'Content-Type':p.endsWith('.html')?'text/html; charset=utf-8':p.endsWith('.css')?'text/css; charset=utf-8':'text/javascript; charset=utf-8','Cache-Control':'no-store','Content-Security-Policy':"default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'none'; img-src 'self' data:; base-uri 'none'; frame-ancestors 'none'; form-action 'none'",'X-Content-Type-Options':'nosniff','Referrer-Policy':'no-referrer'}})}};`;
 const form=new FormData();form.append('metadata',new Blob([JSON.stringify({main_module:'preview.mjs',compatibility_date:'2026-09-11',bindings:[],tags:['ft-overview-demo-only-20261019']})],{type:'application/json'}));form.append('preview.mjs',new Blob([module],{type:'application/javascript+module'}),'preview.mjs');
 const r=await fetch(root+name,{method:'PUT',headers,body:form,signal:AbortSignal.timeout(60000)}),j=await r.json();if(!r.ok||!j.success)throw Error('PREVIEW_UPLOAD_FAILED_'+r.status);
 const sub=await fetch(root+name+'/subdomain',{method:'POST',headers:{...headers,'Content-Type':'application/json'},body:JSON.stringify({enabled:true,previews_enabled:false}),signal:AbortSignal.timeout(20000)});if(!sub.ok)throw Error('PREVIEW_SUBDOMAIN_FAILED_'+sub.status);
 const after=await readVersions();
-const report={status:'PASS',script:name,url:'https://'+name+'.ngophuonghuy.workers.dev/',demo_only:true,bindings:0,provider_calls:0,production_before:before,production_after:after,version:j.result?.version_id||j.result?.deployment_id||null};
+const active=await fetch(root+name+'/deployments',{headers,signal:AbortSignal.timeout(20000)}),activeJSON=await active.json();
+if(!active.ok||!activeJSON.success)throw Error('PREVIEW_ACTIVE_VERSION_NOT_VERIFIED');
+const report={status:'PASS',script:name,url:'https://'+name+'.ngophuonghuy.workers.dev/',demo_only:true,bindings:0,provider_calls:0,production_before:before,production_after:after,version:activeJSON.result?.deployments?.[0]?.versions?.[0]?.version_id||null,source_commit:process.env.GITHUB_SHA||null};
 writeFileSync('ft-overview/preview-release-result.json',JSON.stringify(report,null,2));console.log(JSON.stringify(report));

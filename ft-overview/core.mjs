@@ -96,7 +96,8 @@ export function assess(snapshot, now) {
   else if (model.validated !== true) { entry = model.kind === 'DEMO' ? 'DEMO' : 'RESEARCH';reason = 'Định giá thử nghiệm; chưa đủ bằng chứng để phát khuyến nghị thật'; }
   else { entry = 'REVIEW';reason = 'Đã có định giá; cần nghiệm thu cơ chế ra quyết định trước khi bật khuyến nghị'; }
   const reconciliation = !binary ? 'MARKET INCOMPLETE' : delta === null ? 'MODEL WAIT' : Math.abs(delta) < 1e-9 ? 'ALIGNED' : delta > 0 ? 'MODEL ABOVE MARKET' : 'MODEL BELOW MARKET';
-  return {id:snapshot.id,snapshot,at,minute,fresh,blocked:!!blocked,entry,reason,data,quote,binary,delta,reconciliation,modelOK,marketFresh,modelVersion:modelOK?model.version:null,
+  const synthesis=blocked?'Dữ liệu hiện tại chưa dùng để đưa ra nhận định mới.':!quote?'Giữ nhận định diễn biến; chờ đủ phân phối bàn và giá cùng trạng thái.':quote.ev<=0?'Ở giá đang trả, model chưa cho lợi thế. Dù có thể cao hơn thị trường, giá vẫn chưa vượt mức hòa vốn theo model.':'Giá đang trả cao hơn giá công bằng ước tính. Cần kiểm chứng giả định model và lý do khác biệt trước khi coi đây là lợi thế thực.';
+  return {id:snapshot.id,snapshot,at,minute,fresh,blocked:!!blocked,entry,reason,synthesis,data,quote,binary,delta,reconciliation,modelOK,marketFresh,modelVersion:modelOK?model.version:null,
     recommendation:{selection:'OVER',period:'FT',line:marketFresh?market.line:null,odds:marketFresh?market.over:null,action:'NO_LIVE_RECOMMENDATION'},
     whyChange:'Đối chiếu dữ liệu, trạng thái và giá cùng thời điểm'};
 }

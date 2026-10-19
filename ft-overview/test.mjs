@@ -21,6 +21,7 @@ test('Out-of-order and same-revision conflicts preserve newest data',()=>{const 
 test('Freshness expires without another server update',()=>{const st=createStore();st.ingest(sample());assert.equal(st.read(now+61000)[0].entry,'STALE');assert.equal(st.read(now+61000)[0].rank,null);});
 test('Stats errors and post-goal stale price cannot issue recommendation',()=>{let s=sample();s.statsError=true;assert.equal(assess(s,now).entry,'DATA WAIT');s=sample();s.eventAt=now+1;assert.equal(assess(s,now).entry,'WAIT PRICE');s=sample();s.market.score={home:0,away:0};assert.equal(assess(s,now).marketFresh,false);});
 test('Demo and research are explicitly gated from live recommendations',()=>{let s=sample();assert.equal(assess(s,now).entry,'DEMO');assert.equal(assess(s,now).recommendation.action,'NO_LIVE_RECOMMENDATION');s.model.kind='RESEARCH';assert.equal(assess(s,now).entry,'RESEARCH');});
+test('Agreement or model above market is not automatically a good entry price',()=>{const s=demoSnapshots(now)[2],r=assess(s,now);assert.ok(r.delta>0);assert.ok(r.quote.ev<0);assert.ok(r.synthesis.includes('chưa cho lợi thế'));});
 test('Independent model cannot be substituted with legacy score or wrong observation',()=>{const s=sample();s.model=null;s.legacy={score:99};assert.equal(assess(s,now).modelOK,false);s.model=sample().model;s.model.at--;assert.equal(assess(s,now).modelOK,false);});
 test('Missing historical goals, future and duplicate matches not learned as evidence',()=>{
   const r={date:'2026-10-10T10:00:00Z',status:'FT',home_id:1,away_id:2,goals:{home:2,away:1}};

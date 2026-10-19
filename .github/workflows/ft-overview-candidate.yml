@@ -51,8 +51,14 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: node ft-overview/preview-release.mjs
+      - run: npm install --no-save playwright@1.58.2
+      - run: npx playwright install --with-deps chromium
+      - name: Verify real HTTPS preview, CSP and negative-EV wait state
+        run: node ft-overview/preview-smoke.cjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: ft-overview-preview-release-result
-          path: ft-overview/preview-release-result.json
+          path: |
+            ft-overview/preview-release-result.json
+            ft-overview/qa/published-390.png
