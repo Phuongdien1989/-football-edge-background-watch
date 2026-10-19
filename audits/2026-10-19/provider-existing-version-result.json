@@ -1,0 +1,120 @@
+{
+  "checkpoint": "244008b40e0e4f73603f10ca58caf60c7681be68",
+  "original": "2be01a61-cc5d-43c7-9c6d-13e581296453",
+  "candidate": "0ce2f6fb-7bbb-4a92-9e6c-10a5caf78127",
+  "candidate_source": "2b55cad3e6e28c38992c38f5df7b563471e2e50c",
+  "provider_requests": 0,
+  "deployment": "DIAGNOSTIC_VERIFIED",
+  "errors": [],
+  "preflight": {
+    "commit": "3c97629e51251c56f9edeb8d0f67a7a0dad957a2",
+    "scanner": false,
+    "manual": false,
+    "alarm": null
+  },
+  "preflight_checks": "PASS",
+  "observations": [
+    {
+      "elapsed_ms": 432,
+      "commit": "2b55cad3e6e28c38992c38f5df7b563471e2e50c",
+      "field_present": false,
+      "alarm": null
+    },
+    {
+      "elapsed_ms": 10929,
+      "commit": "2b55cad3e6e28c38992c38f5df7b563471e2e50c",
+      "field_present": true,
+      "alarm": null
+    }
+  ],
+  "stored_provider": {
+    "classification": "V2",
+    "latest": {
+      "at": 1792317798982,
+      "http": 200,
+      "code": "OK",
+      "limits": {
+        "daily_limit": 75000,
+        "daily_remaining": 53861,
+        "minute_limit": 450,
+        "minute_remaining": 449
+      },
+      "retry_after_ms": 0,
+      "rate_scope": "UNSPECIFIED",
+      "request_kind": "OTHER_ENDPOINT",
+      "cooldown_scope": null,
+      "response_count": 1,
+      "error_detail": null
+    },
+    "last_failure": {
+      "at": 1792317797721,
+      "http": 200,
+      "code": "API_PROVIDER_RATE_LIMIT",
+      "limits": {
+        "daily_limit": null,
+        "daily_remaining": null,
+        "minute_limit": null,
+        "minute_remaining": null
+      },
+      "retry_after_ms": 0,
+      "rate_scope": "MINUTE",
+      "request_kind": "OTHER_ENDPOINT",
+      "cooldown_scope": "OTHER_ENDPOINT",
+      "response_count": 0,
+      "error_detail": "{\"rateLimit\":\"Too many requests. You have exceeded the limit of requests per minute of your subscription.\"}"
+    },
+    "pacing": {
+      "configured_minute_limit": 450,
+      "effective_minute_limit": 450,
+      "start_gap_ms": 143,
+      "bootstrap": true,
+      "cooldown_until": 0,
+      "consecutive_rate_failures": 0,
+      "endpoint_cooldowns": [
+        {
+          "request_kind": "OTHER_ENDPOINT",
+          "until": 1792317808862,
+          "failures": 2
+        },
+        {
+          "request_kind": "ODDS",
+          "until": 1792249878718,
+          "failures": 3
+        },
+        {
+          "request_kind": "EVENTS",
+          "until": 0,
+          "failures": 0
+        },
+        {
+          "request_kind": "STATISTICS",
+          "until": 1792249886167,
+          "failures": 3
+        },
+        {
+          "request_kind": "LIVE_WITH_TIMEZONE",
+          "until": 1792249920655,
+          "failures": 3
+        }
+      ],
+      "instance_physical_attempts": 0,
+      "instance_max_starts_per_second": 0
+    },
+    "probe": null
+  },
+  "quota": {
+    "ok": true,
+    "schema": "FE_API_QUOTA_50000_GLOBAL_V1",
+    "day": "2026-10-19",
+    "used": 0,
+    "limit": 50000,
+    "remaining": 50000,
+    "utilization_pct": 0,
+    "hard_cap": true,
+    "pacing": false,
+    "accounting": "PREPAID_BLOCK_UPPER_BOUND",
+    "usage_note": "used includes prepaid reservations that may not have been sent; unused reservations are forfeited on restart",
+    "block_size": 64
+  },
+  "rollback": "PASS"
+}

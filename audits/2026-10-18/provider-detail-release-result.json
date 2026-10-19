@@ -1,0 +1,17 @@
+{
+  "commit": "2b55cad3e6e28c38992c38f5df7b563471e2e50c",
+  "original_version": "2be01a61-cc5d-43c7-9c6d-13e581296453",
+  "baseline": "3c97629e51251c56f9edeb8d0f67a7a0dad957a2",
+  "deployed": false,
+  "provider_requests": 0,
+  "production_d1_writes_requested": 0,
+  "checks": {
+    "preflight": "PASS",
+    "live_settings_and_clients_unchanged": "PASS"
+  },
+  "errors": [
+    "DO_DIAGNOSTIC_ROLLOUT_NOT_VISIBLE"
+  ],
+  "production_version": "0ce2f6fb-7bbb-4a92-9e6c-10a5caf78127",
+  "rollback": "PASS"
+}
