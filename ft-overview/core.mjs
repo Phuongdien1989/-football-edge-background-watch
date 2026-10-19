@@ -12,6 +12,10 @@ export function settlement(total, line) {
   const legs = Number.isInteger(line * 2) ? [line] : [line - .25, line + .25];
   return legs.reduce((sum, leg) => sum + (total > leg ? 1 : total === leg ? 0 : -1), 0) / legs.length;
 }
+export function goalsToFullWin(goals,line){
+  if(!Number.isInteger(goals)||goals<0)return null;
+  try{const first=Math.floor(line)+1;const target=settlement(first,line)===1?first:first+1;return Math.max(0,target-goals);}catch{return null;}
+}
 export function validatePMF(pmf) {
   if (!Array.isArray(pmf) || !pmf.length || pmf.some(p => typeof p !== 'number' || !Number.isFinite(p) || p < 0)) return false;
   return Math.abs(pmf.reduce((a, b) => a + b, 0) - 1) <= 1e-7;

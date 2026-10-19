@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {number,settlement,priceOver,noVig,createStore,researchBaseline,assess} from './core.mjs';
+import {number,settlement,priceOver,noVig,createStore,researchBaseline,assess,goalsToFullWin} from './core.mjs';
 import {readLegacy,marketFromRows} from './adapter.mjs';
 import {demoSnapshots} from './demo.mjs';
 import {trendChart} from './charts.mjs';
@@ -10,6 +10,9 @@ const now=Date.UTC(2026,9,19,10,0),sample=()=>demoSnapshots(now)[0];
 test('Missing data and booleans never become numeric zero',()=>{for(const v of [null,undefined,'',false,true])assert.equal(number(v),null);assert.equal(number(0),0);});
 test('Quarter/whole/half settlement matches split stakes',()=>{
   assert.equal(settlement(2,2.25),-.5);assert.equal(settlement(3,2.75),.5);assert.equal(settlement(2,2),0);assert.equal(settlement(3,2.5),1);assert.equal(settlement(2,2.5),-1);
+});
+test('Full-win target distinguishes half-win on .75 lines and counts current goals once',()=>{
+ assert.equal(goalsToFullWin(1,2.75),3);assert.equal(goalsToFullWin(1,2.25),2);assert.equal(goalsToFullWin(1,2.5),2);assert.equal(goalsToFullWin(3,2.75),1);assert.equal(goalsToFullWin(4,2.75),0);assert.equal(goalsToFullWin(1,2.3),null);
 });
 test('Full score counted once and EV/fair odds consistent',()=>{
   const p=priceOver([.2,.35,.30,.15],1,2.5,2.40);assert.ok(Math.abs(p.win-.45)<1e-9);assert.ok(Math.abs(p.ev-.08)<1e-9);assert.ok(Math.abs(p.fairOdds-1/.45)<1e-9);
