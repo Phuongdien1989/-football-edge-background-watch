@@ -1,4 +1,4 @@
-name: Basic final scores — one-ID probe then paced resumable reads
+name: Resume saved final scores on 2026-10-19 — stop on first provider failure
 on:
   push:
     branches: [fix/central-entry-measurement-20261018]
