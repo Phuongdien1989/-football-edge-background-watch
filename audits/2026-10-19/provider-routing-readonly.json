@@ -1,0 +1,638 @@
+{
+  "commit": "658a963fcaf75f237565eea5115ec7b5f395339f",
+  "mode": "READ_ONLY_ROUTING_AUDIT",
+  "mutations": 0,
+  "provider_requests": 0,
+  "errors": [],
+  "versions_before": {
+    "football-edge-background-watch": [
+      {
+        "version_id": "2be01a61-cc5d-43c7-9c6d-13e581296453",
+        "percentage": 100
+      }
+    ],
+    "shiny-silence-d892": [
+      {
+        "version_id": "03c1d55d-358a-448b-96f3-f356704831df",
+        "percentage": 100
+      }
+    ],
+    "football-edge-desktop-b2-test": [
+      {
+        "version_id": "a332ee39-abb2-422d-a021-db78ef19cc10",
+        "percentage": 100
+      }
+    ]
+  },
+  "do_binding": [
+    {
+      "class_name": "BackgroundWatcher",
+      "name": "BACKGROUND_WATCHER",
+      "namespace_id": "a401c5da72a54ec1ba485db1b46d89c9",
+      "type": "durable_object_namespace"
+    }
+  ],
+  "d1_binding": [
+    {
+      "name": "FOOTBALL_DB",
+      "id": "0d12a7cc-12a9-4c71-b55b-61dfd2dac4d4"
+    }
+  ],
+  "compatibility": {
+    "date": "2026-09-11",
+    "flags": [
+      "nodejs_compat"
+    ]
+  },
+  "namespaces": [
+    {
+      "id": "a401c5da72a54ec1ba485db1b46d89c9",
+      "name": "football-edge-background-watch_BackgroundWatcher",
+      "script": "football-edge-background-watch",
+      "class": "BackgroundWatcher",
+      "use_sqlite": true
+    }
+  ],
+  "version_metadata": [
+    {
+      "id": "2be01a61-cc5d-43c7-9c6d-13e581296453",
+      "keys": [
+        "id",
+        "number",
+        "metadata",
+        "annotations",
+        "resources"
+      ],
+      "metadata": {
+        "created_on": "2026-10-16T03:30:38.061732Z",
+        "source": "wrangler"
+      },
+      "resources_keys": [
+        "script",
+        "script_runtime",
+        "bindings"
+      ],
+      "script": {
+        "etag": "36f5b923dc4bc3f6cf53894419c8ea3a9b11b63a0799ad4fc0ca07d2d6554c7a",
+        "handlers": [
+          "fetch",
+          "scheduled"
+        ],
+        "named_handlers": [
+          {
+            "name": "BackgroundWatcher",
+            "handlers": [
+              "class"
+            ]
+          },
+          {
+            "name": "peakWindow",
+            "handlers": [
+              "class"
+            ]
+          }
+        ],
+        "last_deployed_from": "wrangler"
+      },
+      "do_bindings": [
+        {
+          "class_name": "BackgroundWatcher",
+          "name": "BACKGROUND_WATCHER",
+          "namespace_id": "a401c5da72a54ec1ba485db1b46d89c9",
+          "type": "durable_object_namespace"
+        }
+      ]
+    },
+    {
+      "id": "0ce2f6fb-7bbb-4a92-9e6c-10a5caf78127",
+      "keys": [
+        "id",
+        "number",
+        "metadata",
+        "annotations",
+        "resources"
+      ],
+      "metadata": {
+        "created_on": "2026-10-18T10:23:00.302682Z",
+        "source": "wrangler"
+      },
+      "resources_keys": [
+        "script",
+        "script_runtime",
+        "bindings"
+      ],
+      "script": {
+        "etag": "9af580d7bacdcf4eedff7bab3735215b8faa8eebf5e2f545e17825b8a1a9929a",
+        "handlers": [
+          "fetch",
+          "scheduled"
+        ],
+        "named_handlers": [
+          {
+            "name": "BackgroundWatcher",
+            "handlers": [
+              "class"
+            ]
+          },
+          {
+            "name": "peakWindow",
+            "handlers": [
+              "class"
+            ]
+          }
+        ],
+        "last_deployed_from": "wrangler"
+      },
+      "do_bindings": [
+        {
+          "class_name": "BackgroundWatcher",
+          "name": "BACKGROUND_WATCHER",
+          "namespace_id": "a401c5da72a54ec1ba485db1b46d89c9",
+          "type": "durable_object_namespace"
+        }
+      ]
+    }
+  ],
+  "latest_uploaded_content": {
+    "sha256": "234aa41e4061c514caa2b9015997d16e6945c450efaf186d8fcd1fd8e824189f",
+    "bytes": 1453113,
+    "has_error_detail": true,
+    "has_sanitizer": true,
+    "has_diagnostics": true,
+    "exports": [
+      "export {\n  BackgroundWatcher13 as BackgroundWatcher,\n  worker_notify_v138_peak_window_default as default,\n  peakWindow\n}",
+      "export { BackgroundWatcher }",
+      "export { BackgroundWatcher }",
+      "export { BackgroundWatcher }",
+      "export {\\n  generateRequestDetails,\\n  generateVAPIDKeys\\n}"
+    ],
+    "detail_occurrences": 2
+  },
+  "local_bundles": [
+    {
+      "file": "worker_notify_v138_peak_window.js",
+      "sha256": "044c2e30995473286096d9132884b60a0f729f896103efd3af863e895532dd0f",
+      "bytes": 546488,
+      "has_error_detail": true,
+      "has_sanitizer": true,
+      "has_diagnostics": true,
+      "exports": [
+        "export {\n  BackgroundWatcher13 as BackgroundWatcher,\n  worker_notify_v138_peak_window_default as default,\n  peakWindow\n}"
+      ],
+      "detail_occurrences": 1
+    }
+  ],
+  "health": {
+    "status": 200,
+    "commit": "3c97629e51251c56f9edeb8d0f67a7a0dad957a2",
+    "scanner": false,
+    "manual": false,
+    "alarm": null,
+    "has_error_detail": false,
+    "provider": {
+      "classification": "V2",
+      "latest": {
+        "at": 1792317798982,
+        "http": 200,
+        "code": "OK",
+        "limits": {
+          "daily_limit": 75000,
+          "daily_remaining": 53861,
+          "minute_limit": 450,
+          "minute_remaining": 449
+        },
+        "retry_after_ms": 0,
+        "rate_scope": "UNSPECIFIED",
+        "request_kind": "OTHER_ENDPOINT",
+        "cooldown_scope": null,
+        "response_count": 1
+      },
+      "last_failure": {
+        "at": 1792317797721,
+        "http": 200,
+        "code": "API_PROVIDER_RATE_LIMIT",
+        "limits": {
+          "daily_limit": null,
+          "daily_remaining": null,
+          "minute_limit": null,
+          "minute_remaining": null
+        },
+        "retry_after_ms": 0,
+        "rate_scope": "MINUTE",
+        "request_kind": "OTHER_ENDPOINT",
+        "cooldown_scope": "OTHER_ENDPOINT",
+        "response_count": 0
+      },
+      "pacing": {
+        "configured_minute_limit": 450,
+        "effective_minute_limit": 450,
+        "start_gap_ms": 143,
+        "bootstrap": true,
+        "cooldown_until": 0,
+        "consecutive_rate_failures": 0,
+        "endpoint_cooldowns": [
+          {
+            "request_kind": "OTHER_ENDPOINT",
+            "until": 1792317808862,
+            "failures": 2
+          },
+          {
+            "request_kind": "ODDS",
+            "until": 1792249878718,
+            "failures": 3
+          },
+          {
+            "request_kind": "EVENTS",
+            "until": 0,
+            "failures": 0
+          },
+          {
+            "request_kind": "STATISTICS",
+            "until": 1792249886167,
+            "failures": 3
+          },
+          {
+            "request_kind": "LIVE_WITH_TIMEZONE",
+            "until": 1792249920655,
+            "failures": 3
+          }
+        ],
+        "instance_physical_attempts": 0,
+        "instance_max_starts_per_second": 0
+      },
+      "probe": null
+    },
+    "quota": {
+      "ok": true,
+      "schema": "FE_API_QUOTA_50000_GLOBAL_V1",
+      "day": "2026-10-19",
+      "used": 0,
+      "limit": 50000,
+      "remaining": 50000,
+      "utilization_pct": 0,
+      "hard_cap": true,
+      "pacing": false,
+      "accounting": "PREPAID_BLOCK_UPPER_BOUND",
+      "usage_note": "used includes prepaid reservations that may not have been sent; unused reservations are forfeited on restart",
+      "block_size": 64
+    }
+  },
+  "historical_logs": {
+    "http": 200,
+    "status": "COMPLETED",
+    "count": 219,
+    "groups": {
+      "EDGE 2be01a61-cc5d-43c7-9c6d-13e581296453": {
+        "count": 77,
+        "min": 1792318780609,
+        "max": 1792319125954,
+        "paths": {
+          "/api/notify/status": 36,
+          "/api/notify/ui-state": 16,
+          "/api/notify/validation/summary": 10,
+          "/api/notify/validation/recent": 10,
+          "/health": 5
+        }
+      },
+      "DO 2be01a61-cc5d-43c7-9c6d-13e581296453": {
+        "count": 91,
+        "min": 1792318780747,
+        "max": 1792319125929,
+        "paths": {
+          "/api/notify/status": 23,
+          "/api/notify/ui-state": 16,
+          "/api/notify/validation/summary": 6,
+          "/api/notify/validation/recent": 6,
+          "/api/notify/peak-window": 39,
+          "null": 1
+        }
+      },
+      "EDGE 0ce2f6fb-7bbb-4a92-9e6c-10a5caf78127": {
+        "count": 47,
+        "min": 1792318982936,
+        "max": 1792319059258,
+        "paths": {
+          "/health": 31,
+          "/api/notify/status": 10,
+          "/api/notify/validation/summary": 2,
+          "/api/notify/validation/recent": 2,
+          "/api/notify/ui-state": 2
+        }
+      },
+      "EDGE 1e926ce4-58ee-4654-ac04-d67e453c6092": {
+        "count": 4,
+        "min": 1792318824658,
+        "max": 1792318827822,
+        "paths": {
+          "/health": 2,
+          "/api/notify/status": 2
+        }
+      }
+    }
+  },
+  "recent_traffic": {
+    "from": "2026-10-19T00:47:44.651Z",
+    "to": "2026-10-19T00:50:44.651Z",
+    "http": 200,
+    "total": 75,
+    "groups": [
+      {
+        "version": "2be01a61-cc5d-43c7-9c6d-13e581296453",
+        "do": true,
+        "type": "alarm",
+        "path": null,
+        "outcome": "ok",
+        "count": 2
+      },
+      {
+        "version": "2be01a61-cc5d-43c7-9c6d-13e581296453",
+        "do": false,
+        "type": "fetch",
+        "method": "POST",
+        "path": "/api/db/sync",
+        "outcome": "ok",
+        "count": 5
+      },
+      {
+        "version": "2be01a61-cc5d-43c7-9c6d-13e581296453",
+        "do": false,
+        "type": "fetch",
+        "method": "POST",
+        "path": "/api/db/sync",
+        "count": 15
+      },
+      {
+        "version": "2be01a61-cc5d-43c7-9c6d-13e581296453",
+        "do": false,
+        "type": "fetch",
+        "method": "OPTIONS",
+        "path": "/api/db/sync",
+        "outcome": "ok",
+        "count": 5
+      },
+      {
+        "version": "2be01a61-cc5d-43c7-9c6d-13e581296453",
+        "do": false,
+        "type": "fetch",
+        "method": "POST",
+        "path": "/api/watch/register",
+        "outcome": "ok",
+        "count": 3
+      },
+      {
+        "version": "2be01a61-cc5d-43c7-9c6d-13e581296453",
+        "do": true,
+        "type": "fetch",
+        "method": "POST",
+        "path": "/api/watch/register",
+        "outcome": "ok",
+        "count": 3
+      },
+      {
+        "version": "2be01a61-cc5d-43c7-9c6d-13e581296453",
+        "do": false,
+        "type": "fetch",
+        "method": "OPTIONS",
+        "path": "/api/watch/register",
+        "outcome": "ok",
+        "count": 3
+      },
+      {
+        "version": "2be01a61-cc5d-43c7-9c6d-13e581296453",
+        "do": false,
+        "type": "fetch",
+        "method": "POST",
+        "path": "/api/watch/unregister",
+        "outcome": "ok",
+        "count": 1
+      },
+      {
+        "version": "2be01a61-cc5d-43c7-9c6d-13e581296453",
+        "do": true,
+        "type": "fetch",
+        "method": "POST",
+        "path": "/api/watch/unregister",
+        "outcome": "ok",
+        "count": 1
+      },
+      {
+        "version": "2be01a61-cc5d-43c7-9c6d-13e581296453",
+        "do": false,
+        "type": "fetch",
+        "method": "OPTIONS",
+        "path": "/api/watch/unregister",
+        "outcome": "ok",
+        "count": 1
+      },
+      {
+        "version": "2be01a61-cc5d-43c7-9c6d-13e581296453",
+        "do": false,
+        "type": "fetch",
+        "method": "GET",
+        "path": "/api/notify/status",
+        "outcome": "ok",
+        "count": 3
+      },
+      {
+        "version": "2be01a61-cc5d-43c7-9c6d-13e581296453",
+        "do": true,
+        "type": "fetch",
+        "method": "GET",
+        "path": "/api/notify/status",
+        "outcome": "ok",
+        "count": 3
+      },
+      {
+        "version": "2be01a61-cc5d-43c7-9c6d-13e581296453",
+        "do": false,
+        "type": "fetch",
+        "method": "OPTIONS",
+        "path": "/api/notify/status",
+        "outcome": "ok",
+        "count": 3
+      },
+      {
+        "version": "2be01a61-cc5d-43c7-9c6d-13e581296453",
+        "do": false,
+        "type": "fetch",
+        "method": "GET",
+        "path": "/health",
+        "outcome": "ok",
+        "count": 1
+      },
+      {
+        "version": "2be01a61-cc5d-43c7-9c6d-13e581296453",
+        "do": true,
+        "type": "fetch",
+        "method": "GET",
+        "path": "/api/notify/peak-window",
+        "outcome": "ok",
+        "count": 1
+      },
+      {
+        "version": "2be01a61-cc5d-43c7-9c6d-13e581296453",
+        "do": false,
+        "type": "fetch",
+        "method": "POST",
+        "path": "/api/watch/sync",
+        "outcome": "ok",
+        "count": 2
+      },
+      {
+        "version": "2be01a61-cc5d-43c7-9c6d-13e581296453",
+        "do": true,
+        "type": "fetch",
+        "method": "POST",
+        "path": "/api/watch/sync",
+        "outcome": "ok",
+        "count": 2
+      },
+      {
+        "version": "2be01a61-cc5d-43c7-9c6d-13e581296453",
+        "do": false,
+        "type": "fetch",
+        "method": "OPTIONS",
+        "path": "/api/watch/sync",
+        "outcome": "ok",
+        "count": 2
+      },
+      {
+        "version": "2be01a61-cc5d-43c7-9c6d-13e581296453",
+        "do": false,
+        "type": "fetch",
+        "method": "GET",
+        "path": "/api/notify/validation/recent",
+        "outcome": "ok",
+        "count": 2
+      },
+      {
+        "version": "2be01a61-cc5d-43c7-9c6d-13e581296453",
+        "do": false,
+        "type": "fetch",
+        "method": "GET",
+        "path": "/api/notify/validation/summary",
+        "outcome": "ok",
+        "count": 2
+      },
+      {
+        "version": "2be01a61-cc5d-43c7-9c6d-13e581296453",
+        "do": true,
+        "type": "fetch",
+        "method": "GET",
+        "path": "/api/notify/validation/recent",
+        "outcome": "ok",
+        "count": 2
+      },
+      {
+        "version": "2be01a61-cc5d-43c7-9c6d-13e581296453",
+        "do": true,
+        "type": "fetch",
+        "method": "GET",
+        "path": "/api/notify/validation/summary",
+        "outcome": "ok",
+        "count": 2
+      },
+      {
+        "version": "2be01a61-cc5d-43c7-9c6d-13e581296453",
+        "do": false,
+        "type": "fetch",
+        "method": "OPTIONS",
+        "path": "/api/notify/validation/recent",
+        "outcome": "ok",
+        "count": 2
+      },
+      {
+        "version": "2be01a61-cc5d-43c7-9c6d-13e581296453",
+        "do": false,
+        "type": "fetch",
+        "method": "OPTIONS",
+        "path": "/api/notify/validation/summary",
+        "outcome": "ok",
+        "count": 2
+      },
+      {
+        "version": "2be01a61-cc5d-43c7-9c6d-13e581296453",
+        "do": false,
+        "type": "fetch",
+        "method": "GET",
+        "path": "/api/notify/ui-state",
+        "outcome": "ok",
+        "count": 1
+      },
+      {
+        "version": "2be01a61-cc5d-43c7-9c6d-13e581296453",
+        "do": true,
+        "type": "fetch",
+        "method": "GET",
+        "path": "/api/notify/ui-state",
+        "outcome": "ok",
+        "count": 1
+      },
+      {
+        "version": "2be01a61-cc5d-43c7-9c6d-13e581296453",
+        "do": true,
+        "type": "fetch",
+        "method": "GET",
+        "path": "/api/notify/ui-state",
+        "count": 1
+      },
+      {
+        "version": "2be01a61-cc5d-43c7-9c6d-13e581296453",
+        "do": false,
+        "type": "fetch",
+        "method": "OPTIONS",
+        "path": "/api/notify/ui-state",
+        "outcome": "ok",
+        "count": 1
+      },
+      {
+        "version": "2be01a61-cc5d-43c7-9c6d-13e581296453",
+        "do": false,
+        "type": "fetch",
+        "method": "GET",
+        "path": "/api/watch/list",
+        "outcome": "ok",
+        "count": 1
+      },
+      {
+        "version": "2be01a61-cc5d-43c7-9c6d-13e581296453",
+        "do": true,
+        "type": "fetch",
+        "method": "GET",
+        "path": "/api/watch/list",
+        "outcome": "ok",
+        "count": 1
+      },
+      {
+        "version": "2be01a61-cc5d-43c7-9c6d-13e581296453",
+        "do": false,
+        "type": "fetch",
+        "method": "OPTIONS",
+        "path": "/api/watch/list",
+        "outcome": "ok",
+        "count": 1
+      }
+    ]
+  },
+  "versions_after": {
+    "football-edge-background-watch": [
+      {
+        "version_id": "2be01a61-cc5d-43c7-9c6d-13e581296453",
+        "percentage": 100
+      }
+    ],
+    "shiny-silence-d892": [
+      {
+        "version_id": "03c1d55d-358a-448b-96f3-f356704831df",
+        "percentage": 100
+      }
+    ],
+    "football-edge-desktop-b2-test": [
+      {
+        "version_id": "a332ee39-abb2-422d-a021-db78ef19cc10",
+        "percentage": 100
+      }
+    ]
+  },
+  "versions_unchanged": true
+}
