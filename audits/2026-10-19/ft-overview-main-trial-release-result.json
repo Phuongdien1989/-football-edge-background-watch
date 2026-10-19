@@ -1,0 +1,33 @@
+{
+  "source_commit": "9629821089991e603a90ae9bd04f4ebf262ebf0d",
+  "mode": "MAIN_APP_TRIAL_RECOMMENDATIONS",
+  "rollback": "ac8c0da2-551c-4561-a554-efd4c09339ad",
+  "deployed": true,
+  "provider_calls": 0,
+  "scanner_toggled": false,
+  "backend_changed": false,
+  "production_root_changed": true,
+  "before": {
+    "shiny-silence-d892": "eec395ab-328f-4be2-9da5-17611e7bade3",
+    "football-edge-background-watch": "04cc044d-412f-4844-9b83-c7c786eedd13",
+    "football-edge-desktop-b2-test": "a332ee39-abb2-422d-a021-db78ef19cc10"
+  },
+  "version": "b73642ec-1d4c-41ae-bc28-68c785b6fd79",
+  "after": {
+    "shiny-silence-d892": "b73642ec-1d4c-41ae-bc28-68c785b6fd79",
+    "football-edge-background-watch": "04cc044d-412f-4844-9b83-c7c786eedd13",
+    "football-edge-desktop-b2-test": "a332ee39-abb2-422d-a021-db78ef19cc10"
+  },
+  "status": "PASS",
+  "original_html_sha256": "aa4f0f6318cd52c14ff62b195c5ea04c5267107455924da44c9aa78169fe7f28",
+  "main_html_sha256": "9c557b2b20744aaad5b14ddd367517bd4afb00a7af182ead93e346f857f9947e",
+  "trial_recommendations_enabled": true,
+  "experimental_policy": "FT_OVERVIEW_TRIAL_EV_V1",
+  "static_resources_preserved": [
+    "/push-sw.js",
+    "/manifest.webmanifest"
+  ],
+  "url": "https://shiny-silence-d892.ngophuonghuy.workers.dev/#ftOverviewCard",
+  "original_view_url": "https://shiny-silence-d892.ngophuonghuy.workers.dev/original/",
+  "roll_back_version_exists": true
+}
