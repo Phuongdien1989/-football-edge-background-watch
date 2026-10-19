@@ -7,7 +7,7 @@ const assert=require('node:assert/strict');
  const base=resolve('.'),server=createServer((req,res)=>{
   const path=resolve(base,'.'+decodeURIComponent(new URL(req.url,'http://localhost').pathname));
   if(!path.startsWith(base+'/')){res.writeHead(403);res.end();return;}
-  let p=path;if(req.url.endsWith('/'))p+='/index.html';
+  let p=path;if(new URL(req.url,'http://localhost').pathname.endsWith('/'))p+='/index.html';
   try{const body=readFileSync(p);res.writeHead(200,{'Content-Type':({'.html':'text/html','.mjs':'text/javascript','.css':'text/css'})[extname(p)]||'application/octet-stream'});res.end(body);}catch{res.writeHead(404);res.end();}
  });await new Promise(r=>server.listen(0,'127.0.0.1',r));
  const origin='http://127.0.0.1:'+server.address().port;
