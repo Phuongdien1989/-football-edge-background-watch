@@ -1,0 +1,282 @@
+{
+  "run_id": 39183034623,
+  "source": "a0121e66096fd4290d48742b955e2a8a4f2a1f1b",
+  "mode": "BOUNDED_PROVIDER_CHECK_STAGING_ONLY",
+  "requestShape": "BASIC_SINGLE_ID",
+  "resumedSourceCount": 2,
+  "providerBatchesAttempted": 13,
+  "successfulLogicalCalls": 12,
+  "physicalAttempts": 17,
+  "maxStartsPerSecond": 1,
+  "errors": [
+    "Provider check failed: API_PROVIDER_RATE_LIMIT"
+  ],
+  "productionD1Writes": 0,
+  "cleanup": true,
+  "versionsBefore": {
+    "football-edge-background-watch": [
+      {
+        "version_id": "2be01a61-cc5d-43c7-9c6d-13e581296453",
+        "percentage": 100
+      }
+    ],
+    "shiny-silence-d892": [
+      {
+        "version_id": "03c1d55d-358a-448b-96f3-f356704831df",
+        "percentage": 100
+      }
+    ],
+    "football-edge-desktop-b2-test": [
+      {
+        "version_id": "a332ee39-abb2-422d-a021-db78ef19cc10",
+        "percentage": 100
+      }
+    ]
+  },
+  "versionsAfter": {
+    "football-edge-background-watch": [
+      {
+        "version_id": "2be01a61-cc5d-43c7-9c6d-13e581296453",
+        "percentage": 100
+      }
+    ],
+    "shiny-silence-d892": [
+      {
+        "version_id": "03c1d55d-358a-448b-96f3-f356704831df",
+        "percentage": 100
+      }
+    ],
+    "football-edge-desktop-b2-test": [
+      {
+        "version_id": "a332ee39-abb2-422d-a021-db78ef19cc10",
+        "percentage": 100
+      }
+    ]
+  },
+  "partialSummary": {
+    "algorithm_version": "CENTRAL_ENTRY_PAPER_V1",
+    "selection": "FIRST_CAPTURE_PER_FIXTURE_ENGINE",
+    "real_bet_roi": null,
+    "engines": {
+      "FT": {
+        "samples": 67,
+        "reconciled": 9,
+        "unknown": 58,
+        "positive": 4,
+        "negative": 5,
+        "push": 0,
+        "paper_unit_pl": -0.65,
+        "paper_roi_pct": -7.222222222,
+        "unknown_reasons": {
+          "NO_CONFIRMED_RAW_PERIOD_SCORE": 58
+        }
+      },
+      "H1": {
+        "samples": 82,
+        "reconciled": 8,
+        "unknown": 74,
+        "positive": 1,
+        "negative": 7,
+        "push": 0,
+        "paper_unit_pl": -5.975,
+        "paper_roi_pct": -74.6875,
+        "unknown_reasons": {
+          "NO_CONFIRMED_RAW_PERIOD_SCORE": 74
+        }
+      }
+    }
+  },
+  "pendingUniqueFixtures": 112,
+  "pendingSamples": 132,
+  "last_success": {
+    "at": 1792371442836,
+    "http": 200,
+    "code": "OK",
+    "limits": {
+      "daily_limit": 75000,
+      "daily_remaining": 73947,
+      "minute_limit": 450,
+      "minute_remaining": 427
+    },
+    "retry_after_ms": 0,
+    "rate_scope": "UNSPECIFIED",
+    "request_kind": "OTHER_ENDPOINT",
+    "cooldown_scope": null,
+    "response_count": 1
+  },
+  "last_failure": {
+    "at": 1792371446612,
+    "http": 200,
+    "code": "API_PROVIDER_RATE_LIMIT",
+    "limits": {
+      "daily_limit": null,
+      "daily_remaining": null,
+      "minute_limit": null,
+      "minute_remaining": null
+    },
+    "retry_after_ms": 0,
+    "rate_scope": "MINUTE",
+    "request_kind": "OTHER_ENDPOINT",
+    "cooldown_scope": "OTHER_ENDPOINT",
+    "response_count": 0
+  },
+  "header_sequence": [
+    {
+      "batch": 1,
+      "fixture": 1493170,
+      "ok": true,
+      "at": 1792371409623,
+      "limits": {
+        "daily_limit": 75000,
+        "daily_remaining": 73945,
+        "minute_limit": 450,
+        "minute_remaining": 425
+      }
+    },
+    {
+      "batch": 2,
+      "fixture": 1549813,
+      "ok": true,
+      "at": 1792371412213,
+      "limits": {
+        "daily_limit": 75000,
+        "daily_remaining": 73944,
+        "minute_limit": 450,
+        "minute_remaining": 424
+      }
+    },
+    {
+      "batch": 3,
+      "fixture": 1643168,
+      "ok": true,
+      "at": 1792371414758,
+      "limits": {
+        "daily_limit": 75000,
+        "daily_remaining": 73943,
+        "minute_limit": 450,
+        "minute_remaining": 423
+      }
+    },
+    {
+      "batch": 4,
+      "fixture": 1492408,
+      "ok": true,
+      "at": 1792371418839,
+      "limits": {
+        "daily_limit": 75000,
+        "daily_remaining": 73942,
+        "minute_limit": 450,
+        "minute_remaining": 422
+      }
+    },
+    {
+      "batch": 5,
+      "fixture": 1629935,
+      "ok": true,
+      "at": 1792371421998,
+      "limits": {
+        "daily_limit": 75000,
+        "daily_remaining": 73969,
+        "minute_limit": 450,
+        "minute_remaining": 449
+      }
+    },
+    {
+      "batch": 6,
+      "fixture": 1629936,
+      "ok": true,
+      "at": 1792371424604,
+      "limits": {
+        "daily_limit": 75000,
+        "daily_remaining": 73968,
+        "minute_limit": 450,
+        "minute_remaining": 448
+      }
+    },
+    {
+      "batch": 7,
+      "fixture": 1629934,
+      "ok": true,
+      "at": 1792371427231,
+      "limits": {
+        "daily_limit": 75000,
+        "daily_remaining": 73967,
+        "minute_limit": 450,
+        "minute_remaining": 447
+      }
+    },
+    {
+      "batch": 8,
+      "fixture": 1585780,
+      "ok": true,
+      "at": 1792371430993,
+      "limits": {
+        "daily_limit": 75000,
+        "daily_remaining": 73955,
+        "minute_limit": 450,
+        "minute_remaining": 435
+      }
+    },
+    {
+      "batch": 9,
+      "fixture": 1629938,
+      "ok": true,
+      "at": 1792371433619,
+      "limits": {
+        "daily_limit": 75000,
+        "daily_remaining": 73950,
+        "minute_limit": 450,
+        "minute_remaining": 430
+      }
+    },
+    {
+      "batch": 10,
+      "fixture": 1629937,
+      "ok": true,
+      "at": 1792371436568,
+      "limits": {
+        "daily_limit": 75000,
+        "daily_remaining": 73949,
+        "minute_limit": 450,
+        "minute_remaining": 429
+      }
+    },
+    {
+      "batch": 11,
+      "fixture": 1612256,
+      "ok": true,
+      "at": 1792371439112,
+      "limits": {
+        "daily_limit": 75000,
+        "daily_remaining": 73948,
+        "minute_limit": 450,
+        "minute_remaining": 428
+      }
+    },
+    {
+      "batch": 12,
+      "fixture": 1557272,
+      "ok": true,
+      "at": 1792371442836,
+      "limits": {
+        "daily_limit": 75000,
+        "daily_remaining": 73947,
+        "minute_limit": 450,
+        "minute_remaining": 427
+      }
+    },
+    {
+      "batch": 13,
+      "fixture": 1557258,
+      "ok": false,
+      "at": 1792371446612,
+      "limits": {
+        "daily_limit": null,
+        "daily_remaining": null,
+        "minute_limit": null,
+        "minute_remaining": null
+      }
+    }
+  ],
+  "artifact": 12156883053
+}
