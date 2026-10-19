@@ -44,12 +44,12 @@ try{
  for(const path of ['/icons/icon-180.png','/icons/icon-192.png']){const r=await fetch(publicRoot+path,{signal:AbortSignal.timeout(15000)});if(r.ok&&(r.headers.get('content-type')||'').startsWith('image/'))staticHashes[path]=hash(new Uint8Array(await r.arrayBuffer()));}
  mkdirSync('ft-overview/release',{recursive:true});writeFileSync('ft-overview/release/original.html',original);
  execFileSync(process.execPath,['ft-overview/build-integration.mjs','ft-overview/release/original.html'],{stdio:'inherit'});
- const files={'index.html':readFileSync('ft-overview/build/index.html','utf8')};
+ const files={'index.html':readFileSync('ft-overview/build/index.html','utf8'),'original_index.html':new TextDecoder().decode(original)};
  for(const p of ['core.mjs','adapter.mjs','charts.mjs','demo.mjs','ui.mjs','style.css'])files['ft-overview/'+p]=readFileSync('ft-overview/'+p,'utf8');
  // Absolute addon paths also support trailing-slash use without a redirect.
  files['index.html']=files['index.html'].replaceAll('./ft-overview/','/ft-overview/');
  const worker=liveWrapper(files,entry),form=new FormData();
- const config={...(settings.assets?.config||{})};const oldFirst=config.run_worker_first;config.run_worker_first=oldFirst===true?true:[...new Set([...(Array.isArray(oldFirst)?oldFirst:[]),'/ft-overview-live','/ft-overview-live/','/ft-overview/*'])];
+ const config={...(settings.assets?.config||{})};const oldFirst=config.run_worker_first;config.run_worker_first=oldFirst===true?true:[...new Set([...(Array.isArray(oldFirst)?oldFirst:[]),'/','/index.html','/ft-overview-live','/ft-overview-live/','/ft-overview/*'])];
  const metadata={main_module:'fe-overview-entry.mjs',compatibility_date:settings.compatibility_date||'2026-10-01',compatibility_flags:settings.compatibility_flags||[],keep_assets:true,assets:{config},keep_bindings:['plain_text','secret_text'],bindings:assetBindings.map(b=>({name:b.name,type:'assets'})),tags:settings.tags||[]};
  form.append('metadata',new Blob([JSON.stringify(metadata)],{type:'application/json'}));
  for(const m of modules)form.append(m.name,new Blob([m.bytes],{type:m.type}),m.name);
@@ -59,7 +59,7 @@ try{
  assert.equal(hash(await bytes('/')),hash(original),'ORIGINAL_ROOT_CHANGED');
  for(const [path,h]of Object.entries(staticHashes))assert.equal(hash(await bytes(path)),h,'STATIC_RESOURCE_CHANGED_'+path);
  assert.equal(hash(await bytes('/ft-overview-live')),hash(files['index.html']),'OPT_IN_HTML_NOT_SERVED');
- for(const p of Object.keys(files).filter(p=>p!=='index.html'))assert.equal(hash(await bytes('/'+p)),hash(files[p]),'ADDON_RESOURCE_MISMATCH');
+ for(const p of Object.keys(files).filter(p=>p.startsWith('ft-overview/')))assert.equal(hash(await bytes('/'+p)),hash(files[p]),'ADDON_RESOURCE_MISMATCH');
  report.after=await versions();for(const n of Object.keys(expected).filter(n=>n!==name))assert.equal(report.after[n],expected[n],'UNRELATED_VERSION_CHANGED');
  report.deployed=true;report.url=publicRoot+'/ft-overview-live#ftOverviewCard';report.status='PASS';
 }catch(e){report.error=String(e.message).slice(0,200);process.exitCode=1;
