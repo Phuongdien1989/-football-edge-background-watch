@@ -90,7 +90,7 @@ export function assess(snapshot, now) {
   const data = footballView(snapshot.history, snapshot);
   let entry = 'MODEL WAIT',reason = 'Chưa có phân phối bàn độc lập; không chuyển điểm HT/FT thành xác suất';
   if (terminal) { entry = 'ENDED'; reason = 'Trận đã kết thúc'; }
-  else if (blocked) { entry = fresh ? 'DATA WAIT' : 'STALE'; reason = snapshot.statsError ? 'Nguồn thống kê lỗi; giữ lịch sử để xem lại' : 'Dữ liệu hoặc trạng thái chưa phù hợp để nhận định mới'; }
+  else if (blocked) { entry = fresh ? 'DATA WAIT' : 'STALE'; reason = snapshot.cooldownUntil > now ? 'Đang cooldown sau biến động trận; chờ dữ liệu và giá xác nhận lại' : snapshot.statsError ? 'Nguồn thống kê lỗi; giữ lịch sử để xem lại' : 'Dữ liệu hoặc trạng thái chưa phù hợp để nhận định mới'; }
   else if (!marketFresh) { entry = 'WAIT PRICE';reason = 'Cần giá FT mới, đúng tỷ số và quy tắc thanh toán'; }
   else if (!modelOK) { /* preserve model-wait explanation */ }
   else if (model.validated !== true) { entry = model.kind === 'DEMO' ? 'DEMO' : 'RESEARCH';reason = 'Định giá thử nghiệm; chưa đủ bằng chứng để phát khuyến nghị thật'; }
@@ -109,14 +109,21 @@ export function createStore({maxFixtures=100,maxPoints=120,maxLedger=500} = {}) 
     const old = snapshots.get(s.id);
     if (old && (s.at < old.snapshot.at || s.revision < old.snapshot.revision)) return {accepted:false,reason:'OUT_OF_ORDER'};
     const fp = fingerprint(s);
-    if (old && old.snapshot.revision === s.revision && old.snapshot.at === s.at && old.fp !== fp) return {accepted:false,reason:'REVISION_CONFLICT'};
+    if (old && old.snapshot.revision === s.revision && old.snapshot.at === s.at && old.fp !== fp) {
+      // A newly fetched DEEP history can enrich an existing observation, but
+      // cannot advance its time, alter its score/stats/price or overwrite it.
+      const observation=x=>{const {model,contextAt,...rest}=x;return rest;};
+      if (!(number(s.contextAt)>number(old.snapshot.contextAt)&&number(s.contextAt)>0&&fingerprint(observation(s))===fingerprint(observation(old.snapshot))))return {accepted:false,reason:'REVISION_CONFLICT'};
+    }
     if (old?.fp === fp) return {accepted:false,reason:'DUPLICATE'};
     snapshots.set(s.id,{snapshot:s,fp,sequence:++sequence,points:old?.points || []});
     if (snapshots.size > maxFixtures) snapshots.delete([...snapshots.entries()].sort((a,b) => a[1].sequence-b[1].sequence)[0][0]);
     return {accepted:true};
   }
-  function read(now) {
-    const rows = [...snapshots.values()].map(v => assess(v.snapshot, now));
+  function read(now,{controls=[]}={}) {
+    const controlById=new Map();
+    for(const c of controls){const id=number(c.id),old=controlById.get(id)||{};controlById.set(id,{cooldownUntil:Math.max(number(old.cooldownUntil)||0,number(c.cooldownUntil)||0),eventAt:Math.max(number(old.eventAt)||0,number(c.resetAt)||0)});}
+    const rows = [...snapshots.values()].map(v => {const c=controlById.get(v.snapshot.id);return assess(c?{...v.snapshot,cooldownUntil:Math.max(number(v.snapshot.cooldownUntil)||0,c.cooldownUntil),eventAt:Math.max(number(v.snapshot.eventAt)||0,c.eventAt)}:v.snapshot, now);});
     // Attention order only; no unvalidated EV weighting or forced bet promotion.
     // Stable insertion order inside equal completeness/freshness classes.
     const bucket = r => r.blocked ? 0 : r.modelOK && r.marketFresh ? 3 : r.marketFresh ? 2 : 1;
@@ -128,10 +135,11 @@ export function createStore({maxFixtures=100,maxPoints=120,maxLedger=500} = {}) 
       const v = snapshots.get(r.id), m = r.snapshot.market;
       const key = m ? fingerprint([m.bookmaker,m.period,m.basis,m.line]) : null;
       // One point per source observation, never one per UI refresh.
+      const point={at:r.at,minute:r.minute,revision:r.snapshot.revision,key,goals:r.snapshot.goals,model:r.quote && r.binary ? r.quote.win : null,market:r.binary?.over ?? null,gap:r.blocked || !r.marketFresh,source:r.snapshot.model?.kind || null};
       if (v.points.at(-1)?.revision !== r.snapshot.revision) {
-        v.points.push({at:r.at,minute:r.minute,revision:r.snapshot.revision,key,goals:r.snapshot.goals,model:r.quote && r.binary ? r.quote.win : null,market:r.binary?.over ?? null,gap:r.blocked || !r.marketFresh,source:r.snapshot.model?.kind || null});
+        v.points.push(point);
         v.points = v.points.slice(-maxPoints);
-      }
+      } else v.points[v.points.length-1]=point;
       r.points = structuredClone(v.points);
       const record = {id:r.id,version:VERSION,model:r.modelVersion,at:r.at,revision:r.snapshot.revision,entry:r.entry,line:m?.line,odds:m?.over,goals:r.snapshot.goals};
       const last = [...ledger].reverse().find(x => x.id === r.id);

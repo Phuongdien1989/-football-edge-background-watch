@@ -11,7 +11,10 @@ export function marketFromRows(rows, s) {
       if(!side||line===null||line<0||odd===null||odd<=1)continue;
       const g=groups.get(line)||{line};g[side]=odd;groups.set(line,g);
     }
-    for(const g of groups.values()) if(g.over>1&&g.under>1) return {...g,period:'FT',basis:'FULL_MATCH',bookmaker:r.bookmaker?.name || (typeof r.bookmaker==='string'?r.bookmaker:null) || 'API_FOOTBALL_LIVE_FEED',at:s.at,score:{...s.goals},timestampBasis:'SNAPSHOT_RECEIPT',settlementAssumption:'STANDARD_FULL_MATCH_TOTAL_90_MIN'};
+    const updated=r.update==null?null:time(r.update);
+    if(r.update!=null&&(updated===null||updated>s.at+5000))continue;
+    const candidates=[...groups.values()].sort((a,b)=>Number(b.line===number(r.main_line))-Number(a.line===number(r.main_line)));
+    for(const g of candidates) if(g.over>1&&g.under>1) return {...g,period:'FT',basis:'FULL_MATCH',bookmaker:r.bookmaker?.name || (typeof r.bookmaker==='string'?r.bookmaker:null) || 'API_FOOTBALL_LIVE_FEED',at:updated??s.at,score:{...s.goals},timestampBasis:updated===null?'SNAPSHOT_RECEIPT':'PROVIDER_UPDATE',settlementAssumption:'STANDARD_FULL_MATCH_TOTAL_90_MIN'};
   }
   return null;
 }
@@ -27,15 +30,15 @@ export function readLegacy(bridge, bundleBridge) {
     const id=number(it.id),s=it.latest || {},at=number(s.captured_at);if(!id||!at)continue;
     const old=map.get(id);if(old&&old.at>at)continue;
     const source=metricSnapshot(it),snapshot={id,revision:number(it.serverRow?.revision) ?? at,at,minute:number(s.minute),status:s.status,goals:source.goals,home:it.home || '',away:it.away || '',league:it.league || '',metrics:source.metrics,
-      history:(it.history||[]).map(r=>metricSnapshot({latest:r})),statsError:!!it.eval?.dataIncomplete || !!it.eval?.hardVeto,
+      history:(it.history||[]).map(r=>metricSnapshot({latest:r})),statsError:!!it.eval?.dataIncomplete || s.data_health?.level==='NO_STATS',
       cooldownUntil:number(it.cooldownUntil),legacy:{engine,score:number(it.eval?.score),state:it.state,independent:false},model:null,market:null};
     // HC metrics have no total. Retain separately observed goal-engine metrics
     // only when their observation timestamp is identical.
-    if(engine==='HC'&&old?.at===at){snapshot.metrics=old.metrics;snapshot.history=old.history;snapshot.statsError=old.statsError;}
+    if(engine==='HC'&&old?.at===at){snapshot.metrics=old.metrics;snapshot.history=old.history;snapshot.statsError=old.statsError;snapshot.legacy=old.legacy;}
     const rows=s.market_rows || it.serverRow?.snapshot?.market_rows || [];
     snapshot.market=marketFromRows(rows,snapshot) || (old?.at===at ? old.market:null);
     const b=bundleById.get(id),n=b?.normalized || {},meta=b?.meta;
-    if(meta){snapshot.model=researchBaseline({homeId:meta.teams?.home?.id,awayId:meta.teams?.away?.id,homeRecent:n.home_recent,awayRecent:n.away_recent,kickoff:time(meta.fixture?.timestamp || meta.fixture?.date),at,minute:snapshot.minute,status:snapshot.status});}
+    if(meta){snapshot.contextAt=number(b.observed_at);snapshot.model=researchBaseline({homeId:meta.teams?.home?.id,awayId:meta.teams?.away?.id,homeRecent:n.home_recent,awayRecent:n.away_recent,kickoff:time(meta.fixture?.timestamp || meta.fixture?.date),at,minute:snapshot.minute,status:snapshot.status});}
     map.set(id,snapshot);
   }
   // PRE selection can be evaluated from a previously fetched DEEP bundle.

@@ -11,18 +11,19 @@ const anchor='  // FE_UI_READ_BRIDGE_END';
 if(html.split(anchor).length!==2)throw Error('BRIDGE_ANCHOR_NOT_UNIQUE');
 const bridge=`
   // FE_OVERVIEW_INPUT_BRIDGE_START
-  const foBundleTimes=new WeakMap();
+  const foBundleTimes=new WeakMap(),foBundles=new Map();
+  const foRemember=b=>{const at=Date.now(),id=Number(b?.meta?.fixture_id);foBundleTimes.set(b,at);if(id){foBundles.delete(id);foBundles.set(id,feUICopy({observed_at:at,meta:b.meta,normalized:{home_recent:b.normalized?.home_recent,away_recent:b.normalized?.away_recent,market:b.normalized?.market}}));while(foBundles.size>50)foBundles.delete(foBundles.keys().next().value);}};
   Object.defineProperty(window,'FEOverviewInputBridge',{value:Object.freeze({read:()=>{
     const b=state.lastBundle;if(!b)return [];
-    return feUICopy([{observed_at:foBundleTimes.get(b)??null,meta:b.meta,normalized:{home_recent:b.normalized?.home_recent,away_recent:b.normalized?.away_recent,market:b.normalized?.market}}]);
-  }}),writable:false,configurable:false});
+    return feUICopy([...foBundles.values()]);
+  },readControls:()=>feUICopy([...watchState.items,...h1WatchState.items,...handicapWatchState.pool].map(x=>({id:x.id,cooldownUntil:x.cooldownUntil??0,resetAt:x.resetAt??0})))}),writable:false,configurable:false});
   // FE_OVERVIEW_INPUT_BRIDGE_END
 `;
 html=html.replace(anchor,anchor+bridge);
 // Timestamp at actual bundle assignment; reading an old bundle never refreshes it.
 const assignment='state.lastBundle=bundle;';
 if(html.split(assignment).length!==3)throw Error('BUNDLE_ASSIGNMENT_ANCHOR_DRIFT');
-const observed='state.lastBundle=bundle;foBundleTimes.set(bundle,Date.now());';
+const observed='state.lastBundle=bundle;foRemember(bundle);';
 html=html.replaceAll(assignment,observed);
 const target='<details class="card fo-native" id="ftOverviewCard"><summary class="fo-native-head"><span class="fo-native-icon">◈</span><span><strong>FT OVERVIEW</strong><small>Nhận định toàn trận • Data × Market</small></span><span class="fo-native-toggle">OPEN</span></summary><div data-ft-overview data-fo-integrated aria-label="FT Overview thử nghiệm"></div></details>';
 const marker=html.match(/<(?:section|div)[^>]*id=["']h1WatchCard["'][^>]*>/)?.[0];

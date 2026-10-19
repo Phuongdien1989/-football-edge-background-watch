@@ -4,6 +4,7 @@ import {number,settlement,priceOver,noVig,createStore,researchBaseline,assess} f
 import {readLegacy,marketFromRows} from './adapter.mjs';
 import {demoSnapshots} from './demo.mjs';
 import {trendChart} from './charts.mjs';
+import {runInNewContext} from 'node:vm';
 let tests=0;const test=(name,fn)=>{fn();tests++;console.log('PASS '+name);};
 const now=Date.UTC(2026,9,19,10,0),sample=()=>demoSnapshots(now)[0];
 test('Missing data and booleans never become numeric zero',()=>{for(const v of [null,undefined,'',false,true])assert.equal(number(v),null);assert.equal(number(0),0);});
@@ -38,6 +39,34 @@ test('Adapter reads detached bridge without fetching or mutation',()=>{
   const rows=readLegacy({read:()=>structuredClone(packet)});assert.equal(rows.length,1);assert.equal(rows[0].model,null);assert.equal(rows[0].legacy.independent,false);assert.equal(JSON.stringify(packet),before);
 });
 test('Adapter does not mix half-time market with full-time totals',()=>{const s=sample();const m=marketFromRows([{category:'h1_total',values:[{value:'Over 2.5',odd:2},{value:'Under 2.5',odd:2}]}],s);assert.equal(m,null);});
+test('Provider price update time is preserved; stale/future prices are not made new',()=>{
+ const s=sample(),row={category:'over_under',main_line:2.5,update:new Date(now-120000).toISOString(),values:[{value:'Over 1.5',odd:1.5},{value:'Under 1.5',odd:3},{value:'Over 2.5',odd:2.4},{value:'Under 2.5',odd:1.6}]};
+ const m=marketFromRows([row],s);assert.equal(m.line,2.5);assert.equal(m.at,now-120000);assert.equal(assess({...s,market:m},now).marketFresh,false);assert.equal(marketFromRows([{...row,update:new Date(now+60000).toISOString()}],s),null);
+});
+test('Non-statistical legacy veto does not masquerade as a provider statistics error',()=>{
+ const item={id:5,latest:{captured_at:now,minute:70,status:'2H',goals:{home:0,away:0}},eval:{hardVeto:true,dataIncomplete:false}};
+ const rows=readLegacy({read:()=>({watchState:{items:[item]}})});assert.equal(rows[0].statsError,false);
+ item.latest.data_health={level:'NO_STATS'};assert.equal(readLegacy({read:()=>({watchState:{items:[item]}})})[0].statsError,true);
+});
+test('New DEEP context enriches one observation without refreshing source time or duplicating charts',()=>{
+ const st=createStore(),s=sample();s.model=null;st.ingest(s);st.read(now);
+ assert.equal(st.ingest({...s,contextAt:now+1000,model:sample().model}).accepted,true);
+ assert.equal(st.read(now)[0].modelOK,true);assert.equal(st.read(now)[0].points.length,1);
+ assert.equal(st.read(now+61000)[0].entry,'STALE');
+ assert.equal(st.ingest({...s,contextAt:now+2000,goals:{home:2,away:0}}).reason,'REVISION_CONFLICT');
+ assert.equal(st.ingest({...s,contextAt:now+500}).reason,'REVISION_CONFLICT');
+});
+test('Runtime cooldown blocks all ranking without mutating observed data or source timestamp',()=>{
+ const st=createStore(),s=sample();st.ingest(s);const before=st.export().snapshots;
+ const r=st.read(now,{controls:[{id:s.id,cooldownUntil:now+30000},{id:s.id,cooldownUntil:now+1000}]})[0];assert.equal(r.blocked,true);assert.equal(r.rank,null);assert.ok(r.reason.includes('cooldown'));assert.equal(r.at,now);assert.deepEqual(st.export().snapshots,before);
+ assert.equal(st.read(now+31000)[0].blocked,false);assert.equal(st.read(now+61000)[0].entry,'STALE');
+});
+test('Read bridge caches multiple DEEP fixtures, bounded, detached and without time refresh on read',()=>{
+ const build=readFileSync(new URL('build-integration.mjs',import.meta.url),'utf8'),bridge=build.match(/const bridge=`([\s\S]*?)`;/)[1];
+ const context={state:{lastBundle:null},window:{},watchState:{items:[]},h1WatchState:{items:[]},handicapWatchState:{pool:[]},feUICopy:x=>JSON.parse(JSON.stringify(x)),Date:{now:()=>now}};
+ runInNewContext(bridge+';for(let id=1;id<=55;id++){const b={meta:{fixture_id:id},normalized:{home_recent:[],away_recent:[]}};state.lastBundle=b;foRemember(b);}',context);
+ const rows=context.window.FEOverviewInputBridge.read();assert.equal(rows.length,50);assert.equal(rows[0].meta.fixture_id,6);assert.equal(rows.at(-1).meta.fixture_id,55);rows[0].meta.fixture_id=999;assert.equal(context.window.FEOverviewInputBridge.read()[0].meta.fixture_id,6);context.Date.now=()=>now+500000;assert.equal(context.window.FEOverviewInputBridge.read()[0].observed_at,now);
+});
 test('Module integration cannot write legacy store or send notifications',()=>{
   for(const p of ['core.mjs','adapter.mjs','charts.mjs','ui.mjs']){
     const src=readFileSync(new URL(p,import.meta.url),'utf8');assert.ok(!/\bfetch\s*\(|\bXMLHttpRequest\b|\bWebSocket\b|localStorage\.setItem|\.request\s*\(|\.send\s*\(|\.toggleManual\s*\(/.test(src),p);

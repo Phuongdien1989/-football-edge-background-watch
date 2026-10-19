@@ -55,6 +55,25 @@ The isolated published preview serves only DEMO assets, has zero bindings and a
 
 No claim of production release, restored statistics or proven betting performance.
 
+## Input compatibility hardening
+
+- The additive input bridge retains up to 50 detached DEEP bundles by fixture;
+  selecting another match does not discard the previous match's context.
+- Reads never change source observation times. A newly fetched context may enrich
+  the model of the same football observation without replacing score, stats or
+  price; stale and conflicting contexts are rejected.
+- A separate detached controls read carries original cooldown/reset flags. It
+  can block ranking and price use without rewriting stored observations.
+- Provider market update timestamps are honored when supplied. Future/invalid
+  updates are rejected, stale updates remain stale, paired main lines preferred.
+- A generic engine hard veto is not treated as proof of a statistics-provider
+  error. Existing `dataIncomplete`/NO_STATS indicators remain blocking.
+- TOP buttons identify the fixture, remain unique, and preserve focus; nested
+  expanded details survive refresh. Blocked cards show an explicit wait heading.
+
+These changes complete input compatibility for the covered replay cases, not a
+calibrated model, validated investment ranking or production LIVE/PUSH acceptance.
+
 ## Native layout integration (follow-up)
 
 The new section is a native styled collapsible card immediately before H1/FT/HC.

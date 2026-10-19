@@ -22,17 +22,18 @@ export function mount(root,{demo=false,bridge=window.FEUIReadBridge,bundleBridge
     if(document.visibilityState==='hidden')return;
     const now=demo?demoTime:Date.now();
     if(!demo)for(const row of readLegacy(bridge,bundleBridge))store.ingest(row);
-    const rows=store.read(now),top=rows.filter(r=>r.rank&&r.rank<=5);
+    const rows=store.read(now,{controls:demo?[]:bundleBridge?.readControls?.()||[]}),top=rows.filter(r=>r.rank&&r.rank<=5);
     if(!rows.some(r=>r.id===selected))selected=top[0]?.id||rows[0]?.id;
     const r=rows.find(x=>x.id===selected),s=r?.snapshot,m=s?.market;
     let html=`<header class="fo-header"><div><small>FOOTBALL EDGE · ${demo?'DỮ LIỆU MINH HỌA':'BẢN THỬ ĐỌC DỮ LIỆU'}</small><h2>FT OVERVIEW</h2></div><span class="fo-chip">${demo?'DEMO':'SHADOW'}</span></header>`;
-    html+=`<nav class="fo-top" aria-label="TOP theo dõi">${top.map(x=>`<button data-select="${x.id}" aria-pressed="${x.id===selected}">TOP ${x.rank}</button>`).join('') || '<span>Chưa có trận đang cập nhật</span>'}</nav>`;
+    html+=`<nav class="fo-top" aria-label="TOP theo dõi">${top.map(x=>`<button data-select="${x.id}" title="${esc(x.snapshot.home+' – '+x.snapshot.away)}" aria-label="TOP ${x.rank}: ${esc(x.snapshot.home+' – '+x.snapshot.away)}" aria-pressed="${x.id===selected}">TOP ${x.rank}<small>${esc(x.snapshot.home)}</small></button>`).join('') || '<span>Chưa có trận đang cập nhật</span>'}</nav>`;
     if(!r)html+='<div class="fo-card fo-empty"><h3>Đang chờ dữ liệu app</h3><p>Mở một trận có dữ liệu trong HT / FT / HC. Overview dùng snapshot sẵn có; không tự gọi API.</p></div>';
     else {
       const contract=m?fingerprint([m.bookmaker,m.period,m.basis,m.line]):null;
       const usable=r.modelOK&&!r.blocked&&r.marketFresh,quote=usable?r.quote:null;
       html+=`<article class="fo-card"><div class="fo-flex"><small>${esc(s.league)}</small><span class="fo-chip">${r.rank?'TOP #'+r.rank:r.entry}</span></div><div class="fo-match"><b>${esc(s.home)}</b><div><strong>${esc(s.goals.home)} – ${esc(s.goals.away)}</strong><small>${esc(s.minute)}′ · ${esc(s.status)}</small></div><b>${esc(s.away)}</b></div>
-        <section class="fo-recommend"><small>BET RECOMMENDATION · ${esc(r.entry)}</small><h3>${m&&r.marketFresh?'OVER '+esc(m.line)+' FT @ '+Number(m.over).toFixed(2):'CHỜ LINE / GIÁ HỢP LỆ'}</h3><p>${demo?(quote?.ev>0?'MINH HỌA • Cân nhắc trong ví dụ giả định':'MINH HỌA • CHỜ GIÁ — chưa có lợi thế model'):esc(r.reason)}</p>${m&&r.marketFresh?`<small>Thêm ${Math.max(0,Math.floor(m.line)+1-s.goals.home-s.goals.away)} bàn để thắng đủ · quy tắc tổng bàn FT</small>`:''}</section>
+        <div class="fo-readiness" aria-label="Trạng thái đầu vào"><span data-ready="${r.fresh&&!r.blocked}">DATA ${r.blocked?'WAIT':'OK'}</span><span data-ready="${r.modelOK}">MODEL ${r.modelOK?'RESEARCH':'WAIT'}</span><span data-ready="${r.marketFresh}">PRICE ${r.marketFresh?'OK':'WAIT'}</span></div>
+        <section class="fo-recommend"><small>BET RECOMMENDATION · ${esc(r.entry)}</small><h3>${r.blocked?'CHỜ DỮ LIỆU XÁC NHẬN':m&&r.marketFresh?(demo?'OVER ':'ĐANG ĐỊNH GIÁ OVER ')+esc(m.line)+' FT @ '+Number(m.over).toFixed(2):'CHỜ LINE / GIÁ HỢP LỆ'}</h3><p>${demo?(quote?.ev>0?'MINH HỌA • Cân nhắc trong ví dụ giả định':'MINH HỌA • CHỜ GIÁ — chưa có lợi thế model'):esc(r.reason)}</p>${!demo?'<small>SHADOW • Chưa phát khuyến nghị cược thật</small>':''}${!r.blocked&&m&&r.marketFresh?`<small>Thêm ${Math.max(0,Math.floor(m.line)+1-s.goals.home-s.goals.away)} bàn để thắng đủ · quy tắc tổng bàn FT</small>`:''}</section>
         <section class="fo-panel"><div class="fo-flex"><h3>DATA × MARKET</h3><small><i class="fo-blue">●</i> DATA <i class="fo-purple">●</i> MARKET</small></div><small>${m?'Cùng kèo Over '+esc(m.line)+' FT':'Chờ xác định kèo'} · xác suất thắng đủ</small>${trendChart(r.points,contract)}<small>Đổi line/nguồn hoặc thiếu dữ liệu: ngắt đường. Không nối các kèo khác nhau.</small></section>
         <section class="fo-assessment"><h3>EDGE ASSESSMENT</h3><b>${esc(r.reconciliation)}</b><p>${esc(r.synthesis)}</p><details><summary>Cơ sở nhận định</summary><p>${esc(r.data.reason)}</p><p>${r.delta===null?'Chưa đủ cơ sở so hai xác suất.':`Chênh model − thị trường: ${(r.delta*100).toFixed(1)} điểm %. Đây là khác biệt ước tính, chưa xác định bên nào đúng.`}</p>${s.model?.assumptions?.length?'<small>Model nghiên cứu: '+esc(s.model.assumptions.join(' · '))+'</small>':''}</details></section>
         <div class="fo-grid"><section class="fo-panel"><h3>BÀN CÒN LẠI</h3>${barsChart(r.modelOK&&!r.blocked?s.model.pmf:null,s.goals.home+s.goals.away,m?.line)}<small>${quote?'Thắng đủ '+pct(quote.win)+' · thắng nửa '+pct(quote.halfWin)+' · hoàn '+pct(quote.push):'Chưa có ước tính sử dụng được'}</small></section><section class="fo-panel"><h3>PRICE VALUE</h3>${priceChart(quote?.fairOdds,m?.over)}<b class="fo-ev ${quote?.ev<0?'fo-negative':''}">EV ƯỚC TÍNH ${quote?pct(quote.ev):'—'}</b><small>Giá trị thử nghiệm; chưa phải lợi thế đã kiểm chứng.</small></section></div>
@@ -40,7 +41,7 @@ export function mount(root,{demo=false,bridge=window.FEUIReadBridge,bundleBridge
         <footer class="fo-footer"><small>${r.fresh?'● Dữ liệu trong cửa sổ mới':'● STALE'} · ${Math.max(0,Math.floor((now-r.at)/1000))} giây trước</small><button data-export>Xuất checkpoint</button></footer></article>`;
     }
     html+='<p class="fo-note">Bản thử riêng · HT / FT / HC và TOP gốc vẫn giữ nguyên · '+esc(VERSION)+'</p>';
-    if(html!==lastHTML){const open=!!root.querySelector('details[open]');root.innerHTML=html;if(open)root.querySelector('details')?.setAttribute('open','');lastHTML=html;}
+    if(html!==lastHTML){const open=[...root.querySelectorAll('details')].map(x=>x.open),focus=root.contains(document.activeElement)?document.activeElement?.dataset.select:null;root.innerHTML=html;root.querySelectorAll('details').forEach((x,i)=>{x.open=!!open[i];});if(focus)root.querySelector('[data-select="'+Number(focus)+'"]')?.focus({preventScroll:true});lastHTML=html;}
     if(!demo)try{const saved=JSON.stringify(store.export());if(saved!==lastSaved&&saved.length<1500000){sessionStorage.setItem(storageKey,saved);lastSaved=saved;}}catch{}
     refreshCount++;
   }
@@ -54,3 +55,5 @@ export function mount(root,{demo=false,bridge=window.FEUIReadBridge,bundleBridge
 }
 const root=document.querySelector('[data-ft-overview]');
 if(root)window.FTOverviewPreview=mount(root,{demo:document.documentElement.dataset.foDemo==='true'&&new URLSearchParams(location.search).get('source')!=='bridge'});
+const native=document.querySelector('#ftOverviewCard');
+if(native){const label=native.querySelector('.fo-native-toggle');const sync=()=>{if(label)label.textContent=native.open?'CLOSE':'OPEN';};native.addEventListener('toggle',sync);sync();}

@@ -28,6 +28,7 @@ const assert=require('node:assert/strict');
   await page.setViewportSize({width:390,height:900});await page.goto(origin+'/ft-overview/build/');await page.waitForSelector('#ftOverviewCard .fo-empty',{state:'attached'});
   assert.equal(await page.locator('#ftOverviewCard').getAttribute('open'),null);
   await page.locator('#ftOverviewCard summary').first().click();await page.waitForSelector('#ftOverviewCard .fo-empty');
+  await page.waitForFunction(()=>document.querySelector('.fo-native-toggle')?.textContent==='CLOSE');
   assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));
   assert.equal(await page.locator('#liveWatchCard').count(),1);assert.equal(await page.locator('#h1WatchCard').count(),1);assert.equal(await page.locator('#handicapWatchCard').count(),1);
   const bridge=await page.evaluate(()=>({original:typeof FEUIReadBridge?.read,overview:typeof FEOverviewInputBridge?.read,preview:!!FTOverviewPreview}));
@@ -37,11 +38,18 @@ const assert=require('node:assert/strict');
   // Isolated adapter UI using a real-shaped bridge; expired stats cannot recommend.
   const live=await context.newPage();await live.addInitScript(()=>{
     const now=Date.now(),item={id:51,home:'<img src=x onerror=alert(1)>',away:'B',latest:{captured_at:now,minute:35,status:'1H',goals:{home:0,away:0},metrics:{total:{shots:7,sot:2}},stats_presence:{shots:true,sot:true}},eval:{score:80,scoreMode:'FULL'},history:[]};
-    window.__fixture=item;window.FEUIReadBridge={read:()=>({h1WatchState:{items:[window.__fixture]},watchState:{items:[]},handicapWatchState:{pool:[]}})};
+    window.__fixture=item;window.__controls=[];window.FEOverviewInputBridge={read:()=>[],readControls:()=>window.__controls};window.FEUIReadBridge={read:()=>({h1WatchState:{items:[window.__fixture]},watchState:{items:[]},handicapWatchState:{pool:[structuredClone(window.__fixture)]}})};
   });
   await live.goto(origin+'/ft-overview/?source=bridge');await live.waitForSelector('.fo-card');
   assert.equal(await live.locator('.fo-match img').count(),0);
   assert.ok((await live.locator('.fo-recommend').innerText()).includes('WAIT PRICE'));
+  assert.equal(await live.locator('.fo-top button').count(),1);
+  await live.evaluate(()=>{window.__controls=[{id:51,cooldownUntil:Date.now()+30000}];FTOverviewPreview.refresh();});
+  assert.equal(await live.locator('.fo-top button').count(),0);
+  assert.ok((await live.locator('.fo-recommend').innerText()).includes('cooldown'));
+  assert.equal(await live.locator('.fo-recommend h3').innerText(),'CHỜ DỮ LIỆU XÁC NHẬN');
+  await live.evaluate(()=>{window.__controls=[];FTOverviewPreview.refresh();});
+  await live.locator('.fo-details summary').click();await live.evaluate(()=>FTOverviewPreview.refresh());assert.equal(await live.locator('.fo-details').getAttribute('open'),'');
   await live.evaluate(()=>{const actualNow=Date.now;Date.now=()=>actualNow()+120000;FTOverviewPreview.refresh();});
   assert.ok((await live.locator('[data-ft-overview]').innerText()).includes('STALE'));
   console.log(JSON.stringify({status:'PASS',viewports:[390,1280],integrated_bridges:bridge,external_requests_sent:0,external_requests_blocked:blocked,live_fake_bridge:'PASS',top_selection:'PASS',xss:'PASS'}));

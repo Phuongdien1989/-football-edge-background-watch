@@ -6,6 +6,7 @@
 @media(min-width:768px){.fo-grid{grid-template-columns:1fr 1fr;gap:12px}.fo-card{padding:24px}.fo-recommend h3{font-size:28px}.fo-match strong{font-size:45px}}
 @media(max-width:360px){.fo-card{padding:12px}.fo-recommend h3{font-size:20px}.fo-match strong{font-size:29px}}
 .fo-negative{color:#ac6416}.fo-assessment details{margin-top:7px;font-size:10px}.fo-assessment summary{cursor:pointer;color:#648074}
+.fo-top button{min-width:0}.fo-top button small{max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:8px;margin-top:3px}.fo-top button[aria-pressed=true] small{color:#e0fff4}.fo-readiness{display:flex;gap:6px;margin-bottom:10px}.fo-readiness span{font:700 9px system-ui;border-radius:8px;background:#fff2d8;color:#8d6720;padding:6px 8px}.fo-readiness span[data-ready=true]{background:#e5f8ef;color:#11805d}
 /* Additive integration: same rounded native card, own scoped selectors only. */
 #ftOverviewCard.fo-native{margin-top:16px;margin-bottom:16px;padding:16px;border:1px solid #dce9f5;border-radius:26px;background:linear-gradient(125deg,#f4faff,#fff);box-shadow:0 12px 30px #16365907;scroll-margin-top:70px}
 #ftOverviewCard>.fo-native-head{display:flex;align-items:center;gap:12px;cursor:pointer;list-style:none;color:#143464;min-height:44px;text-align:left}
