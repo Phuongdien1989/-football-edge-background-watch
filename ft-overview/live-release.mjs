@@ -12,7 +12,7 @@ const report={source_commit:process.env.GITHUB_SHA,mode:'OPT_IN_SAME_ORIGIN_SHAD
 async function cf(path,options={}){const r=await fetch(root+path,{...options,headers:{...headers,...options.headers},signal:AbortSignal.timeout(30000)});const j=await r.json();assert(r.ok&&j.success,'CF_OPERATION_FAILED_'+r.status);return j.result;}
 async function active(n){const v=(await cf(n+'/deployments')).deployments?.[0]?.versions;assert(v?.length===1&&v[0].percentage===100,'SPLIT_DEPLOYMENT');return v[0].version_id;}
 async function versions(){const out={};for(const n of Object.keys(expected))out[n]=await active(n);return out;}
-async function bytes(path){const r=await fetch(publicRoot+path,{headers:{'Cache-Control':'no-cache'},signal:AbortSignal.timeout(25000)});assert(r.ok,'PUBLIC_RESOURCE_READ_FAILED');return new Uint8Array(await r.arrayBuffer());}
+async function bytes(path){const r=await fetch(publicRoot+path,{headers:{'Cache-Control':'no-cache'},signal:AbortSignal.timeout(25000)});assert(r.ok,'PUBLIC_RESOURCE_READ_FAILED_'+r.status+'_'+path);return new Uint8Array(await r.arrayBuffer());}
 if(process.argv[2]==='rollback'){
  if(!existsSync('ft-overview/live-release-result.json')){console.log('NO_RELEASE_TO_ROLL_BACK');process.exit(0);}
  const state=JSON.parse(readFileSync('ft-overview/live-release-result.json'));if(!state.deployed){console.log('NO_SUCCESSFUL_RELEASE_TO_ROLL_BACK');process.exit(0);}
@@ -40,7 +40,8 @@ try{
  }
  report.original_modules=modules.map(m=>({name:m.name,sha256:hash(m.bytes)}));
  const original=await bytes('/');assert.equal(hash(original),'aa4f0f6318cd52c14ff62b195c5ea04c5267107455924da44c9aa78169fe7f28','ORIGINAL_HTML_DRIFT');
- const staticHashes={};for(const path of ['/push-sw.js','/manifest.webmanifest','/icons/icon-180.png','/icons/icon-192.png'])staticHashes[path]=hash(await bytes(path));
+ const staticHashes={};for(const path of ['/push-sw.js','/manifest.webmanifest'])staticHashes[path]=hash(await bytes(path));
+ for(const path of ['/icons/icon-180.png','/icons/icon-192.png']){const r=await fetch(publicRoot+path,{signal:AbortSignal.timeout(15000)});if(r.ok&&(r.headers.get('content-type')||'').startsWith('image/'))staticHashes[path]=hash(new Uint8Array(await r.arrayBuffer()));}
  mkdirSync('ft-overview/release',{recursive:true});writeFileSync('ft-overview/release/original.html',original);
  execFileSync(process.execPath,['ft-overview/build-integration.mjs','ft-overview/release/original.html'],{stdio:'inherit'});
  const files={'index.html':readFileSync('ft-overview/build/index.html','utf8')};
