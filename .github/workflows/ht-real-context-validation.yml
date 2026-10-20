@@ -1,0 +1,26 @@
+name: HT real context read-only validation
+on:
+  push:
+    branches: [feature/ht-early-evidence-20261020]
+    paths: ['audits/scripts/ht-real-context-validation.mjs', '.github/workflows/ht-real-context-validation.yml']
+permissions: {contents: read}
+jobs:
+  context:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: football-edge-production
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: One bounded read of real half-time history only
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node audits/scripts/ht-real-context-validation.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ht-real-context-validation
+          path: audits/2026-10-21/ht-real-context-validation.json
+          retention-days: 90
