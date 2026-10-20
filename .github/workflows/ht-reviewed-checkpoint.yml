@@ -1,0 +1,31 @@
+name: HT reviewed artifact checkpoint
+on:
+  push:
+    branches: [feature/ht-early-evidence-20261020]
+    paths: ['audits/2026-10-21/HT_COMPLETE_CANDIDATE.md', 'audits/scripts/ht-reviewed-checkpoint.mjs', '.github/workflows/ht-reviewed-checkpoint.yml']
+permissions:
+  contents: read
+  actions: read
+jobs:
+  checkpoint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - uses: actions/download-artifact@v4
+        with:
+          name: football-edge-ht-complete-candidate
+          run-id: 39489155884
+          github-token: ${{ github.token }}
+          path: ht-review
+      - run: node audits/scripts/ht-reviewed-checkpoint.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Football_Edge_HT_Reviewed_20261021
+          path: |
+            ht-review/Football_Edge_HT_Reviewed_20261021.zip
+            ht-review/SHA256.txt
+            ht-review/package/README.md
+          retention-days: 90
