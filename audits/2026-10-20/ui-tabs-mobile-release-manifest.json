@@ -1,0 +1,172 @@
+{
+  "source_commit": "723ae37eac825ef1fe8285c8395826b09eba35c5",
+  "target": "shiny-silence-d892",
+  "rollback_version": "b73642ec-1d4c-41ae-bc28-68c785b6fd79",
+  "baseline_versions": {
+    "shiny-silence-d892": "b73642ec-1d4c-41ae-bc28-68c785b6fd79",
+    "football-edge-background-watch": "04cc044d-412f-4844-9b83-c7c786eedd13",
+    "football-edge-desktop-b2-test": "a332ee39-abb2-422d-a021-db78ef19cc10"
+  },
+  "backup_files": [
+    {
+      "path": "index.html",
+      "bytes": 1336886,
+      "sha256": "9c557b2b20744aaad5b14ddd367517bd4afb00a7af182ead93e346f857f9947e"
+    },
+    {
+      "path": "original/index.html",
+      "bytes": 1335441,
+      "sha256": "5095a6470f866932a9cfe30efb591c9856c147fceb5de5696ee0c48141b977fc"
+    },
+    {
+      "path": "ft-overview-live/index.html",
+      "bytes": 1336886,
+      "sha256": "9c557b2b20744aaad5b14ddd367517bd4afb00a7af182ead93e346f857f9947e"
+    },
+    {
+      "path": "push-sw.js",
+      "bytes": 1240,
+      "sha256": "c2a193ef7464ebd0a41de358ea69c1d1f91a28866e70baf8e7cbb83499573ec9"
+    },
+    {
+      "path": "manifest.webmanifest",
+      "bytes": 167,
+      "sha256": "2f8d30f69d89e49fa95194f09a8fb254bb3b313aa369b57b45337292fbaabc26"
+    },
+    {
+      "path": "ft-overview/core.mjs",
+      "bytes": 15557,
+      "sha256": "1ee74e827136bb08a9c506fda82ccd677bc4be65c07b4da37491f3dc2e8605c5"
+    },
+    {
+      "path": "ft-overview/adapter.mjs",
+      "bytes": 4901,
+      "sha256": "fe46fc0c85d9189482eb6c8e3945e71926159fa278575c5ba1f1e059f2bfbe7c"
+    },
+    {
+      "path": "ft-overview/charts.mjs",
+      "bytes": 3563,
+      "sha256": "8f50dd01869394643eaa927180574513b0515845ca3ac480c0c964399d0bd140"
+    },
+    {
+      "path": "ft-overview/demo.mjs",
+      "bytes": 909,
+      "sha256": "7b668049592044259ab012bd508533a84fabca560b443803c11be860077a3053"
+    },
+    {
+      "path": "ft-overview/ui.mjs",
+      "bytes": 9656,
+      "sha256": "c684fe10946fb331c641cb17d79a19937002ec6e757cd55d347be732ee79fa24"
+    },
+    {
+      "path": "ft-overview/style.css",
+      "bytes": 5777,
+      "sha256": "5950e9b1bebc5c37a0c6208a346afead58bdfefd5884cadb0c813ce76da2fa75"
+    }
+  ],
+  "files": [
+    {
+      "path": "favicon.svg",
+      "bytes": 397,
+      "sha256": "86dd2e7407f7ce24d2b46d34665e8bf487dcda939c6ef57adf3049de5f1c18c7"
+    },
+    {
+      "path": "ft-overview-live/index.html",
+      "bytes": 1336886,
+      "sha256": "9c557b2b20744aaad5b14ddd367517bd4afb00a7af182ead93e346f857f9947e"
+    },
+    {
+      "path": "ft-overview/adapter.mjs",
+      "bytes": 4901,
+      "sha256": "fe46fc0c85d9189482eb6c8e3945e71926159fa278575c5ba1f1e059f2bfbe7c"
+    },
+    {
+      "path": "ft-overview/charts.mjs",
+      "bytes": 3563,
+      "sha256": "8f50dd01869394643eaa927180574513b0515845ca3ac480c0c964399d0bd140"
+    },
+    {
+      "path": "ft-overview/core.mjs",
+      "bytes": 15557,
+      "sha256": "1ee74e827136bb08a9c506fda82ccd677bc4be65c07b4da37491f3dc2e8605c5"
+    },
+    {
+      "path": "ft-overview/demo.mjs",
+      "bytes": 909,
+      "sha256": "7b668049592044259ab012bd508533a84fabca560b443803c11be860077a3053"
+    },
+    {
+      "path": "ft-overview/style.css",
+      "bytes": 5777,
+      "sha256": "5950e9b1bebc5c37a0c6208a346afead58bdfefd5884cadb0c813ce76da2fa75"
+    },
+    {
+      "path": "ft-overview/ui.mjs",
+      "bytes": 9753,
+      "sha256": "002125d6791fc02bbb2344ec282e7865d0e9a491b8ce1111739928555dbca89a"
+    },
+    {
+      "path": "icons/icon-180.png",
+      "bytes": 9732,
+      "sha256": "39baa32ec57de8caf0b213208fe21e1233655f6cc9d2897de6af5286aa1b7390"
+    },
+    {
+      "path": "icons/icon-192.png",
+      "bytes": 9646,
+      "sha256": "a66ce7d1ab15fc05215d170d5f60c45f409f14a871a72eb1478a45193a2ea327"
+    },
+    {
+      "path": "icons/icon-512.png",
+      "bytes": 26607,
+      "sha256": "f91fc87967c4f44cab0754ecc9dc66bc4c4e59d05558387e4f74d4d2cea2dae6"
+    },
+    {
+      "path": "index.html",
+      "bytes": 1337367,
+      "sha256": "88a4a49e62fe6c6ce37445d00457d728de1c1ee55a4bc8e8b1359994ea9f3bdc"
+    },
+    {
+      "path": "manifest.webmanifest",
+      "bytes": 167,
+      "sha256": "2f8d30f69d89e49fa95194f09a8fb254bb3b313aa369b57b45337292fbaabc26"
+    },
+    {
+      "path": "original/index.html",
+      "bytes": 1335441,
+      "sha256": "5095a6470f866932a9cfe30efb591c9856c147fceb5de5696ee0c48141b977fc"
+    },
+    {
+      "path": "push-sw.js",
+      "bytes": 1240,
+      "sha256": "c2a193ef7464ebd0a41de358ea69c1d1f91a28866e70baf8e7cbb83499573ec9"
+    },
+    {
+      "path": "ui-tabs/integrated.css",
+      "bytes": 5387,
+      "sha256": "dfccb59ccc6c9127bbfb0b1b8d29c745f52f500823b8ca2b1d10d7fd8cb4058c"
+    },
+    {
+      "path": "ui-tabs/integrated.mjs",
+      "bytes": 8351,
+      "sha256": "5ba58d8301ff4b1fb5f23510753d16b779b9a17bbd54e6e9805148e0c405335a"
+    },
+    {
+      "path": "ui-tabs/read-model.mjs",
+      "bytes": 7435,
+      "sha256": "b88f1356fc37845b00f47ba01eae78ca58bd3aa30f2781f5d7073a9c2a138e00"
+    }
+  ],
+  "changed_existing_files": [
+    "ft-overview/ui.mjs",
+    "index.html"
+  ],
+  "additional_files": [
+    "ui-tabs/integrated.css",
+    "ui-tabs/integrated.mjs",
+    "ui-tabs/read-model.mjs",
+    "favicon.svg",
+    "icons/icon-180.png",
+    "icons/icon-192.png",
+    "icons/icon-512.png"
+  ]
+}
