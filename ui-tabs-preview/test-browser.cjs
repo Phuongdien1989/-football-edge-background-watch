@@ -16,21 +16,21 @@ const csp="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inlin
  assert.equal(new Set(await page.locator('.rank-row').evaluateAll(xs=>xs.map(x=>x.hash))).size,5);
  assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
  await page.screenshot({path:'ui-tabs-preview/qa/overview-'+width+'.png',fullPage:true});
- await page.locator('[data-tab=valuation]').click();await page.waitForURL('**/#valuation');assert.equal(await page.locator('.rank-row').count(),1);
+ await page.locator('[data-tab=valuation]').click();await page.waitForURL('**/#valuation');await page.waitForFunction(()=>document.querySelector('#content').getAttribute('aria-labelledby')==='tab-valuation');assert.equal(await page.locator('.rank-row').count(),1);
  await page.locator('.rank-row').click();await page.waitForSelector('.chart');assert((await page.locator('main').innerText()).includes('DATA × MARKET'));
  const a=page.locator('details').first();await a.locator('summary').click();assert(await a.evaluate(x=>x.open));
  if(width===390)await page.screenshot({path:'ui-tabs-preview/qa/detail-390.png',fullPage:true});
- await page.locator('[data-tab=ht]').click();assert.equal(await page.locator('.rank-row').count(),2);
+ await page.locator('[data-tab=ht]').click();await page.waitForFunction(()=>document.querySelector('#content').getAttribute('aria-labelledby')==='tab-ht');assert.equal(await page.locator('.rank-row').count(),2);
  await page.goBack();await page.waitForSelector('.chart');assert(await page.locator('details').first().evaluate(x=>x.open));
- await page.locator('.back').click();await page.waitForURL('**/#valuation');assert.equal(await page.locator('.rank-row').count(),1);
+ await page.locator('.back').click();await page.waitForURL('**/#valuation');await page.waitForSelector('.rank-row');assert.equal(await page.locator('.rank-row').count(),1);
  const n=requests.length;
- for(let i=0;i<3;i++)for(const key of ['overview','ht','ft','hc','valuation']){await page.locator('[data-tab='+key+']').click();await page.waitForURL('**/#'+key);}
+ for(let i=0;i<3;i++)for(const key of ['overview','ht','ft','hc','valuation']){await page.locator('[data-tab='+key+']').click();await page.waitForURL('**/#'+key);await page.waitForFunction(k=>document.querySelector('#content').getAttribute('aria-labelledby')==='tab-'+k,key);}
  assert.equal(requests.length,n,'tab switch must not request resources');
  await page.locator('[data-nav=matches]').click();await page.locator('.search').fill('Coast');assert.equal(await page.locator('.rank-row').count(),1);
- await page.locator('[data-nav=follow]').click();assert((await page.locator('main').innerText()).includes('Chưa kết nối'));
- await page.locator('[data-nav=settings]').click();await page.locator('[data-empty]').click();await page.locator('[data-tab=overview]').click();assert.equal(await page.locator('.rank-row').count(),0);assert(await page.locator('.empty').isVisible());
+ await page.locator('[data-nav=follow]').click();await page.waitForSelector('.symbol');assert((await page.locator('main').innerText()).includes('Chưa kết nối'));
+ await page.locator('[data-nav=settings]').click();await page.locator('[data-empty]').click();await page.locator('[data-tab=overview]').click();await page.waitForSelector('.empty');assert.equal(await page.locator('.rank-row').count(),0);assert(await page.locator('.empty').isVisible());
  if(width===390)await page.screenshot({path:'ui-tabs-preview/qa/empty-390.png',fullPage:true});
- await page.locator('[data-nav=settings]').click();await page.locator('[data-empty]').click();await page.locator('[data-tab=overview]').click();assert.equal(await page.locator('.rank-row').count(),5);
+ await page.locator('[data-nav=settings]').click();await page.locator('[data-empty]').click();await page.locator('[data-tab=overview]').click();await page.waitForSelector('.rank-row');assert.equal(await page.locator('.rank-row').count(),5);
  assert.deepEqual(errors,[]);assert.deepEqual(external,[]);assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
  results.push({width,status:'PASS',tabs:5,unique_fixtures:5,no_overflow:true,back_and_accordion_preserved:true,tab_switch_requests:0,external_requests:0,empty_state:true,search:true});await ctx.close();
  }}finally{await browser.close();if(server)await new Promise(r=>server.close(r));}
