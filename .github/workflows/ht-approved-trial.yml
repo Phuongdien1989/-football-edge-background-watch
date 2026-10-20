@@ -11,7 +11,8 @@ concurrency:
   cancel-in-progress: false
 jobs:
   release:
-    if: startsWith(github.event.head_commit.message, 'release(ht): approved controlled trial')
+    if: >-
+      startsWith(github.event.head_commit.message, 'release(ht): approved controlled trial')
     runs-on: ubuntu-latest
     timeout-minutes: 20
     environment: football-edge-production
