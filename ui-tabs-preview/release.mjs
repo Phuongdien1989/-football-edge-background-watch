@@ -10,7 +10,8 @@ async function versions(){const out={};for(const name of Object.keys(expected)){
 const before=await versions(),name='football-edge-tabs-preview',tag='fe-ui-tabs-demo-only-20261020';
 const existing=await fetch(api+name+'/settings',{headers,signal:AbortSignal.timeout(25000)});
 if(existing.status!==404){const j=await existing.json();assert(existing.ok&&j.success&&j.result.tags?.includes(tag)&&(j.result.bindings||[]).length===0,'REFUSE_NON_PREVIEW_TARGET');}
-const files=Object.fromEntries(['index.html','style.css','app.mjs'].map(f=>['/'+f,readFileSync('ui-tabs-preview/'+f,'utf8')]));
+const files=Object.fromEntries(['index.html','style.css','app.mjs','data.html','data-view.mjs','read-model.mjs','archive-data.mjs'].map(f=>['/'+f,readFileSync('ui-tabs-preview/'+f,'utf8')]));
+for(const f of ['ui.mjs','core.mjs','adapter.mjs','charts.mjs','demo.mjs','style.css'])files['/ft-overview/'+f]=readFileSync('ft-overview/'+f,'utf8');
 const csp="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'none'; worker-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'";
 const code=`const files=${JSON.stringify(files)};export default {fetch(request){const u=new URL(request.url),p=u.pathname==='/'?'/index.html':u.pathname;if(!(p in files))return new Response('Not found',{status:404});return new Response(files[p],{headers:{'Content-Type':p.endsWith('.html')?'text/html; charset=utf-8':p.endsWith('.css')?'text/css; charset=utf-8':'text/javascript; charset=utf-8','Content-Security-Policy':${JSON.stringify(csp)},'Cache-Control':'no-store','X-Content-Type-Options':'nosniff','Referrer-Policy':'no-referrer'}})}};`;
 const form=new FormData();form.append('metadata',new Blob([JSON.stringify({main_module:'preview.mjs',compatibility_date:'2026-10-01',bindings:[],tags:[tag]})],{type:'application/json'}));form.append('preview.mjs',new Blob([code],{type:'application/javascript+module'}),'preview.mjs');

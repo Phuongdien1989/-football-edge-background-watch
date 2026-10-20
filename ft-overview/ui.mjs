@@ -6,7 +6,7 @@ const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&
 const pct=x=>typeof x==='number'&&Number.isFinite(x)?`${(100*x).toFixed(1)}%`:'—';
 export function mount(root,{demo=false,bridge=window.FEUIReadBridge,bundleBridge=window.FEOverviewInputBridge,inputSource=null,controlSource=null,archive=false,trialRecommendations=false}={}) {
   trialRecommendations=trialRecommendations&&!demo&&!archive;
-  const store=createStore({trialRecommendations});let selected=null,lastHTML='',demoTime=Date.now(),refreshCount=0;
+  const store=createStore({trialRecommendations});let selected=null,lastHTML='',demoTime=Date.now(),refreshCount=0,lastAssessedRows=[];
   const storageKey='FE_FT_OVERVIEW_RESEARCH_V1';let lastSaved='';
   if(!demo&&!archive)try{const saved=sessionStorage.getItem(storageKey);if(saved)store.restore(JSON.parse(saved));}catch{}
   const snapshots=demo?demoSnapshots(demoTime):[];
@@ -24,6 +24,7 @@ export function mount(root,{demo=false,bridge=window.FEUIReadBridge,bundleBridge
     const now=demo?demoTime:Date.now();
     if(!demo)for(const row of inputSource?inputSource():readLegacy(bridge,bundleBridge))store.ingest(row);
     const rows=store.read(now,{controls:demo?[]:controlSource?controlSource():bundleBridge?.readControls?.()||[]}),top=rows.filter(r=>r.rank&&r.rank<=5);
+    lastAssessedRows=rows;
     if(!rows.some(r=>r.id===selected))selected=top[0]?.id||rows[0]?.id;
     const r=rows.find(x=>x.id===selected),s=r?.snapshot,m=s?.market;
     let html=`<header class="fo-header"><div><small>FOOTBALL EDGE · ${demo?'DỮ LIỆU MINH HỌA':archive?'DỮ LIỆU THẬT ĐÃ LƯU':'BẢN THỬ ĐỌC DỮ LIỆU'}</small><h2>FT OVERVIEW</h2></div><span class="fo-chip">${demo?'DEMO':archive?'ARCHIVE':'SHADOW'}</span></header>`;
@@ -52,7 +53,7 @@ export function mount(root,{demo=false,bridge=window.FEUIReadBridge,bundleBridge
   }};
   root.addEventListener('click',click);window.addEventListener('fe-notify-sync-updated',render);document.addEventListener('visibilitychange',render);
   render();const timer=setInterval(render,3000);
-  return Object.freeze({read:()=>store.export(),refresh:render,select:id=>{selected=Number(id);render();},get refreshCount(){return refreshCount;},destroy:()=>{clearInterval(timer);root.removeEventListener('click',click);window.removeEventListener('fe-notify-sync-updated',render);document.removeEventListener('visibilitychange',render);}});
+  return Object.freeze({read:()=>store.export(),readDisplay:()=>structuredClone(lastAssessedRows),refresh:render,select:id=>{selected=Number(id);render();},get refreshCount(){return refreshCount;},destroy:()=>{clearInterval(timer);root.removeEventListener('click',click);window.removeEventListener('fe-notify-sync-updated',render);document.removeEventListener('visibilitychange',render);}});
 }
 const root=document.querySelector('[data-ft-overview]');
 if(root&&!root.hasAttribute('data-fo-manual'))window.FTOverviewPreview=mount(root,{demo:document.documentElement.dataset.foDemo==='true'&&new URLSearchParams(location.search).get('source')!=='bridge',trialRecommendations:document.documentElement.dataset.foTrial==='true'});

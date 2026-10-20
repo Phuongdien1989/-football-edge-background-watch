@@ -18,6 +18,7 @@ jobs:
       - uses: actions/setup-node@v4
         with: {node-version: '22'}
       - run: node --check ui-tabs-preview/app.mjs && node --check ui-tabs-preview/release.mjs
+      - run: node ui-tabs-preview/test-read-model.mjs && node ft-overview/test.mjs
       - run: npm install --no-save playwright@1.58.2
       - run: npx playwright install --with-deps chromium
       - name: Layout and interaction acceptance before publication
@@ -41,3 +42,7 @@ jobs:
             ui-tabs-preview/index.html
             ui-tabs-preview/style.css
             ui-tabs-preview/app.mjs
+            ui-tabs-preview/data.html
+            ui-tabs-preview/data-view.mjs
+            ui-tabs-preview/read-model.mjs
+            ui-tabs-preview/archive-data.mjs
