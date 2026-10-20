@@ -1,0 +1,61 @@
+{
+  "release_commit": "76eae2e373138adeb0acaa0fff567b784ecd5016",
+  "candidate_code": "a9e9cc68cc07af27bdca0305b6f227da12f64cb9",
+  "source_run": 39491133238,
+  "original_versions": {
+    "shiny-silence-d892": "3c0e47ed-275b-410c-b527-77f1ff65a28a",
+    "football-edge-background-watch": "04cc044d-412f-4844-9b83-c7c786eedd13",
+    "football-edge-desktop-b2-test": "a332ee39-abb2-422d-a021-db78ef19cc10"
+  },
+  "versions": {
+    "football-edge-background-watch": "fe5c9fb5-ae1d-4aa6-8850-8cbdeb2b8e73",
+    "shiny-silence-d892": "0a87e8c1-c1fa-4a89-ac54-ddd47ab6b2ed"
+  },
+  "status": "TRIAL_DEPLOYED_TECHNICAL_ACCEPTANCE_PASS",
+  "scanner_toggled": false,
+  "provider_requests_requested": 0,
+  "d1_writes_requested": 0,
+  "database_backup": false,
+  "checks": {
+    "account_d1_headroom": "AVAILABLE_AT_PREFLIGHT",
+    "backend_dry_run": {
+      "status": "PASS",
+      "bundle_line": "Total Upload: 562.33 KiB / gzip: 124.63 KiB"
+    },
+    "mobile_dry_run": {
+      "status": "PASS",
+      "bundle_line": "Total Upload: 0.31 KiB / gzip: 0.22 KiB"
+    },
+    "package_and_preserved_assets": "PASS",
+    "old_versions_exist": "PASS",
+    "https_browser": "PASS",
+    "scanner_stays_off": "PASS"
+  },
+  "scan_before": {
+    "enabled": false,
+    "manualEnabled": false,
+    "next_alarm": null
+  },
+  "binding_signature": "61f38c93ac90a307fa7ea53e5970bb43eb2faa3f1dcb80e865d78f945e07cf3d",
+  "account_d1_usage": {
+    "utc_day": "2026-10-20",
+    "rows_written": 21404,
+    "rows_read": 425188,
+    "source": "Cloudflare account-wide analytics; may lag live traffic"
+  },
+  "artifact_files": 128,
+  "mobile_backup_files": 18,
+  "backend_backup_files": 29,
+  "rollback": "ORIGINAL_VERSIONS_AVAILABLE",
+  "live_push": "PHONE_ACCEPTANCE_PENDING",
+  "not_verified": [
+    "Actual iPhone/PWA and Push receipt",
+    "Authenticated live provider warm-up",
+    "Account quota under candidate live traffic",
+    "Forecast accuracy"
+  ],
+  "verified_at": "2026-10-20T20:46:13.2151086Z",
+  "workflow": "https://github.com/Phuongdien1989/-football-edge-background-watch/actions/runs/39494486949",
+  "backup_artifact": "https://github.com/Phuongdien1989/-football-edge-background-watch/actions/runs/39494486949/artifacts/12297436359",
+  "evidence_artifact": "https://github.com/Phuongdien1989/-football-edge-background-watch/actions/runs/39494486949/artifacts/12297700365"
+}
