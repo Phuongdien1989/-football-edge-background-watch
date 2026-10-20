@@ -10,7 +10,7 @@ function observation(raw={},names={}){
  return {at,status:txt(raw.status),minute:num(raw.minute),goals:{home:num(g.home),away:num(g.away)},home:txt(names.home),away:txt(names.away),league:txt(names.league),metrics:Object.fromEntries(['shots','sot','inbox','xg'].map(k=>[k,raw.stats_presence?.[k]===true?num(raw.metrics?.total?.[k]):null]))};
 }
 function legacySignal(it,key,now){
- const obs=observation(it.latest,it),e=it.eval||{},history=(it.history||[]).slice(-80).map(h=>({at:num(h.captured_at),value:num(h.metrics?.total?.sot),score:null}));
+ const obs=observation(it.latest,it),e=it.eval||{},history=(it.history||[]).slice(-80).map(h=>({at:num(h.captured_at),value:h.stats_presence?.sot===true?num(h.metrics?.total?.sot):null,score:null}));
  return {engine:key,observation:obs,state:txt(key==='hc'?e.state:it.state),score:key==='hc'?null:num(e.score),gap:key==='hc'?num(e.states?.liveGap):null,reason:txt(it.reason||e.reason),recommendation:txt(e.recommendation),freshness:freshness(obs.at,obs.status,now),history,historyUnit:'SOT',source:'LEGACY_READ_BRIDGE',rank:null};
 }
 function basePacket(mode,now){return {schema:'FE_TABS_DISPLAY_V1',mode,read_at:now,fixtures:[],top:[],lists:{ht:[],ft:[],hc:[],valuation:[]},warnings:[],sourceError:null};}
