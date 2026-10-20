@@ -1,0 +1,25 @@
+{
+  "status": "PASS",
+  "source": "user-supplied favicon.svg",
+  "source_sha256": "86dd2e7407f7ce24d2b46d34665e8bf487dcda939c6ef57adf3049de5f1c18c7",
+  "files": [
+    {
+      "path": "icons/icon-180.png",
+      "width": 180,
+      "height": 180,
+      "sha256": "39baa32ec57de8caf0b213208fe21e1233655f6cc9d2897de6af5286aa1b7390"
+    },
+    {
+      "path": "icons/icon-192.png",
+      "width": 192,
+      "height": 192,
+      "sha256": "a66ce7d1ab15fc05215d170d5f60c45f409f14a871a72eb1478a45193a2ea327"
+    },
+    {
+      "path": "icons/icon-512.png",
+      "width": 512,
+      "height": 512,
+      "sha256": "f91fc87967c4f44cab0754ecc9dc66bc4c4e59d05558387e4f74d4d2cea2dae6"
+    }
+  ]
+}

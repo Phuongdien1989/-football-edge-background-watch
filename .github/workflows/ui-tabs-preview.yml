@@ -1,0 +1,60 @@
+name: UI tabs — isolated layout preview
+on:
+  push:
+    branches: [feature/ft-overview-shadow-20261019]
+    paths: ['ui-tabs-preview/**', '.github/workflows/ui-tabs-preview.yml']
+permissions: {contents: read}
+concurrency:
+  group: fe-ui-tabs-isolated-preview
+  cancel-in-progress: false
+jobs:
+  preview:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: football-edge-production
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - run: node --check ui-tabs-preview/app.mjs && node --check ui-tabs-preview/release.mjs
+      - run: node ui-tabs-preview/test-read-model.mjs && node ft-overview/test.mjs
+      - run: node ui-tabs-preview/build-integrated.mjs
+      - run: npm install --no-save playwright@1.58.2
+      - run: npx playwright install --with-deps chromium
+      - name: Layout and interaction acceptance before publication
+        run: node ui-tabs-preview/test-browser.cjs
+      - name: Same-page original runtime and tab integration acceptance
+        run: node ui-tabs-preview/test-integrated.cjs
+      - name: Clean candidate acceptance without sandbox hooks
+        run: node ui-tabs-preview/test-candidate.cjs
+      - name: Publish isolated zero-binding preview only
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node ui-tabs-preview/release.mjs
+      - name: HTTPS layout acceptance
+        env:
+          PREVIEW_URL: https://football-edge-tabs-preview.ngophuonghuy.workers.dev/
+        run: node ui-tabs-preview/test-browser.cjs
+      - name: HTTPS same-page integration acceptance
+        env:
+          PREVIEW_URL: https://football-edge-tabs-preview.ngophuonghuy.workers.dev/
+        run: node ui-tabs-preview/test-integrated.cjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: football-edge-tabs-step3-preview
+          path: |
+            ui-tabs-preview/qa/
+            ui-tabs-preview/release-result.json
+            ui-tabs-preview/index.html
+            ui-tabs-preview/style.css
+            ui-tabs-preview/app.mjs
+            ui-tabs-preview/data.html
+            ui-tabs-preview/data-view.mjs
+            ui-tabs-preview/read-model.mjs
+            ui-tabs-preview/archive-data.mjs
+            ui-tabs-preview/integrated.mjs
+            ui-tabs-preview/integrated.css
+            ui-tabs-preview/generated/

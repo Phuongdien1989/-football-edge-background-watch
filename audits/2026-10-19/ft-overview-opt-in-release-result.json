@@ -1,0 +1,29 @@
+{
+  "source_commit": "aa78295612808155b32cd0ea8bcd6ea41c03bc5f",
+  "mode": "STATIC_ASSET_OPT_IN_SHADOW",
+  "rollback": "03c1d55d-358a-448b-96f3-f356704831df",
+  "deployed": true,
+  "provider_calls": 0,
+  "scanner_toggled": false,
+  "backend_changed": false,
+  "production_root_changed": false,
+  "before": {
+    "shiny-silence-d892": "03c1d55d-358a-448b-96f3-f356704831df",
+    "football-edge-background-watch": "04cc044d-412f-4844-9b83-c7c786eedd13",
+    "football-edge-desktop-b2-test": "a332ee39-abb2-422d-a021-db78ef19cc10"
+  },
+  "version": "ac8c0da2-551c-4561-a554-efd4c09339ad",
+  "after": {
+    "shiny-silence-d892": "ac8c0da2-551c-4561-a554-efd4c09339ad",
+    "football-edge-background-watch": "04cc044d-412f-4844-9b83-c7c786eedd13",
+    "football-edge-desktop-b2-test": "a332ee39-abb2-422d-a021-db78ef19cc10"
+  },
+  "status": "PASS",
+  "original_html_sha256": "aa4f0f6318cd52c14ff62b195c5ea04c5267107455924da44c9aa78169fe7f28",
+  "static_resources_preserved": [
+    "/push-sw.js",
+    "/manifest.webmanifest"
+  ],
+  "url": "https://shiny-silence-d892.ngophuonghuy.workers.dev/ft-overview-live/#ftOverviewCard",
+  "roll_back_version_exists": true
+}

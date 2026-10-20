@@ -1,0 +1,44 @@
+name: FT Overview — main app trial release
+on:
+  push:
+    branches: [feature/ft-overview-shadow-20261019]
+    paths: ['ft-overview/frozen-original-mobile.html', 'ft-overview/live-release.mjs', 'ft-overview/live-smoke.cjs', '.github/workflows/ft-overview-opt-in-release.yml']
+concurrency:
+  group: ft-overview-mobile-opt-in-release
+  cancel-in-progress: false
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: football-edge-production
+    permissions: {contents: read}
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - run: node ft-overview/test.mjs
+      - run: npm install --no-save playwright@1.58.2
+      - run: npx playwright install --with-deps chromium
+      - name: Publish main app trial and retain original view
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node ft-overview/live-release.mjs
+      - name: Check main trial recommendation UI without provider or scan requests
+        run: node ft-overview/live-smoke.cjs
+      - name: Restore original version if acceptance fails
+        if: failure()
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node ft-overview/live-release.mjs rollback
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ft-overview-opt-in-release-result
+          path: |
+            ft-overview/live-release-result.json
+            ft-overview/qa/live-opt-in-390.png
+            ft-overview/live-site/
+            ft-overview/assets-release.json

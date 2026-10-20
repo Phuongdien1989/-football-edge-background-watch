@@ -1,0 +1,33 @@
+import assert from 'node:assert/strict';
+import {fromBridges,fromArchiveAudit,displayAction,freshness} from './read-model.mjs';
+import archive from './archive-data.mjs';
+const now=Date.now();let tests=0;
+function test(name,fn){fn();tests++;console.log('PASS '+name);}
+function item(n,score=73){return {id:n,home:'Home '+n,away:'Away '+n,state:'READY',reason:'Original source reason',eval:{score,quality:4},latest:{captured_at:now,status:'2H',minute:60,goals:{home:0,away:0},stats_presence:{shots:true,sot:false},metrics:{total:{shots:0,sot:99}}},api_key:'must-not-export',device:'private'};}
+const a=item(1,61),b=item(2,92),legacyData={watchState:{items:[a,b]},h1WatchState:{items:[item(1,66)]},handicapWatchState:{pool:[]}},masters=[{id:1,ft:a,__rank:{top:1,primary:{engine:'FT'}},__addon:{rankWhy:'source rank 1'}},{id:2,ft:b,__rank:{top:2,primary:{engine:'FT'}}}];
+let mutations=0;const legacy={read:()=>legacyData},master={masterRows:()=>masters,request:()=>mutations++,toggleManual:()=>mutations++,refreshEntryValidation:()=>mutations++};
+const before=JSON.stringify({legacyData,masters});const p=fromBridges({legacy,master},now);
+test('source TOP preserved despite reverse scores',()=>assert.deepEqual(p.top.map(x=>x.id),[1,2]));
+test('original score retained, no score-to-probability',()=>{assert.equal(p.fixtures[0].signals.ft.score,61);assert.equal(p.fixtures[0].signals.ht.score,66);assert.equal(p.fixtures[0].signals.ft.probability,undefined);});
+test('one fixture carries separate engine signals',()=>assert.equal(p.fixtures.filter(x=>x.id===1).length,1));
+test('source list order retained without claiming new engine rank',()=>{assert.deepEqual(p.lists.ft,[1,2]);assert.equal(p.fixtures[0].signals.ft.rank,null);});
+test('zero observed and absent metric kept distinct',()=>assert.deepEqual(p.fixtures[0].observation.metrics,{shots:0,sot:null,inbox:null,xg:null}));
+test('input untouched',()=>assert.equal(JSON.stringify({legacyData,masters}),before));
+test('mutating bridge methods never called',()=>assert.equal(mutations,0));
+test('whitelist removes arbitrary credentials',()=>assert(!JSON.stringify(p).includes('must-not-export')));
+test('detached output',()=>{p.fixtures[0].signals.ft.score=999;assert.equal(a.eval.score,61);});
+test('duplicate fixture cannot fill TOP twice',()=>assert.equal(fromBridges({master:{masterRows:()=>[...masters,masters[0]]}},now).top.length,2));
+test('no bridge gives empty state, no demo fallback',()=>assert.equal(fromBridges({},now).fixtures.length,0));
+test('source failure surfaced',()=>assert.equal(fromBridges({legacy:{read:()=>{throw Error();}}},now).sourceError,'BRIDGE_READ_FAILED'));
+test('stale and terminal are separate from provider health',()=>{assert.equal(freshness(now-120000,'2H',now),'STALE');assert.equal(freshness(now,'FT',now),'ENDED');assert.equal(freshness(now+9000,'2H',now),'INVALID_TIME');});
+test('archive observations preserved',()=>{const x=fromArchiveAudit(archive,now);assert.equal(x.fixtures.length,19);assert.equal(x.fixtures[0].observation.at,archive.matches[0].source_at);assert.equal(x.top.length,0);assert.equal(x.lists.valuation.length,0);assert(x.fixtures.every(f=>displayAction(f.signals.valuation,now,'ARCHIVE').startsWith('ARCHIVE')));});
+const snapshot={id:9,at:now,status:'2H',minute:62,goals:{home:1,away:0},home:'QA',away:'QA',metrics:{shots:0},market:{line:2.5,over:1.95,at:now,score:{home:1,away:0},period:'FT',basis:'FULL_MATCH'}};
+const assessed={id:9,snapshot,rank:1,entry:'TRIAL OVER',reason:'From existing model',recommendation:{action:'TRIAL_OVER'},blocked:false,marketFresh:true,modelOK:true,quote:{ev:.03,fairOdds:1.83}};
+const ov=fromBridges({legacy,master,overviewRows:()=>[assessed]},now);
+test('Overview EV rank remains separate from Master TOP',()=>{assert.deepEqual(ov.top.map(x=>x.id),[1,2]);assert.deepEqual(ov.lists.valuation,[9]);});
+test('existing assessed recommendation displayed without recompute',()=>assert(displayAction(ov.fixtures.find(x=>x.id===9).signals.valuation,now,'BRIDGE').includes('2.5 @ 1.95')));
+test('stale cached assessed recommendation suppressed',()=>assert.equal(displayAction(ov.fixtures.find(x=>x.id===9).signals.valuation,now+120000,'BRIDGE'),'Dữ liệu cũ · Chờ cập nhật'));
+test('score mismatch cannot display old recommendation',()=>{const bad=structuredClone(ov.fixtures.find(x=>x.id===9).signals.valuation);bad.marketScore.home=0;assert.equal(displayAction(bad,now,'BRIDGE'),'Chờ line / giá khớp dữ liệu');});
+test('missing/zero current score not double counted',()=>{const s=ov.fixtures.find(x=>x.id===9).signals.valuation;assert.equal(s.observation.goals.home,1);assert.equal(s.line,2.5);});
+test('different engine observations are retained separately',()=>{const h=item(1,66);h.latest.captured_at=now-30000;h.latest.minute=30;h.latest.goals.home=1;const d=fromBridges({legacy:{read:()=>({watchState:{items:[a]},h1WatchState:{items:[h]}})}},now);assert.equal(d.fixtures[0].signals.ht.observation.minute,30);assert.equal(d.fixtures[0].signals.ht.observation.goals.home,1);assert.equal(d.fixtures[0].signals.ft.observation.minute,60);assert.equal(d.fixtures[0].signals.ft.observation.goals.home,0);});
+console.log(JSON.stringify({status:'PASS',tests,source_writes:0,network_calls:0}));

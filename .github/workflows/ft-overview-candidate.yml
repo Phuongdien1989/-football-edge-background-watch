@@ -1,0 +1,93 @@
+name: FT Overview — isolated candidate QA and demo preview
+on:
+  push:
+    branches: [feature/ft-overview-shadow-20261019]
+    paths: ['ft-overview/**', '.github/workflows/ft-overview-candidate.yml']
+jobs:
+  qa:
+    if: "!contains(github.event.head_commit.message, '[opt-in-release]')"
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    permissions: {contents: read}
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false, fetch-depth: 0}
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - run: node ft-overview/test.mjs
+      - name: Fetch original Mobile read-only and build verified additive integration
+        run: |
+          curl --fail --silent --show-error --max-time 40 'https://shiny-silence-d892.ngophuonghuy.workers.dev/' -o /tmp/fo-original.html
+          node ft-overview/build-integration.mjs /tmp/fo-original.html
+      - name: Existing HT FT provider and UI regressions
+        run: |
+          node tests/test-provider-errors.mjs
+          node tests/test-notify-statistics-errors.mjs
+          node tests/test-notify-ui-state.mjs
+      - run: npm install --no-save playwright@1.58.2
+      - run: npx playwright install --with-deps chromium
+      - name: Mobile/Desktop visual and isolated bridge QA
+        run: node ft-overview/browser-test.cjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ft-overview-candidate-preview
+          path: |
+            ft-overview/qa/
+            ft-overview/build/
+            ft-overview/README.md
+  real-input:
+    needs: qa
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    environment: football-edge-production
+    permissions: {contents: read}
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Read bounded existing D1 snapshots only; never scan or call provider
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node ft-overview/capture-stored.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ft-overview-real-input
+          path: |
+            ft-overview/real-input-report.json
+            ft-overview/replay-data.mjs
+  demo-preview:
+    needs: [qa, real-input]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: football-edge-production
+    permissions: {contents: read}
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - uses: actions/download-artifact@v4
+        with:
+          name: ft-overview-real-input
+          path: ft-overview/
+      - name: Create only isolated demo Worker and verify production unchanged
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node ft-overview/preview-release.mjs
+      - run: npm install --no-save playwright@1.58.2
+      - run: npx playwright install --with-deps chromium
+      - name: Verify real HTTPS preview, CSP and negative-EV wait state
+        run: node ft-overview/preview-smoke.cjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ft-overview-preview-release-result
+          path: |
+            ft-overview/preview-release-result.json
+            ft-overview/qa/published-390.png
+            ft-overview/qa/published-integrated-*.png
+            ft-overview/qa/published-archive-390.png

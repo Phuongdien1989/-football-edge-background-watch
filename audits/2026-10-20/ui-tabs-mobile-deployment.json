@@ -1,0 +1,16 @@
+{
+  "status": "PASS",
+  "source_commit": "723ae37eac825ef1fe8285c8395826b09eba35c5",
+  "deployed": true,
+  "rollback_version": "b73642ec-1d4c-41ae-bc28-68c785b6fd79",
+  "provider_calls": 0,
+  "d1_queries": 0,
+  "scanner_toggled": false,
+  "version": "3c0e47ed-275b-410c-b527-77f1ff65a28a",
+  "after": {
+    "shiny-silence-d892": "3c0e47ed-275b-410c-b527-77f1ff65a28a",
+    "football-edge-background-watch": "04cc044d-412f-4844-9b83-c7c786eedd13",
+    "football-edge-desktop-b2-test": "a332ee39-abb2-422d-a021-db78ef19cc10"
+  },
+  "live_push": "REQUIRES_PHONE_ACCEPTANCE"
+}

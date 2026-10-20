@@ -1,0 +1,114 @@
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+import {number,settlement,priceOver,noVig,createStore,researchBaseline,assess,goalsToFullWin} from './core.mjs';
+import {readLegacy,marketFromRows} from './adapter.mjs';
+import {demoSnapshots} from './demo.mjs';
+import {trendChart} from './charts.mjs';
+import {runInNewContext} from 'node:vm';
+import {storedRowsToInputs,auditStoredInputs,sourceDetailRowsToInputs} from './stored-replay.mjs';
+let tests=0;const test=(name,fn)=>{fn();tests++;console.log('PASS '+name);};
+const now=Date.UTC(2026,9,19,10,0),sample=()=>demoSnapshots(now)[0];
+test('Missing data and booleans never become numeric zero',()=>{for(const v of [null,undefined,'',false,true])assert.equal(number(v),null);assert.equal(number(0),0);});
+test('Quarter/whole/half settlement matches split stakes',()=>{
+  assert.equal(settlement(2,2.25),-.5);assert.equal(settlement(3,2.75),.5);assert.equal(settlement(2,2),0);assert.equal(settlement(3,2.5),1);assert.equal(settlement(2,2.5),-1);
+});
+test('Full-win target distinguishes half-win on .75 lines and counts current goals once',()=>{
+ assert.equal(goalsToFullWin(1,2.75),3);assert.equal(goalsToFullWin(1,2.25),2);assert.equal(goalsToFullWin(1,2.5),2);assert.equal(goalsToFullWin(3,2.75),1);assert.equal(goalsToFullWin(4,2.75),0);assert.equal(goalsToFullWin(1,2.3),null);
+});
+test('Full score counted once and EV/fair odds consistent',()=>{
+  const p=priceOver([.2,.35,.30,.15],1,2.5,2.40);assert.ok(Math.abs(p.win-.45)<1e-9);assert.ok(Math.abs(p.ev-.08)<1e-9);assert.ok(Math.abs(p.fairOdds-1/.45)<1e-9);
+  const q=priceOver([.2,.35,.30,.15],1,2.25,2.40);assert.ok(Math.abs(q.halfLose-.35)<1e-9);assert.ok(Math.abs(q.ev-(.45*1.4-.35/2-.2))<1e-9);
+});
+test('Invalid or incomplete distribution and invalid line rejected',()=>{assert.equal(priceOver([.2,.2],1,2.5,2),null);assert.equal(priceOver([1],1,2.3,2),null);assert.equal(priceOver([1],1,2.5,null),null);});
+test('No-vig only compares matched binary full-time contracts',()=>{const s=sample();assert.ok(noVig(s.market));assert.equal(noVig({...s.market,line:2.25}),null);assert.equal(noVig({...s.market,under:null}),null);assert.equal(noVig({...s.market,basis:'REMAINING'}),null);});
+test('Replay after lost ACK does not create duplicate ledger or chart point',()=>{const s=sample(),st=createStore();assert.equal(st.ingest(s).accepted,true);st.read(now);assert.equal(st.ingest(s).reason,'DUPLICATE');for(let i=0;i<20;i++)st.read(now);assert.equal(st.export().ledger.length,1);assert.equal(st.read(now)[0].points.length,1);});
+test('Out-of-order and same-revision conflicts preserve newest data',()=>{const st=createStore(),s=sample();st.ingest(s);assert.equal(st.ingest({...s,at:now-1}).reason,'OUT_OF_ORDER');assert.equal(st.ingest({...s,goals:{home:0,away:0}}).reason,'REVISION_CONFLICT');assert.equal(st.read(now)[0].snapshot.goals.home,1);});
+test('Freshness expires without another server update',()=>{const st=createStore();st.ingest(sample());assert.equal(st.read(now+61000)[0].entry,'STALE');assert.equal(st.read(now+61000)[0].rank,null);});
+test('Stats errors and post-goal stale price cannot issue recommendation',()=>{let s=sample();s.statsError=true;assert.equal(assess(s,now).entry,'DATA WAIT');s=sample();s.eventAt=now+1;assert.equal(assess(s,now).entry,'WAIT PRICE');s=sample();s.market.score={home:0,away:0};assert.equal(assess(s,now).marketFresh,false);});
+test('Demo and research are explicitly gated from live recommendations',()=>{let s=sample();assert.equal(assess(s,now).entry,'DEMO');assert.equal(assess(s,now).recommendation.action,'NO_LIVE_RECOMMENDATION');s.model.kind='RESEARCH';assert.equal(assess(s,now).entry,'RESEARCH');});
+test('Owner-enabled trial gives a research recommendation at positive EV and waits at non-positive EV',()=>{
+ const s=sample();s.model.kind='RESEARCH';const r=assess(s,now,{trialRecommendations:true});assert.equal(r.entry,'TRIAL OVER');assert.equal(r.recommendation.action,'TRIAL_OVER');assert.equal(r.recommendation.experimental,true);assert.equal(r.recommendation.line,2.5);assert.equal(r.recommendation.odds,2.4);
+ s.market.over=2;assert.equal(assess(s,now,{trialRecommendations:true}).recommendation.action,'WAIT_PRICE');assert.equal(assess(s,now).recommendation.action,'NO_LIVE_RECOMMENDATION');
+});
+test('Trial activation cannot recommend on missing/stale/model-free/error/demo/cooldown data',()=>{
+ const base=sample();base.model.kind='RESEARCH';for(const mutate of [s=>s.model=null,s=>s.market=null,s=>s.statsError=true,s=>s.cooldownUntil=now+30000,s=>s.model.kind='DEMO',s=>s.market.score={home:0,away:0}]){const s=structuredClone(base);mutate(s);assert.notEqual(assess(s,now,{trialRecommendations:true}).recommendation.action,'TRIAL_OVER');}assert.notEqual(assess(base,now+61000,{trialRecommendations:true}).recommendation.action,'TRIAL_OVER');
+});
+test('Trial requires observed LIVE statistics, accepts genuine zero and allows historical PRE estimates',()=>{const s=sample();s.model.kind='RESEARCH';s.metrics={};assert.equal(assess(s,now,{trialRecommendations:true}).entry,'DATA WAIT');s.metrics={shots:0};assert.equal(assess(s,now,{trialRecommendations:true}).entry,'TRIAL OVER');s.metrics={};s.status='NS';s.minute=0;assert.equal(assess(s,now,{trialRecommendations:true}).entry,'TRIAL OVER');});
+test('Trial TOP competes on estimated EV for distinct fixtures and records its experimental policy',()=>{
+ const st=createStore({trialRecommendations:true}),a=sample(),b=sample();a.model.kind=b.model.kind='RESEARCH';b.id++;b.market.over=2.7;st.ingest(a);st.ingest(b);assert.equal(st.read(now)[0].id,b.id);assert.equal(st.export().ledger[0].policy,'FT_OVERVIEW_TRIAL_EV_V1');
+ const newer=structuredClone(a);newer.at++;newer.revision++;newer.model.at++;newer.market.at++;newer.market.over=3;st.ingest(newer);assert.equal(st.read(now+1)[0].id,a.id);assert.equal(new Set(st.read(now+1).map(r=>r.id)).size,2);
+});
+test('Invalid quarter contract cannot crash trial ranking or produce a recommendation',()=>{const st=createStore({trialRecommendations:true}),s=sample();s.model.kind='RESEARCH';s.market.line=2.3;st.ingest(s);assert.doesNotThrow(()=>st.read(now));assert.notEqual(st.read(now)[0].recommendation.action,'TRIAL_OVER');});
+test('Paired FT line already reached by current goals cannot masquerade as a free winning bet',()=>{const s=sample();s.model.kind='RESEARCH';s.market.line=.5;assert.equal(assess(s,now,{trialRecommendations:true}).marketFresh,false);assert.notEqual(assess(s,now,{trialRecommendations:true}).recommendation.action,'TRIAL_OVER');assert.equal(marketFromRows([{category:'over_under',values:[{value:'Over 0.5',odd:2},{value:'Under 0.5',odd:2}]}],s),null);s.market.line=1;assert.equal(assess(s,now,{trialRecommendations:true}).marketFresh,false);});
+test('Agreement or model above market is not automatically a good entry price',()=>{const s=demoSnapshots(now)[2],r=assess(s,now);assert.ok(r.delta>0);assert.ok(r.quote.ev<0);assert.ok(r.synthesis.includes('chưa cho lợi thế'));});
+test('Independent model cannot be substituted with legacy score or wrong observation',()=>{const s=sample();s.model=null;s.legacy={score:99};assert.equal(assess(s,now).modelOK,false);s.model=sample().model;s.model.at--;assert.equal(assess(s,now).modelOK,false);});
+test('Missing historical goals, future and duplicate matches not learned as evidence',()=>{
+  const r={date:'2026-10-10T10:00:00Z',status:'FT',home_id:1,away_id:2,goals:{home:2,away:1}};
+  const input={homeId:1,awayId:2,homeRecent:[r,r,{...r,date:'2026-10-21T10:00:00Z'},{...r,date:'2026-10-09T10:00:00Z',goals:{home:null,away:1}}],awayRecent:[r],kickoff:now-3600000,at:now,minute:60,status:'2H'};
+  const m=researchBaseline(input);assert.deepEqual(m.sample,{home:1,away:1});assert.equal(m.validated,false);assert.equal(researchBaseline({...input,status:'ET'}),null);assert.equal(researchBaseline({...input,homeRecent:[]}),null);
+});
+test('Goal resets football delta context; no false momentum across score change',()=>{const s=sample();s.history=[{at:now-300000,goals:{home:0,away:0},metrics:{sot:0}}];assert.equal(assess(s,now).data.label,'BASELINE');});
+test('Restart restores ledger/state and a replay remains idempotent',()=>{const a=createStore();a.ingest(sample());a.read(now);const b=createStore();assert.equal(b.restore(a.export()),true);assert.equal(b.ingest(sample()).reason,'DUPLICATE');b.read(now);assert.equal(b.export().ledger.length,1);});
+test('Top fixtures unique and stable on identical repeated inputs',()=>{const st=createStore();demoSnapshots(now).forEach(s=>st.ingest(s));const a=st.read(now).map(x=>x.id);assert.deepEqual(st.read(now).map(x=>x.id),a);assert.equal(new Set(a).size,5);assert.equal(st.export().ledger.length,5);});
+test('Contract changes interrupt graph instead of drawing false continuity',()=>{const points=[{at:1,minute:30,key:'A',model:.4,market:.3},{at:2,minute:31,key:'B',model:.6,market:.5}];const chart=trendChart(points,'B');assert.ok(!chart.includes('NaN'));assert.equal((chart.match(/<circle/g)||[]).length,2);});
+test('Adapter reads detached bridge without fetching or mutation',()=>{
+  const fixture={id:5,home:'A',away:'B',latest:{captured_at:now,minute:32,status:'1H',goals:{home:0,away:0},metrics:{total:{shots:10,sot:4,inbox:7,xg:1}},stats_presence:{shots:true,sot:true,inbox:true,xg:true}},eval:{score:76,scoreMode:'FULL'},history:[]};
+  const packet={h1WatchState:{items:[fixture]},watchState:{items:[]},handicapWatchState:{pool:[]}},before=JSON.stringify(packet);
+  const rows=readLegacy({read:()=>structuredClone(packet)});assert.equal(rows.length,1);assert.equal(rows[0].model,null);assert.equal(rows[0].legacy.independent,false);assert.equal(JSON.stringify(packet),before);
+});
+test('Adapter does not mix half-time market with full-time totals',()=>{const s=sample();const m=marketFromRows([{category:'h1_total',values:[{value:'Over 2.5',odd:2},{value:'Under 2.5',odd:2}]}],s);assert.equal(m,null);});
+test('Provider price update time is preserved; stale/future prices are not made new',()=>{
+ const s=sample(),row={category:'over_under',main_line:2.5,update:new Date(now-120000).toISOString(),values:[{value:'Over 1.5',odd:1.5},{value:'Under 1.5',odd:3},{value:'Over 2.5',odd:2.4},{value:'Under 2.5',odd:1.6}]};
+ const m=marketFromRows([row],s);assert.equal(m.line,2.5);assert.equal(m.at,now-120000);assert.equal(assess({...s,market:m},now).marketFresh,false);assert.equal(marketFromRows([{...row,update:new Date(now+60000).toISOString()}],s),null);
+});
+test('Non-statistical legacy veto does not masquerade as a provider statistics error',()=>{
+ const item={id:5,latest:{captured_at:now,minute:70,status:'2H',goals:{home:0,away:0}},eval:{hardVeto:true,dataIncomplete:false}};
+ const rows=readLegacy({read:()=>({watchState:{items:[item]}})});assert.equal(rows[0].statsError,false);
+ item.latest.data_health={level:'NO_STATS'};assert.equal(readLegacy({read:()=>({watchState:{items:[item]}})})[0].statsError,true);
+ delete item.latest.data_health;item.eval={dataIncomplete:true,scoreMode:'BASELINE'};assert.equal(readLegacy({read:()=>({watchState:{items:[item]}})})[0].statsError,false);
+});
+test('Foreground to server synchronization cannot mix revision domains and freeze updates',()=>{
+ const item={id:5,latest:{captured_at:now,minute:70,status:'2H',goals:{home:0,away:0}},eval:{}};
+ const bridge={read:()=>({watchState:{items:[item]}})},st=createStore();st.ingest(readLegacy(bridge)[0]);
+ item.serverRow={revision:7};item.latest.captured_at=now+1000;item.latest.goals.home=1;
+ assert.equal(st.ingest(readLegacy(bridge)[0]).accepted,true);assert.equal(st.read(now+1000)[0].snapshot.goals.home,1);
+});
+test('New DEEP context enriches one observation without refreshing source time or duplicating charts',()=>{
+ const st=createStore(),s=sample();s.model=null;st.ingest(s);st.read(now);
+ assert.equal(st.ingest({...s,contextAt:now+1000,model:sample().model}).accepted,true);
+ assert.equal(st.read(now)[0].modelOK,true);assert.equal(st.read(now)[0].points.length,1);
+ assert.equal(st.read(now+61000)[0].entry,'STALE');
+ assert.equal(st.ingest({...s,contextAt:now+2000,goals:{home:2,away:0}}).reason,'REVISION_CONFLICT');
+ assert.equal(st.ingest({...s,contextAt:now+500}).reason,'REVISION_CONFLICT');
+});
+test('Runtime cooldown blocks all ranking without mutating observed data or source timestamp',()=>{
+ const st=createStore(),s=sample();st.ingest(s);const before=st.export().snapshots;
+ const r=st.read(now,{controls:[{id:s.id,cooldownUntil:now+30000},{id:s.id,cooldownUntil:now+1000}]})[0];assert.equal(r.blocked,true);assert.equal(r.rank,null);assert.ok(r.reason.includes('cooldown'));assert.equal(r.at,now);assert.deepEqual(st.export().snapshots,before);
+ assert.equal(st.read(now+31000)[0].blocked,false);assert.equal(st.read(now+61000)[0].entry,'STALE');
+});
+test('Read bridge caches multiple DEEP fixtures, bounded, detached and without time refresh on read',()=>{
+ const build=readFileSync(new URL('build-integration.mjs',import.meta.url),'utf8'),bridge=build.match(/const bridge=`([\s\S]*?)`;/)[1];
+ const context={state:{lastBundle:null},window:{},watchState:{items:[]},h1WatchState:{items:[]},handicapWatchState:{pool:[]},feUICopy:x=>JSON.parse(JSON.stringify(x)),Date:{now:()=>now}};
+ runInNewContext(bridge+';for(let id=1;id<=55;id++){const b={meta:{fixture_id:id},normalized:{home_recent:[],away_recent:[]}};state.lastBundle=b;foRemember(b);}',context);
+ const rows=context.window.FEOverviewInputBridge.read();assert.equal(rows.length,50);assert.equal(rows[0].meta.fixture_id,6);assert.equal(rows.at(-1).meta.fixture_id,55);rows[0].meta.fixture_id=999;assert.equal(context.window.FEOverviewInputBridge.read()[0].meta.fixture_id,6);context.Date.now=()=>now+500000;assert.equal(context.window.FEOverviewInputBridge.read()[0].observed_at,now);
+});
+test('Production stored replay exports football whitelist only and never renews old timestamps',()=>{
+ const s=sample(),item={id:s.id,token:'DO_NOT_EXPORT',devices:{secret:'DO_NOT_EXPORT'},last:{sourceHealth:{stats:'OK',events:'OK'}},ui:{captured_at:now,fixture:{fixture:{id:s.id,status:{short:'2H',elapsed:60}},teams:{home:{name:'A'},away:{name:'B'}},goals:s.goals},snapshot:{captured_at:now,goals:s.goals,metrics:{total:{sot:0}},stats_presence:{sot:true},apiKey:'DO_NOT_EXPORT'}}};
+ const p=storedRowsToInputs([{fixture_id:s.id,payload:JSON.stringify(item)}]);assert.equal(p.inputs[0].metrics.sot,0);assert.equal(p.inputs[0].model,null);assert.equal(p.inputs[0].at,now);assert.ok(!JSON.stringify(p).includes('DO_NOT_EXPORT'));
+ const r=auditStoredInputs(p,now+120000);assert.equal(r.matches[0].entry_now,'STALE');assert.equal(r.top.length,0);assert.equal(r.matches[0].live_action,'NO_LIVE_RECOMMENDATION');assert.equal(r.provider_calls,0);
+});
+test('Stored tombstones, invalid snapshots and fixture mismatch do not reappear as matches',()=>{
+ const p=storedRowsToInputs([{fixture_id:1,payload:'{"__fe_deleted":true}'},{fixture_id:2,payload:'bad'},{fixture_id:3,payload:JSON.stringify({id:3,ui:{captured_at:now,fixture:{fixture:{id:4}}}})}]);assert.equal(p.inputs.length,0);assert.equal(p.rejected.length,2);
+});
+test('Source-detail replay uses existing normalization and groups observations without inventing a model',()=>{
+ const f={fixture:{id:55,status:{short:'2H',elapsed:60}},teams:{home:{name:'A'},away:{name:'B'}},goals:{home:0,away:1}},engine={statMap:()=>({}),watchStatsPresence:()=>({core:true,sot:true}),watchAggregate:()=>({total:{sot:0}}),normalizeLiveMarkets:()=>[]};
+ const row={fixture_id:55,captured_at:now,score_home:0,score_away:1,payload_json:JSON.stringify({fixture:f,stats_raw:[],secret:'DO_NOT_EXPORT'})};
+ const p=sourceDetailRowsToInputs([row,{...row,captured_at:now-180000}],engine);assert.equal(p.inputs.length,1);assert.equal(p.inputs[0].history.length,1);assert.equal(p.inputs[0].sourceKind,'STORED_SOURCE_DETAIL_NORMALIZED');assert.equal(p.inputs[0].metrics.sot,0);assert.equal(p.inputs[0].model,null);assert.ok(!JSON.stringify(p).includes('DO_NOT_EXPORT'));
+ const bad=sourceDetailRowsToInputs([{...row,score_home:2}],engine);assert.equal(bad.inputs[0].sourceMismatch,true);assert.equal(bad.inputs[0].statsError,true);
+});
+test('Module integration cannot write legacy store or send notifications',()=>{
+  for(const p of ['core.mjs','adapter.mjs','charts.mjs','ui.mjs']){
+    const src=readFileSync(new URL(p,import.meta.url),'utf8');assert.ok(!/\bfetch\s*\(|\bXMLHttpRequest\b|\bWebSocket\b|localStorage\.setItem|\.request\s*\(|\.send\s*\(|\.toggleManual\s*\(/.test(src),p);
+  }
+});
+console.log(JSON.stringify({status:'PASS',tests,network_calls:0,production_mutations:0}));

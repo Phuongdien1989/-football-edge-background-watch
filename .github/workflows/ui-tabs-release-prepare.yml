@@ -1,0 +1,52 @@
+name: UI tabs — release preparation only
+on:
+  push:
+    branches: [feature/ft-overview-shadow-20261019]
+    paths: ['ui-tabs-preview/prepare-release.mjs', 'ui-tabs-preview/publish-candidate.mjs', 'ui-tabs-preview/release-baseline.json', 'ui-tabs-preview/icon.svg', 'ui-tabs-preview/build-icons.cjs', 'ui-tabs-preview/release-workflow.yml', '.github/workflows/ui-tabs-release-prepare.yml']
+permissions: {contents: read}
+concurrency:
+  group: fe-ui-tabs-release-prepare
+  cancel-in-progress: false
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    environment: football-edge-production
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Build exact clean candidate already accepted in Step 5
+        run: node ui-tabs-preview/build-integrated.mjs
+      - name: Verify production publication requires explicit approval
+        run: |
+          node --check ui-tabs-preview/prepare-release.mjs
+          node --check ui-tabs-preview/publish-candidate.mjs
+          node --input-type=module -e "import{spawnSync}from'node:child_process';import assert from'node:assert/strict';const r=spawnSync(process.execPath,['ui-tabs-preview/publish-candidate.mjs','deploy'],{encoding:'utf8',env:{...process.env,FE_TABS_PRODUCTION_APPROVED:''}});assert.notEqual(r.status,0);assert(r.stderr.includes('PRODUCTION_APPROVAL_REQUIRED'));console.log('UNAPPROVED_PUBLICATION_BLOCKED');"
+      - run: npm install --no-save playwright@1.58.2
+      - run: npx playwright install --with-deps webkit
+      - name: Restore icon files from the supplied SVG
+        run: node ui-tabs-preview/build-icons.cjs
+      - name: Read-only Cloudflare preflight and preserve active frontend assets
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node ui-tabs-preview/prepare-release.mjs
+      - name: Package dry-run only
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: npx --yes wrangler@4 deploy --dry-run --config ui-tabs-preview/release-package/wrangler.json
+      - name: WebKit acceptance of clean candidate
+        env: {QA_BROWSER: webkit, CANDIDATE_DIR: ui-tabs-preview/release-package/site}
+        run: node ui-tabs-preview/test-candidate.cjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: football-edge-tabs-release-ready
+          path: |
+            ui-tabs-preview/release-package/
+            ui-tabs-preview/qa/clean-candidate-webkit.json
+            ui-tabs-preview/generated/candidate/candidate-build.json
+            ui-tabs-preview/generated/icon-build.json

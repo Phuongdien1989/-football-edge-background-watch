@@ -1,0 +1,47 @@
+{
+  "status": "PASS",
+  "cases": [
+    {
+      "width": 390,
+      "status": "PASS",
+      "actual_legacy_bridge": true,
+      "top_matches_source": true,
+      "same_engine_nodes": true,
+      "raw_state_unchanged": true,
+      "interval_count_unchanged": true,
+      "legacy_controls_preserved": true,
+      "legacy_link_routed": true,
+      "old_matches_navigation": true,
+      "reload_matches_route": true,
+      "wrong_engine_deeplink_rejected": true,
+      "stale_ended_cooldown_excluded_from_top": true,
+      "empty_source_no_fallback": true,
+      "bottom_navigation_active_correct": true,
+      "external_requests_sent": 0,
+      "external_requests_blocked": 0,
+      "QA_fixtures_only": true
+    },
+    {
+      "width": 1280,
+      "status": "PASS",
+      "actual_legacy_bridge": true,
+      "top_matches_source": true,
+      "same_engine_nodes": true,
+      "raw_state_unchanged": true,
+      "interval_count_unchanged": true,
+      "legacy_controls_preserved": true,
+      "legacy_link_routed": true,
+      "old_matches_navigation": true,
+      "reload_matches_route": true,
+      "wrong_engine_deeplink_rejected": true,
+      "stale_ended_cooldown_excluded_from_top": true,
+      "empty_source_no_fallback": true,
+      "bottom_navigation_active_correct": true,
+      "external_requests_sent": 0,
+      "external_requests_blocked": 0,
+      "QA_fixtures_only": true
+    }
+  ],
+  "live_provider_acceptance": "NOT_TESTED",
+  "production_deployed": false
+}
