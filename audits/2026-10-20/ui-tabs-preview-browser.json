@@ -1,0 +1,55 @@
+{
+  "status": "PASS",
+  "target": "ISOLATED_HTTPS",
+  "production_connected": false,
+  "results": [
+    {
+      "width": 375,
+      "status": "PASS",
+      "tabs": 5,
+      "unique_fixtures": 5,
+      "no_overflow": true,
+      "back_and_accordion_preserved": true,
+      "tab_switch_requests": 0,
+      "external_requests": 0,
+      "empty_state": true,
+      "search": true
+    },
+    {
+      "width": 390,
+      "status": "PASS",
+      "tabs": 5,
+      "unique_fixtures": 5,
+      "no_overflow": true,
+      "back_and_accordion_preserved": true,
+      "tab_switch_requests": 0,
+      "external_requests": 0,
+      "empty_state": true,
+      "search": true
+    },
+    {
+      "width": 414,
+      "status": "PASS",
+      "tabs": 5,
+      "unique_fixtures": 5,
+      "no_overflow": true,
+      "back_and_accordion_preserved": true,
+      "tab_switch_requests": 0,
+      "external_requests": 0,
+      "empty_state": true,
+      "search": true
+    },
+    {
+      "width": 1280,
+      "status": "PASS",
+      "tabs": 5,
+      "unique_fixtures": 5,
+      "no_overflow": true,
+      "back_and_accordion_preserved": true,
+      "tab_switch_requests": 0,
+      "external_requests": 0,
+      "empty_state": true,
+      "search": true
+    }
+  ]
+}
