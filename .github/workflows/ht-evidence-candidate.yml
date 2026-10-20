@@ -19,6 +19,8 @@ jobs:
         run: node ht-early-candidate/build.mjs
       - name: Replay baseline and candidate; verify engine parity
         run: node ht-early-candidate/test.mjs
+      - name: Replay actual HT collector paths and shared HUB acquisition
+        run: node ht-early-candidate/test-collection.mjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:

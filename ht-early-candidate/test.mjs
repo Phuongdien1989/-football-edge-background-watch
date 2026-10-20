@@ -1,22 +1,32 @@
 import assert from 'node:assert/strict';
 import {readFileSync,writeFileSync} from 'node:fs';
 import vm from 'node:vm';
+import {createHash} from 'node:crypto';
 import {createHTTemporal} from './temporal.mjs';
+import {createHTCollection} from './collection.mjs';
 const now=1792526400000;
 class Clock extends Date {static now(){return now;}}
 const mobile=readFileSync('ht-early-candidate/generated/index.html','utf8');
 const backend=readFileSync('ht-early-candidate/generated/backend/notify-core-h1.js','utf8');
 const baseline=readFileSync('ui-tabs-preview/generated/candidate/index.html','utf8');
+const build=JSON.parse(readFileSync('ht-early-candidate/generated/build-report.json','utf8'));
+assert(build.worker_baseline_blob,'BUILD_STAGE_2_REQUIRED');
+const sha=s=>createHash('sha256').update(s).digest('hex');
+assert.equal(sha(mobile),build.mobile_candidate_sha256,'STALE_MOBILE_BUILD');
+assert.equal(sha(backend),build.backend_candidate_sha256,'STALE_BACKEND_BUILD');
+assert.equal(sha(createHTTemporal.toString()),build.shared_factory_sha256,'STALE_TEMPORAL_FACTORY');
+assert.equal(sha(createHTCollection.toString()),build.collection_factory_sha256,'STALE_COLLECTION_FACTORY');
+assert(mobile.includes(createHTCollection.toString()),'MOBILE_COLLECTION_FACTORY_DRIFT');
 function fn(source,name,indent='  ') {
   const start=source.indexOf(indent+'function '+name+'(');assert(start>=0,name);
   const next=['\n'+indent+'function ','\n'+indent+'async function '].map(t=>source.indexOf(t,start+1)).filter(n=>n>=0);
   return source.slice(start,Math.min(...next));
 }
 const shared=createHTTemporal();
-const back=vm.createContext({Date:Clock,Math,createBaseEngine:()=>({}),createHTTemporal});
+const back=vm.createContext({Date:Clock,Math,createBaseEngine:()=>({}),createHTTemporal,createHTCollection});
 vm.runInContext(backend.replace(/^import .*\n/gm,'').replace('export function createEngine','function createEngine'),back);
 const names=['watchClamp','watchMetricAvailable','watchMetricDelta','h1WatchFindBaseline','h1WatchWindow','h1WatchHistoryAge','h1WatchDisplayWindow','h1WatchGameScore','h1WatchPressure','h1WatchChance','h1WatchMomentum','h1WatchMarketScore','h1WatchContextScore','h1WatchQualityScore','h1WatchCore','h1WatchEvaluate','qsigTrend'];
-const front=vm.createContext({Date:Clock,Math,HTTemporal:shared});
+const front=vm.createContext({Date:Clock,Math,HTTemporal:shared,HTCollection:createHTCollection()});
 vm.runInContext(names.map(n=>fn(mobile,n)).join('\n'),front);
 const old=vm.createContext({Date:Clock,Math});vm.runInContext(names.map(n=>fn(baseline,n)).join('\n'),old);
 const plain=v=>JSON.parse(JSON.stringify(v));
@@ -94,6 +104,6 @@ check('FT trend behavior unchanged for unmarked existing evaluations',()=>{
 check('all inline classic scripts parse without executing app side effects',()=>{
   for(const match of mobile.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/g))if(!/type=["'](?:module|application\/ld\+json|application\/json)/.test(match[1]))new vm.Script(match[2]);
 });
-const report={status:'PASS',tests,production_deployed:false,provider_requests:0,d1_writes:0,old_short:plain(old.h1WatchEvaluate(short,current)),candidate_short:plain(front.h1WatchEvaluate(short,current)),remaining:['early-half collection before minute 20','remaining-HT-goal valuation and exact market contract pricing','browser/phone acceptance','production deployment and LIVE/PUSH verification']};
+const report={status:'PASS',tests,production_deployed:false,provider_requests:0,d1_writes:0,old_short:plain(old.h1WatchEvaluate(short,current)),candidate_short:plain(front.h1WatchEvaluate(short,current)),remaining:['remaining-HT-goal valuation and exact market contract pricing','browser/phone acceptance','production deployment and LIVE/PUSH verification']};
 writeFileSync('ht-early-candidate/generated/test-report.json',JSON.stringify(report,null,2)+'\n');
 console.log(JSON.stringify({status:'PASS',tests,production_deployed:false}));
