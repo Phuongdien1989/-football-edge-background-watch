@@ -19,10 +19,13 @@ jobs:
         with: {node-version: '22'}
       - run: node --check ui-tabs-preview/app.mjs && node --check ui-tabs-preview/release.mjs
       - run: node ui-tabs-preview/test-read-model.mjs && node ft-overview/test.mjs
+      - run: node ui-tabs-preview/build-integrated.mjs
       - run: npm install --no-save playwright@1.58.2
       - run: npx playwright install --with-deps chromium
       - name: Layout and interaction acceptance before publication
         run: node ui-tabs-preview/test-browser.cjs
+      - name: Same-page original runtime and tab integration acceptance
+        run: node ui-tabs-preview/test-integrated.cjs
       - name: Publish isolated zero-binding preview only
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -32,6 +35,10 @@ jobs:
         env:
           PREVIEW_URL: https://football-edge-tabs-preview.ngophuonghuy.workers.dev/
         run: node ui-tabs-preview/test-browser.cjs
+      - name: HTTPS same-page integration acceptance
+        env:
+          PREVIEW_URL: https://football-edge-tabs-preview.ngophuonghuy.workers.dev/
+        run: node ui-tabs-preview/test-integrated.cjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -46,3 +53,6 @@ jobs:
             ui-tabs-preview/data-view.mjs
             ui-tabs-preview/read-model.mjs
             ui-tabs-preview/archive-data.mjs
+            ui-tabs-preview/integrated.mjs
+            ui-tabs-preview/integrated.css
+            ui-tabs-preview/generated/
