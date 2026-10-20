@@ -1,0 +1,28 @@
+{
+  "status": "PASS",
+  "cases": [
+    {
+      "width": 390,
+      "status": "PASS",
+      "clean_without_sandbox": true,
+      "original_inputs_enabled": true,
+      "tab_navigation": true,
+      "reload_matches_route": true,
+      "external_requests_sent": 0,
+      "blocked_by_test_harness": 0
+    },
+    {
+      "width": 1280,
+      "status": "PASS",
+      "clean_without_sandbox": true,
+      "original_inputs_enabled": true,
+      "tab_navigation": true,
+      "reload_matches_route": true,
+      "external_requests_sent": 0,
+      "blocked_by_test_harness": 0
+    }
+  ],
+  "browser": "Chromium; iPhone viewport/touch emulation is not real Safari",
+  "production_deployed": false,
+  "live_push": "NOT_TESTED"
+}

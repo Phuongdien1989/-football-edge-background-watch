@@ -1,0 +1,24 @@
+{
+  "status": "PASS",
+  "source_commit": "b660b1dd7e78236a33b2b709af6bcad20ef88971",
+  "url": "https://football-edge-tabs-preview.ngophuonghuy.workers.dev/",
+  "version": "a6df4d3e-f39b-4a02-b501-0f7218f1a16e",
+  "bindings": 0,
+  "production_before": {
+    "shiny-silence-d892": "b73642ec-1d4c-41ae-bc28-68c785b6fd79",
+    "football-edge-background-watch": "04cc044d-412f-4844-9b83-c7c786eedd13",
+    "football-edge-desktop-b2-test": "a332ee39-abb2-422d-a021-db78ef19cc10"
+  },
+  "production_after": {
+    "shiny-silence-d892": "b73642ec-1d4c-41ae-bc28-68c785b6fd79",
+    "football-edge-background-watch": "04cc044d-412f-4844-9b83-c7c786eedd13",
+    "football-edge-desktop-b2-test": "a332ee39-abb2-422d-a021-db78ef19cc10"
+  },
+  "production_deployed": false,
+  "provider_calls": 0,
+  "d1_queries": 0,
+  "scanner_toggled": false,
+  "demo_only": false,
+  "isolated_preview_only": true,
+  "stored_archive_available": true
+}
