@@ -31,6 +31,9 @@ async function prepare(){
   const candidate='ui-tabs-preview/generated/candidate';
   assert.equal(hash(readFileSync(candidate+'/index.html')),baseline.candidate_html_sha256,'CANDIDATE_HTML_DRIFT');
   const additions=[];for(const file of walk(candidate)){const relative=file.slice(candidate.length+1);if(relative==='candidate-build.json')continue;assert(relative==='index.html'||/^ui-tabs\/(integrated\.mjs|integrated\.css|read-model\.mjs)$/.test(relative)||/^ft-overview\/(ui\.mjs|core\.mjs|adapter\.mjs|charts\.mjs|demo\.mjs|style\.css)$/.test(relative),'UNEXPECTED_CANDIDATE_FILE');const data=readFileSync(file);save(out+'/site/'+relative,data);additions.push(relative);}
+  // Restore missing icon URLs already referenced by the existing HTML/Push SW.
+  // Existing remote icons, if any, take precedence over the supplied SVG fallback.
+  for(const relative of ['favicon.svg','icons/icon-180.png','icons/icon-192.png','icons/icon-512.png'])if(!captured.some(f=>f.path===relative)){save(out+'/site/'+relative,readFileSync('ui-tabs-preview/generated/icons/'+relative));additions.push(relative);}
   const changed=captured.filter(f=>hash(readFileSync(out+'/site/'+f.path))!==f.sha256).map(f=>f.path).sort();
   assert.deepEqual(changed,['ft-overview/ui.mjs','index.html'],'UNEXPECTED_BASELINE_ASSET_CHANGE');
   for(const f of ['index.html','ui-tabs/integrated.mjs'])for(const marker of ['__FETabsSandbox','__FETabsQA','PREVIEW_NETWORK_DISABLED','sandbox-boot'])assert(!readFileSync(out+'/site/'+f,'utf8').includes(marker),'SANDBOX_IN_CANDIDATE');

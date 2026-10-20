@@ -5,12 +5,13 @@ const assert=require('node:assert/strict'),http=require('node:http');
 const {readFileSync,existsSync,mkdirSync,writeFileSync}=require('node:fs');
 const path=require('node:path');
 (async()=>{
- const dir=path.resolve('ui-tabs-preview/generated/candidate'),errors=[],cases=[];
+ const dir=path.resolve(process.env.CANDIDATE_DIR||'ui-tabs-preview/generated/candidate'),errors=[],cases=[];
  const server=http.createServer((req,res)=>{
   const p=new URL(req.url,'http://localhost').pathname;
   const file=path.resolve(dir,'.'+(p==='/'?'/index.html':p));
   if(!file.startsWith(dir+'/')||!existsSync(file)){res.writeHead(404).end();return;}
-  res.writeHead(200,{'Content-Type':file.endsWith('.html')?'text/html; charset=utf-8':file.endsWith('.css')?'text/css':'text/javascript','Content-Security-Policy':"default-src 'self' data:; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'none'; worker-src 'none'"});res.end(readFileSync(file));
+  const types={'.html':'text/html; charset=utf-8','.css':'text/css','.mjs':'text/javascript','.js':'text/javascript','.png':'image/png','.svg':'image/svg+xml','.webmanifest':'application/manifest+json'};
+  res.writeHead(200,{'Content-Type':types[path.extname(file)]||'application/octet-stream','Content-Security-Policy':"default-src 'self' data:; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'none'; worker-src 'none'"});res.end(readFileSync(file));
  });
  await new Promise(r=>server.listen(0,'127.0.0.1',r));
  const engine=process.env.QA_BROWSER==='webkit'?'webkit':'chromium';
@@ -22,6 +23,7 @@ const path=require('node:path');
    await page.goto(base+'/#fe-tabs/overview',{waitUntil:'networkidle'});await page.waitForFunction(()=>!!window.FETabsIntegrated&&!!window.FTOverviewPreview);await page.waitForTimeout(1000);
    assert(await page.evaluate(()=>!window.__FETabsSandbox&&!window.__FETabsQA));
    assert.equal(await page.locator('#feTabsSandboxLabel').count(),0);assert.equal(await page.locator('[data-ftabs-tab]').count(),5);
+   if(process.env.CANDIDATE_DIR)assert.deepEqual(await page.evaluate(async()=>{const sizes=[];for(const n of [180,192,512]){const img=new Image();img.src='/icons/icon-'+n+'.png';await img.decode();sizes.push([img.naturalWidth,img.naturalHeight]);}return sizes;}),[[180,180],[192,192],[512,512]]);
    // Clean source has no sandbox locking of ordinary connection inputs.
    assert(await page.evaluate(()=>[...document.querySelectorAll('#connectCard input')].some(x=>!x.disabled)));
    for(const tab of ['ht','ft','hc','valuation','overview']){await page.locator('[data-ftabs-tab='+tab+']').click();await page.waitForFunction(t=>FETabsIntegrated.mode().current===t,tab);}
