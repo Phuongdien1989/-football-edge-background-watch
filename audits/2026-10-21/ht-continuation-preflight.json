@@ -1,0 +1,61 @@
+{
+  "checked_at": "2026-10-20T20:35:29.349Z",
+  "status": "PRE_RELEASE_CHECKS_PASS_LIVE_ACCEPTANCE_PENDING",
+  "production_deployed": false,
+  "scanner_toggled": false,
+  "database_backup": false,
+  "checks": {
+    "package_hashes": {
+      "status": "PASS",
+      "files": 128
+    },
+    "backup": {
+      "status": "PASS",
+      "mobile_files": 18,
+      "backend_original_files": 29,
+      "candidate_changed_existing_backend_files": [
+        "notify-core-h1.js",
+        "worker_notify_v130.js"
+      ],
+      "configuration_unchanged": true
+    },
+    "rollback_versions": "PASS",
+    "health": {
+      "status": "PASS",
+      "commit": "da5242bb41b2401271f52dda17b0e2208e7e3819",
+      "scanner_enabled": true,
+      "manual_enabled": true,
+      "next_alarm": 1792528549998
+    },
+    "active_mobile_assets": {
+      "status": "PASS",
+      "verified": 18
+    }
+  },
+  "rollbacks": {
+    "shiny-silence-d892": {
+      "version": "3c0e47ed-275b-410c-b527-77f1ff65a28a",
+      "exists": true,
+      "currently_active": true
+    },
+    "football-edge-background-watch": {
+      "version": "04cc044d-412f-4844-9b83-c7c786eedd13",
+      "exists": true,
+      "currently_active": true
+    },
+    "football-edge-desktop-b2-test": {
+      "version": "a332ee39-abb2-422d-a021-db78ef19cc10",
+      "exists": true,
+      "currently_active": true
+    }
+  },
+  "not_verified": [
+    "Authenticated candidate provider warm-up",
+    "Physical iPhone/PWA and Push receipt",
+    "Production quota under candidate traffic",
+    "Actual rollback execution (not invoked against healthy production)"
+  ],
+  "release_gate": "HOLD: candidate not deployed; real-device and authenticated live acceptance pending",
+  "continuation_decision": "HOLD_PRODUCTION_RELEASE_SCANNER_STILL_ON",
+  "required_action": "Use TẠM DỪNG QUÉT in BACKGROUND SCAN STATUS; local HT OFF is a different control. Verify enabled=false, manualEnabled=false and next_alarm=null before release."
+}

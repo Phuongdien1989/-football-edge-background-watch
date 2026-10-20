@@ -1,0 +1,96 @@
+name: HT evidence candidate offline
+on:
+  push:
+    branches: [feature/ht-early-evidence-20261020]
+    paths: ['ht-early-candidate/**', '.github/workflows/ht-evidence-candidate.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  replay:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Build isolated Mobile and backend candidates
+        run: node ht-early-candidate/build.mjs
+      - name: Replay baseline and candidate; verify engine parity
+        run: node ht-early-candidate/test.mjs
+      - name: Replay actual HT collector paths and shared HUB acquisition
+        run: node ht-early-candidate/test-collection.mjs
+      - name: Price HT contracts and verify score-time provenance
+        run: node ht-early-candidate/test-valuation.mjs
+      - name: Verify HT model, context cache and connected contract pricing
+        run: node ht-early-candidate/test-model.mjs
+      - name: Verify bounded HT history warm-up with existing quota wrappers
+        run: node ht-early-candidate/test-history.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ht-evidence-candidate
+          path: ht-early-candidate/generated/
+          retention-days: 30
+
+  package_test:
+    needs: replay
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      WRANGLER_SEND_METRICS: 'false'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          ref: da5242bb41b2401271f52dda17b0e2208e7e3819
+          path: ht-prod-baseline
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - uses: actions/download-artifact@v4
+        with:
+          name: ht-evidence-candidate
+          path: ht-early-candidate/generated
+      - run: node ht-early-candidate/prepare-package.mjs ht-prod-baseline
+      - run: npm install --no-save playwright@1.58.2 wrangler@4
+      - run: npx playwright install --with-deps chromium webkit
+      - name: Backend candidate import-chain and bindings dry-run only
+        run: npx wrangler deploy --dry-run --config ht-early-candidate/generated/package/backend/wrangler.toml --outdir ht-early-candidate/generated/package/backend-bundle
+      - name: Browser acceptance on iPhone width and Desktop
+        run: node ht-early-candidate/test-browser.cjs
+      - name: Package candidate, baseline backup and evidence
+        working-directory: ht-early-candidate/generated
+        run: zip -qr Football_Edge_HT_Candidate_20261021.zip package
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: football-edge-ht-complete-candidate
+          path: |
+            ht-early-candidate/generated/package/
+            ht-early-candidate/generated/Football_Edge_HT_Candidate_20261021.zip
+          retention-days: 30
+  preview:
+    needs: package_test
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    environment: football-edge-production
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - uses: actions/download-artifact@v4
+        with:
+          name: football-edge-ht-complete-candidate
+          path: ht-release
+      - name: Publish labelled zero-binding HT demo only
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node ht-early-candidate/release-preview.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: football-edge-ht-preview-deployment
+          path: ht-release/preview-deployment.json

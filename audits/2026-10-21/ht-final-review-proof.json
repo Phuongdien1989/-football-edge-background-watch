@@ -1,0 +1,78 @@
+{
+  "date_vietnam": "2026-10-21",
+  "status": "READY_FOR_REVIEW_NOT_PRODUCTION_ACCEPTED",
+  "code_commit": "a9e9cc68cc07af27bdca0305b6f227da12f64cb9",
+  "workflow": "https://github.com/Phuongdien1989/-football-edge-background-watch/actions/runs/39491133238",
+  "tests": {
+    "temporal": 15,
+    "collection": 23,
+    "valuation": 25,
+    "model": 12,
+    "history_cache": 6,
+    "total": 81,
+    "browser_cases": 4,
+    "backend_dry_run": "PASS",
+    "bundle_kib": 562.33,
+    "gzip_kib": 124.63
+  },
+  "preview": {
+    "status": "PASS",
+    "source_commit": "a9e9cc68cc07af27bdca0305b6f227da12f64cb9",
+    "url": "https://football-edge-ht-candidate.ngophuonghuy.workers.dev/",
+    "preview_version": "011bbe49-aee7-4f28-be4d-1ed7b92123a9",
+    "production_before": {
+      "shiny-silence-d892": "3c0e47ed-275b-410c-b527-77f1ff65a28a",
+      "football-edge-background-watch": "04cc044d-412f-4844-9b83-c7c786eedd13",
+      "football-edge-desktop-b2-test": "a332ee39-abb2-422d-a021-db78ef19cc10"
+    },
+    "production_after": {
+      "shiny-silence-d892": "3c0e47ed-275b-410c-b527-77f1ff65a28a",
+      "football-edge-background-watch": "04cc044d-412f-4844-9b83-c7c786eedd13",
+      "football-edge-desktop-b2-test": "a332ee39-abb2-422d-a021-db78ef19cc10"
+    },
+    "production_deployed": false,
+    "preview_bindings": 0,
+    "demo_only": true,
+    "real_provider_calls": 0,
+    "d1_queries": 0,
+    "scanner_toggled": false
+  },
+  "package": {
+    "artifact_id": 12296196931,
+    "artifact_url": "https://github.com/Phuongdien1989/-football-edge-background-watch/actions/runs/39491133238/artifacts/12296196931",
+    "archive": "Football_Edge_HT_Candidate_20261021.zip",
+    "includes": [
+      "Mobile candidate assets",
+      "backend overlay from pinned production source",
+      "baseline Mobile and backend source/assets backup",
+      "hash manifest",
+      "unit and browser evidence"
+    ],
+    "database_backup": false
+  },
+  "real_history_check": {
+    "workflow": "https://github.com/Phuongdien1989/-football-edge-background-watch/actions/runs/39489975309",
+    "rows_returned": 2,
+    "rows_read": 4,
+    "usable_ft_halftime_rows": 0,
+    "provider_calls": 0,
+    "d1_writes": 0
+  },
+  "repair": {
+    "on_missing_ht_samples": "quota-counted team history warm-up",
+    "max_extra_provider_calls_per_cycle": 2,
+    "team_cache_ms": 3600000,
+    "error_backoff_ms": 60000,
+    "new_timers": 0,
+    "new_d1_writes": 0,
+    "existing_api_limits_preserved": true
+  },
+  "not_verified": [
+    "real iPhone/PWA",
+    "LIVE/PUSH delivery with candidate",
+    "actual provider warm-up response under authenticated candidate use",
+    "whole-account quota after candidate rollout",
+    "prediction accuracy or profitability"
+  ],
+  "production_deployed": false
+}

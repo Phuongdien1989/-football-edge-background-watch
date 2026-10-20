@@ -1,0 +1,20 @@
+name: HT existing model source audit
+on:
+  push:
+    branches: [feature/ht-early-evidence-20261020]
+    paths: ['audits/scripts/ht-existing-model-source.mjs', '.github/workflows/ht-source-audit.yml']
+permissions:
+  contents: read
+jobs:
+  source:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - run: node audits/scripts/ht-existing-model-source.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ht-existing-model-source
+          path: ht-early-candidate/generated/existing-model-source.json
