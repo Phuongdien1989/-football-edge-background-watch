@@ -1,0 +1,72 @@
+name: HT approved controlled trial release
+on:
+  push:
+    branches: [feature/ht-early-evidence-20261020]
+    paths: ['.github/workflows/ht-approved-trial.yml']
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: fe-football-edge-mobile-production
+  cancel-in-progress: false
+jobs:
+  release:
+    if: startsWith(github.event.head_commit.message, 'release(ht): approved controlled trial')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: football-edge-production
+    env:
+      WRANGLER_SEND_METRICS: 'false'
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - run: node --check audits/scripts/ht-controlled-trial.mjs && node --check audits/scripts/ht-live-https.cjs
+      - uses: actions/download-artifact@v4
+        with:
+          name: football-edge-ht-complete-candidate
+          run-id: 39491133238
+          github-token: ${{ github.token }}
+          path: accept-package
+      - run: npm install --no-save wrangler@4 playwright@1.58.2
+      - run: npx playwright install --with-deps webkit
+      - name: Verify paused scanner, pinned source, backups and rollback versions
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node audits/scripts/ht-controlled-trial.mjs prepare
+      - name: Preserve complete old source and Mobile assets before production changes
+        uses: actions/upload-artifact@v4
+        with:
+          name: football-edge-pre-ht-backup
+          path: |
+            accept-package/package/backup/
+            accept-package/package/manifest.json
+            ht-rollout/release.json
+          retention-days: 90
+      - name: Controlled backend and Mobile trial deployment
+        id: deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node audits/scripts/ht-controlled-trial.mjs deploy
+      - name: HTTPS WebKit acceptance with provider and scan requests blocked
+        run: node audits/scripts/ht-live-https.cjs
+      - name: Verify active versions and scanner remains OFF
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node audits/scripts/ht-controlled-trial.mjs verify
+      - name: Restore exact pre-HT versions if post-deploy acceptance fails
+        if: failure() && steps.deploy.outcome == 'success'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node audits/scripts/ht-controlled-trial.mjs rollback
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: football-edge-ht-trial-acceptance
+          path: ht-rollout/
+          retention-days: 90
