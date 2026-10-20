@@ -1,0 +1,31 @@
+name: UI tabs — read-only baseline freeze
+on:
+  push:
+    branches: [feature/ft-overview-shadow-20261019]
+    paths: ['audits/2026-10-20/freeze-ui.mjs', '.github/workflows/ui-tabs-freeze.yml']
+permissions: {contents: read}
+jobs:
+  freeze:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    environment: football-edge-production
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Verify active versions and capture frontend only
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node audits/2026-10-20/freeze-ui.mjs
+      - name: Package verified baseline
+        run: cd ui-tabs-freeze && zip -qr ../Football_Edge_UI_Freeze_20261020.zip .
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: football-edge-ui-freeze-20261020
+          path: |
+            Football_Edge_UI_Freeze_20261020.zip
+            ui-tabs-freeze/verification.json
+          retention-days: 90
