@@ -5,7 +5,7 @@ const assert=require('node:assert/strict'),http=require('node:http');
 const {readFileSync,existsSync,mkdirSync,writeFileSync}=require('node:fs');
 const path=require('node:path');
 (async()=>{
- const dir=path.resolve(process.env.CANDIDATE_DIR||'ui-tabs-preview/generated/candidate'),errors=[],cases=[];
+ const dir=path.resolve(process.env.CANDIDATE_DIR||'ui-tabs-preview/generated/candidate'),errors=[],cases=[],target=process.env.PRODUCTION_URL;
  const server=http.createServer((req,res)=>{
   const p=new URL(req.url,'http://localhost').pathname;
   const file=path.resolve(dir,'.'+(p==='/'?'/index.html':p));
@@ -13,16 +13,18 @@ const path=require('node:path');
   const types={'.html':'text/html; charset=utf-8','.css':'text/css','.mjs':'text/javascript','.js':'text/javascript','.png':'image/png','.svg':'image/svg+xml','.webmanifest':'application/manifest+json'};
   res.writeHead(200,{'Content-Type':types[path.extname(file)]||'application/octet-stream','Content-Security-Policy':"default-src 'self' data:; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'none'; worker-src 'none'"});res.end(readFileSync(file));
  });
- await new Promise(r=>server.listen(0,'127.0.0.1',r));
+ if(!target)await new Promise(r=>server.listen(0,'127.0.0.1',r));
  const engine=process.env.QA_BROWSER==='webkit'?'webkit':'chromium';
- const base='http://127.0.0.1:'+server.address().port,browser=await (engine==='webkit'?webkit:chromium).launch({headless:true,...(engine==='chromium'?{args:['--no-sandbox']}:{})});
+ const base=(target||'http://127.0.0.1:'+server.address().port).replace(/\/$/,''),browser=await (engine==='webkit'?webkit:chromium).launch({headless:true,...(engine==='chromium'?{args:['--no-sandbox']}:{})});
+ const safePaths=new Set(['/',...JSON.parse(readFileSync('ui-tabs-preview/release-baseline.json')).files.map(x=>'/'+x.path),'/ui-tabs/integrated.mjs','/ui-tabs/integrated.css','/ui-tabs/read-model.mjs','/icons/icon-180.png','/icons/icon-192.png','/icons/icon-512.png','/favicon.svg']);
  try{
   for(const config of [{...devices['iPhone 13'],defaultBrowserType:undefined},{viewport:{width:1280,height:900}}]){
    const ctx=await browser.newContext({...config,serviceWorkers:'block'}),page=await ctx.newPage();let blocked=0;
-   await ctx.route('**/*',r=>new URL(r.request().url()).origin===base?r.continue():(blocked++,r.abort()));page.on('pageerror',e=>errors.push(e.message));
+   await ctx.route('**/*',r=>{const u=new URL(r.request().url());return u.origin===base&&(!target||(safePaths.has(u.pathname)&&['GET','HEAD'].includes(r.request().method())))?r.continue():(blocked++,r.abort());});page.on('pageerror',e=>errors.push(e.message));
    await page.goto(base+'/#fe-tabs/overview',{waitUntil:'networkidle'});await page.waitForFunction(()=>!!window.FETabsIntegrated&&!!window.FTOverviewPreview);await page.waitForTimeout(1000);
    assert(await page.evaluate(()=>!window.__FETabsSandbox&&!window.__FETabsQA));
    assert.equal(await page.locator('#feTabsSandboxLabel').count(),0);assert.equal(await page.locator('[data-ftabs-tab]').count(),5);
+   if(target&&config.viewport.width===390)await page.screenshot({path:'ui-tabs-preview/qa/production-tabs-390.png',fullPage:false});
    if(process.env.CANDIDATE_DIR)assert.deepEqual(await page.evaluate(async()=>{const sizes=[];for(const n of [180,192,512]){const img=new Image();img.src='/icons/icon-'+n+'.png';await img.decode();sizes.push([img.naturalWidth,img.naturalHeight]);}return sizes;}),[[180,180],[192,192],[512,512]]);
    // Clean source has no sandbox locking of ordinary connection inputs.
    assert(await page.evaluate(()=>[...document.querySelectorAll('#connectCard input')].some(x=>!x.disabled)));
@@ -33,6 +35,6 @@ const path=require('node:path');
    cases.push({width:await page.evaluate(()=>innerWidth),status:'PASS',clean_without_sandbox:true,original_inputs_enabled:true,tab_navigation:true,reload_matches_route:true,external_requests_sent:0,blocked_by_test_harness:blocked});await ctx.close();
   }
   assert.deepEqual(errors,[]);
- }finally{await browser.close();await new Promise(r=>server.close(r));}
- mkdirSync('ui-tabs-preview/qa',{recursive:true});const report={status:'PASS',cases,browser:engine,real_phone_safari_pwa:'NOT_TESTED',production_deployed:false,live_push:'NOT_TESTED'};writeFileSync('ui-tabs-preview/qa/clean-candidate'+(engine==='webkit'?'-webkit':'')+'.json',JSON.stringify(report,null,2));console.log(JSON.stringify(report));
+ }finally{await browser.close();if(!target)await new Promise(r=>server.close(r));}
+ mkdirSync('ui-tabs-preview/qa',{recursive:true});const report={status:'PASS',cases,browser:engine,real_phone_safari_pwa:'NOT_TESTED',production_deployed:!!target,static_only_https_smoke:!!target,live_push:'NOT_TESTED'};writeFileSync('ui-tabs-preview/qa/clean-candidate'+(engine==='webkit'?'-webkit':'')+(target?'-https':'')+'.json',JSON.stringify(report,null,2));console.log(JSON.stringify(report));
 })().catch(e=>{console.error(e);process.exitCode=1;});

@@ -1,4 +1,4 @@
-// Manually invoked only after acceptance; never called by a push workflow.
+// Invoked only by the explicitly approved release job after acceptance.
 import assert from 'node:assert/strict';
 import {readFileSync,writeFileSync,readdirSync} from 'node:fs';
 import {createHash} from 'node:crypto';
@@ -16,7 +16,7 @@ const walk=dir=>readdirSync(dir,{withFileTypes:true}).flatMap(x=>x.isDirectory()
 async function verifyPublic(files){for(const f of files)assert.equal(hash((await publicFile('/'+(f.path==='index.html'?'':f.path.endsWith('/index.html')?f.path.slice(0,-10):f.path))).bytes),f.sha256,'SERVED_ASSET_MISMATCH_'+f.path);}
 async function restore(ownVersion){const current=await activeVersions();assert.equal(current[name],ownVersion,'UNRELATED_VERSION_REFUSE_ROLLBACK');for(const n of Object.keys(baseline.versions).filter(x=>x!==name))assert.equal(current[n],baseline.versions[n],'UNRELATED_PRODUCTION_DRIFT');const r=await fetch('https://api.cloudflare.com/client/v4/accounts/'+encodeURIComponent(process.env.CLOUDFLARE_ACCOUNT_ID)+'/workers/scripts/'+name+'/deployments',{method:'POST',headers:{Authorization:'Bearer '+process.env.CLOUDFLARE_API_TOKEN,'Content-Type':'application/json'},body:JSON.stringify({strategy:'percentage',versions:[{version_id:manifest.rollback_version,percentage:100}]}),signal:AbortSignal.timeout(30000)}),j=await r.json();assert(r.ok&&j.success,'ROLLBACK_API_FAILED');assert.deepEqual(await activeVersions(),baseline.versions,'ROLLBACK_VERSION_NOT_RESTORED');await verifyPublic(manifest.backup_files);}
 if(action==='rollback'){
- const report=JSON.parse(readFileSync(resultPath));assert.equal(report.source_commit,manifest.source_commit,'DEPLOYMENT_RECORD_MISMATCH');assert(report.version,'NO_OWN_DEPLOYMENT_RECORDED');await restore(report.version);report.rollback_verified=true;report.deployed=false;writeFileSync(resultPath,JSON.stringify(report,null,2));console.log('ROLLBACK_VERIFIED');
+ const report=JSON.parse(readFileSync(resultPath));assert.equal(report.source_commit,manifest.source_commit,'DEPLOYMENT_RECORD_MISMATCH');assert(report.version,'NO_OWN_DEPLOYMENT_RECORDED');await restore(report.version);report.rollback_verified=true;report.deployed=false;report.status='ROLLED_BACK';report.after=await activeVersions();writeFileSync(resultPath,JSON.stringify(report,null,2));console.log('ROLLBACK_VERIFIED');
 }else{
  const report={status:'FAIL',source_commit:manifest.source_commit,deployed:false,rollback_version:manifest.rollback_version,provider_calls:0,d1_queries:0,scanner_toggled:false};
  try{
