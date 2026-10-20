@@ -1,6 +1,6 @@
 // Acceptance of the clean candidate only. The test server, not the candidate,
 // blocks network access. No credentials, fixtures or production data are supplied.
-const {chromium,devices}=require('playwright');
+const {chromium,webkit,devices}=require('playwright');
 const assert=require('node:assert/strict'),http=require('node:http');
 const {readFileSync,existsSync,mkdirSync,writeFileSync}=require('node:fs');
 const path=require('node:path');
@@ -13,7 +13,8 @@ const path=require('node:path');
   res.writeHead(200,{'Content-Type':file.endsWith('.html')?'text/html; charset=utf-8':file.endsWith('.css')?'text/css':'text/javascript','Content-Security-Policy':"default-src 'self' data:; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'none'; worker-src 'none'"});res.end(readFileSync(file));
  });
  await new Promise(r=>server.listen(0,'127.0.0.1',r));
- const base='http://127.0.0.1:'+server.address().port,browser=await chromium.launch({headless:true,args:['--no-sandbox']});
+ const engine=process.env.QA_BROWSER==='webkit'?'webkit':'chromium';
+ const base='http://127.0.0.1:'+server.address().port,browser=await (engine==='webkit'?webkit:chromium).launch({headless:true,...(engine==='chromium'?{args:['--no-sandbox']}:{})});
  try{
   for(const config of [{...devices['iPhone 13'],defaultBrowserType:undefined},{viewport:{width:1280,height:900}}]){
    const ctx=await browser.newContext({...config,serviceWorkers:'block'}),page=await ctx.newPage();let blocked=0;
@@ -31,5 +32,5 @@ const path=require('node:path');
   }
   assert.deepEqual(errors,[]);
  }finally{await browser.close();await new Promise(r=>server.close(r));}
- mkdirSync('ui-tabs-preview/qa',{recursive:true});const report={status:'PASS',cases,browser:'Chromium; iPhone viewport/touch emulation is not real Safari',production_deployed:false,live_push:'NOT_TESTED'};writeFileSync('ui-tabs-preview/qa/clean-candidate.json',JSON.stringify(report,null,2));console.log(JSON.stringify(report));
+ mkdirSync('ui-tabs-preview/qa',{recursive:true});const report={status:'PASS',cases,browser:engine,real_phone_safari_pwa:'NOT_TESTED',production_deployed:false,live_push:'NOT_TESTED'};writeFileSync('ui-tabs-preview/qa/clean-candidate'+(engine==='webkit'?'-webkit':'')+'.json',JSON.stringify(report,null,2));console.log(JSON.stringify(report));
 })().catch(e=>{console.error(e);process.exitCode=1;});
