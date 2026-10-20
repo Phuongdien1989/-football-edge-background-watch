@@ -79,10 +79,14 @@ await check('Mobile starts only on manual start and stops without losing collect
   const saved=m.writes.length;m.ctx.stopH1Watch();await m.ctx.refreshH1Watch();assert.equal(m.writes.length,saved);assert.equal(m.ctx.H1_COLLECTION.pool.size,12);
 });
 await check('Mobile pause during discovery prevents all detail calls',async()=>{
-  const m=makeMobile();let release;
-  m.ctx.ultraHeartbeat=()=>new Promise(r=>release=r);
-  const p=m.ctx.startH1Watch();m.ctx.stopH1Watch();release({rows:fixtures});await p;
+  const m=makeMobile();let release,started;const entered=new Promise(r=>started=r);
+  m.ctx.ultraHeartbeat=()=>{started();return new Promise(r=>release=r);};
+  const p=m.ctx.startH1Watch();await entered;m.ctx.stopH1Watch();release({rows:fixtures});await p;
   assert.equal(m.calls.filter(x=>x.startsWith('snapshot:')).length,0);assert.equal(m.timers.length,0);
+});
+await check('Mobile pause during history loading prevents discovery and detail calls',async()=>{
+  const m=makeMobile();let release;m.ctx.loadHTCollectionContext=()=>new Promise(r=>release=r);
+  const p=m.ctx.startH1Watch();m.ctx.stopH1Watch();release({rows:[]});await p;assert.equal(m.calls.length,0);assert.equal(m.timers.length,0);
 });
 await check('Mobile pause during a detail request does not publish or schedule',async()=>{
   const m=makeMobile();let release;let waiting;
