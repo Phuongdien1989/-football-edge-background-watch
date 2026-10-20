@@ -1,0 +1,71 @@
+name: UI tabs — owner-approved Mobile release
+on:
+  push:
+    branches: [feature/ft-overview-shadow-20261019]
+    paths: ['.github/workflows/ui-tabs-approved-release.yml']
+permissions: {contents: read}
+concurrency:
+  group: fe-football-edge-mobile-production
+  cancel-in-progress: false
+jobs:
+  release:
+    if: startsWith(github.event.head_commit.message, 'release(ui-tabs): owner-approved main deployment')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: football-edge-production
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Build the approved clean Mobile candidate
+        run: node ui-tabs-preview/build-integrated.mjs
+      - run: npm install --no-save playwright@1.58.2
+      - run: npx playwright install --with-deps webkit
+      - run: node ui-tabs-preview/build-icons.cjs
+      - name: Verify current production, rollback and frozen assets
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node ui-tabs-preview/prepare-release.mjs
+      - name: Validate the full asset package without deployment
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: npx --yes wrangler@4 deploy --dry-run --config ui-tabs-preview/release-package/wrangler.json
+      - name: Final WebKit acceptance before publication
+        env: {QA_BROWSER: webkit, CANDIDATE_DIR: ui-tabs-preview/release-package/site}
+        run: node ui-tabs-preview/test-candidate.cjs
+      - name: Publish the UI accepted by the owner on 20 October 2026
+        id: deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          FE_TABS_PRODUCTION_APPROVED: 'true'
+          FE_TABS_APPROVED_COMMIT: ${{ github.sha }}
+        run: node ui-tabs-preview/publish-candidate.mjs deploy
+      - name: HTTPS WebKit acceptance of the published Mobile UI
+        env:
+          QA_BROWSER: webkit
+          CANDIDATE_DIR: ui-tabs-preview/release-package/site
+          PRODUCTION_URL: https://shiny-silence-d892.ngophuonghuy.workers.dev/
+        run: node ui-tabs-preview/test-candidate.cjs
+      - name: Restore the preserved version if HTTPS acceptance fails
+        if: failure() && steps.deploy.outcome == 'success'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          FE_TABS_PRODUCTION_APPROVED: 'true'
+          FE_TABS_APPROVED_COMMIT: ${{ github.sha }}
+        run: node ui-tabs-preview/publish-candidate.mjs rollback
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: football-edge-tabs-mobile-release
+          path: |
+            ui-tabs-preview/release-package/
+            ui-tabs-preview/qa/clean-candidate-webkit*.json
+            ui-tabs-preview/qa/production-tabs-390.png
+            ui-tabs-preview/generated/candidate/candidate-build.json
+            ui-tabs-preview/generated/icon-build.json
+
