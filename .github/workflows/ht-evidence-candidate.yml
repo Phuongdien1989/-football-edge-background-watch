@@ -21,6 +21,8 @@ jobs:
         run: node ht-early-candidate/test.mjs
       - name: Replay actual HT collector paths and shared HUB acquisition
         run: node ht-early-candidate/test-collection.mjs
+      - name: Price HT contracts and verify score-time provenance
+        run: node ht-early-candidate/test-valuation.mjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:

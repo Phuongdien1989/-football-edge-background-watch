@@ -56,3 +56,24 @@ Generated files live only under `ht-early-candidate/generated/`. Root production
 5. Only after validation, prepare a pinned release and rollback. Keep production untouched until that release is ready and authorized.
 
 No claim is made about improved betting returns, reduced production D1 usage or successful LIVE/PUSH with this candidate.
+
+
+## Checkpoint 3 — HT contract pricing, 21/10/2026 (Vietnam)
+
+Added pure valuation.mjs and valuation-adapter.mjs. They do not alter the generated Mobile/scanner candidate or production, and do not enable Push/recommendations.
+
+- Reuse existing ft-overview/core.mjs settlement/PMF pricing, with separate HT contract validation. That existing file is unchanged.
+- Price exact first-half totals using the current first-half score plus additional-goal PMF once. Integer, half and quarter lines expose full/half win, push and loss weights, fair odds and estimated EV.
+- An accepted model must explicitly describe H1 remaining goals for this fixture, score, minute and observation time. No legacy strength-score conversion, automatic FT-to-HT scaling, or inferred zero for missing data.
+- No fixed minute20 gate in this pricing interface: an actual HT PMF can be priced earlier. A missing PMF remains MODEL_WAIT. The collector's pre-minute20 evaluator still remains EARLY_EVIDENCE/WAIT because a real HT predictor has not been connected.
+- Explicit HT categories, same-score quotes, actual market timestamps and settlement basis are required. The adapter does not use stats freshness as a substitute for market freshness. It does not pair different bookmakers, synthesize absent Under odds, or assume a current price after a goal.
+- Only paired half-goal lines produce a proportional no-vig probability. Integer/quarter contracts use settlement-aware EV; a reciprocal price is not a binary probability.
+- Default is RESEARCH_ONLY. An explicit trial option can produce TRIAL_OVER for estimated EV > 0, with research/uncertainty warnings. Market agreement alone cannot override a negative offered-price EV. Sensitivity scenarios can show sign changes without pretending to be a calibrated confidence interval.
+- Attention ranking keeps at most five distinct fixtures and may retain WAIT candidates. It does not fill five forced bets or change the app's existing Master TOP.
+- Pure synthetic contract tests verify mechanics. They do not validate a predictive model, improve forecast accuracy, prove profit or verify phone Push.
+
+Important limit: the inspected FT Overview baseline is explicitly an FT constant-rate research model. It is not reused as an HT predictor. This checkpoint creates an HT pricing boundary; it does not certify that all other historic app models were fully audited or that HT prediction is complete.
+
+Next: inspect the app's goal-potential/HT data dependencies and real available historical half-time data, connect an independently estimated HT PMF with honest sample size/uncertainty, then package and review the actual phone preview. No extra provider requests or quota upgrade are authorized by this offline code change.
+
+Execution note: the local execution environment was unavailable for this checkpoint. Source changes were saved on the existing GitHub draft branch and the repository's offline GitHub Actions workflow is the verification environment. Do not report CI success until that run completes.
