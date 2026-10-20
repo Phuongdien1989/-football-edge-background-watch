@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {readFileSync,writeFileSync,mkdirSync} from 'node:fs';
+import {readFileSync,writeFileSync,mkdirSync,copyFileSync} from 'node:fs';
 import {execFileSync} from 'node:child_process';
 import {createHash} from 'node:crypto';
 // Preview-only builder. Never deploy this sandbox boot/QA hook to production.
@@ -30,3 +30,14 @@ assert.equal(restored,base,'NON_ADDITIVE_INTEGRATION');assert.equal(html.split('
 mkdirSync('ui-tabs-preview/generated',{recursive:true});writeFileSync('ui-tabs-preview/generated/integrated.html',html);
 const report={status:'PASS',additive_reconstruction:true,baseline_sha256:createHash('sha256').update(base).digest('hex'),candidate_sha256:createHash('sha256').update(html).digest('hex'),production_deployed:false,sandbox_network_lock:true,qa_hook:'preview hostname + qa=1 only'};
 writeFileSync('ui-tabs-preview/generated/integration-build.json',JSON.stringify(report,null,2));console.log(JSON.stringify(report));
+// A separate, unserved release candidate: no network override, QA seed or disabled controls.
+const candidate=base.replace('<section class="fe-p1-command"',panel+'<section class="fe-p1-command"').replace('</head>',css+'</head>').replace('</body>',module+'</body>');
+assert.equal(candidate.replace(panel,'').replace(css,'').replace(module,''),base);
+const cleanModule=readFileSync('ui-tabs-preview/integrated.mjs','utf8').replace(/\/\/ SANDBOX_ONLY_START[\s\S]*?\/\/ SANDBOX_ONLY_END\n/,'');
+for(const text of [candidate,cleanModule])for(const forbidden of ['__FETabsSandbox','__FETabsQA','PREVIEW_NETWORK_DISABLED','qa=1','sandbox-boot'])assert(!text.includes(forbidden),'SANDBOX_CODE_IN_RELEASE_CANDIDATE');
+const out='ui-tabs-preview/generated/candidate';mkdirSync(out+'/ui-tabs',{recursive:true});mkdirSync(out+'/ft-overview',{recursive:true});
+writeFileSync(out+'/index.html',candidate);writeFileSync(out+'/ui-tabs/integrated.mjs',cleanModule);
+for(const file of ['integrated.css','read-model.mjs'])copyFileSync('ui-tabs-preview/'+file,out+'/ui-tabs/'+file);
+for(const file of ['ui.mjs','core.mjs','adapter.mjs','charts.mjs','demo.mjs','style.css'])copyFileSync('ft-overview/'+file,out+'/ft-overview/'+file);
+const cleanReport={status:'PASS',baseline_sha256:report.baseline_sha256,candidate_sha256:createHash('sha256').update(candidate).digest('hex'),additive_reconstruction:true,sandbox_code_absent:true,network_override_absent:true,production_deployed:false,remaining_acceptance:['real-phone review','LIVE/PUSH production acceptance after explicit release approval'],rollback_mobile_version:'b73642ec-1d4c-41ae-bc28-68c785b6fd79'};
+writeFileSync(out+'/candidate-build.json',JSON.stringify(cleanReport,null,2));console.log(JSON.stringify(cleanReport));

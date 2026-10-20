@@ -26,6 +26,8 @@ jobs:
         run: node ui-tabs-preview/test-browser.cjs
       - name: Same-page original runtime and tab integration acceptance
         run: node ui-tabs-preview/test-integrated.cjs
+      - name: Clean candidate acceptance without sandbox hooks
+        run: node ui-tabs-preview/test-candidate.cjs
       - name: Publish isolated zero-binding preview only
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
