@@ -51,6 +51,7 @@ function patch(source,isMobile) {
     for(const name of ['startH1Watch','refreshH1Watch','scheduleH1Watch','stopH1Watch']) {
       const old=extract(out,name,'  ');replace(old.slice(0,old.lastIndexOf('}')+1),'  '+mobileCollection[name].toString());
     }
+    replace('  function grHTML(item,engine){','  function grHTML(item,engine){\n    if(engine===\'H1\')return \'<div class="watch-alert-note">Dự báo bàn HT và giá kèo nằm trong card HT Pricing. Các điểm bên dưới mô tả diễn biến trận.</div>\';');
     replace('  function h1WatchApplyState(item,s,ev){','  function h1WatchApplyState(item,s,ev){\n    if(HTCollection.isEarly(s)){item.state="BASELINE";item.reason="EARLY OBSERVATION • đang tích lũy HT • chưa định giá kèo";return;}');
     replace('Engine nhận trận 1H khoảng phút 20–45.','Bật HT để tích lũy từ đầu hiệp; chưa có dữ liệu thì tiếp tục theo dõi LIVE.');
   }

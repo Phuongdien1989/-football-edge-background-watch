@@ -104,6 +104,11 @@ check('FT trend behavior unchanged for unmarked existing evaluations',()=>{
 check('all inline classic scripts parse without executing app side effects',()=>{
   for(const match of mobile.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/g))if(!/type=["'](?:module|application\/ld\+json|application\/json)/.test(match[1]))new vm.Script(match[2]);
 });
+check('HT has one pricing view while the FT Goal Radar path remains byte-identical',()=>{
+  const text=fn(mobile,'grHTML'),guard="    if(engine==='H1')return '<div class=\"watch-alert-note\">Dự báo bàn HT và giá kèo nằm trong card HT Pricing. Các điểm bên dưới mô tả diễn biến trận.</div>';";
+  assert(text.includes(guard));assert.equal(text.replace('\n'+guard,''),fn(baseline,'grHTML'));
+  const c=vm.createContext({});vm.runInContext(text,c);const html=c.grHTML({},'H1');assert(html.includes('HT Pricing'));assert(!html.includes('%'));
+});
 const report={status:'PASS',tests,production_deployed:false,provider_requests:0,d1_writes:0,old_short:plain(old.h1WatchEvaluate(short,current)),candidate_short:plain(front.h1WatchEvaluate(short,current)),remaining:['remaining-HT-goal valuation and exact market contract pricing','browser/phone acceptance','production deployment and LIVE/PUSH verification']};
 writeFileSync('ht-early-candidate/generated/test-report.json',JSON.stringify(report,null,2)+'\n');
 console.log(JSON.stringify({status:'PASS',tests,production_deployed:false}));
