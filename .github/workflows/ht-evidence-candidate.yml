@@ -1,0 +1,27 @@
+name: HT evidence candidate offline
+on:
+  push:
+    branches: [feature/ht-early-evidence-20261020]
+    paths: ['ht-early-candidate/**', '.github/workflows/ht-evidence-candidate.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  replay:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Build isolated Mobile and backend candidates
+        run: node ht-early-candidate/build.mjs
+      - name: Replay baseline and candidate; verify engine parity
+        run: node ht-early-candidate/test.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ht-evidence-candidate
+          path: ht-early-candidate/generated/
+          retention-days: 30
