@@ -25,6 +25,8 @@ jobs:
         run: node ht-early-candidate/test-valuation.mjs
       - name: Verify HT model, context cache and connected contract pricing
         run: node ht-early-candidate/test-model.mjs
+      - name: Verify bounded HT history warm-up with existing quota wrappers
+        run: node ht-early-candidate/test-history.mjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:

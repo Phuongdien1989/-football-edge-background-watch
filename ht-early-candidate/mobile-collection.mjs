@@ -15,6 +15,8 @@ export async function loadHTCollectionContext() {
 export async function fetchH1CollectionSnapshot(item,f,session) {
   const alive=()=>h1WatchState.active&&session===H1_COLLECTION.generation;
   if(!alive())return null;
+  item.htContext=await H1_COLLECTION.history.contextFor(H1_COLLECTION.context,f,async team=>{if(!alive())throw Error('HT_COLLECTION_STOPPED');return footballCached('/fixtures',{team,last:8,status:'FT'},3600000,true);});
+  if(!alive())return null;
   const cached=item.latest;
   if(item.serverRow&&cached?.source==='NOTIFY_SERVER'&&item.serverRow.source_health?.stats==='OK'&&Number.isFinite(cached.fresh_at)&&Date.now()>=cached.fresh_at&&Date.now()-cached.fresh_at<=55000
     &&cached.status===f.fixture.status.short&&cached.goals?.home===f.goals?.home&&cached.goals?.away===f.goals?.away) {
@@ -67,6 +69,7 @@ export async function refreshH1Watch(quiet=false) {
   if(!h1WatchState.active||h1WatchState.refreshing)return;
   if(document.visibilityState!=='visible'&&quiet){scheduleH1Watch();return;}
   const session=H1_COLLECTION.generation,alive=()=>h1WatchState.active&&session===H1_COLLECTION.generation;
+  H1_COLLECTION.history.beginCycle();
   h1WatchState.refreshing=true;clearTimeout(h1WatchState.timer);h1WatchState.nextAt=0;
   try {
     const hb=await ultraHeartbeat(false);if(!alive())return;

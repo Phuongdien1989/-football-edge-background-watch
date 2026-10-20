@@ -32,10 +32,10 @@ for(const name of ['notify-core-h1.js','worker_notify_v130.js']) {
  const normalized=original.replaceAll("from '../../../","from './").replaceAll("from '../../","from './ht-early-candidate/");
  save(backend+'/'+name,normalized);
 }
-for(const name of ['temporal.mjs','collection.mjs','model.mjs','context.mjs','assess-item.mjs','valuation.mjs','valuation-adapter.mjs'])save(backend+'/ht-early-candidate/'+name,readFileSync('ht-early-candidate/'+name));
+for(const name of ['temporal.mjs','collection.mjs','history.mjs','model.mjs','context.mjs','assess-item.mjs','valuation.mjs','valuation-adapter.mjs'])save(backend+'/ht-early-candidate/'+name,readFileSync('ht-early-candidate/'+name));
 save(backend+'/ft-overview/core.mjs',readFileSync('ft-overview/core.mjs'));
 // The new valuation folder is one level below backend; preserve its existing ../ft-overview imports.
-for(const name of ['build-report.json','test-report.json','collection-test-report.json','valuation-test-report.json','model-test-report.json'])save(out+'/evidence/'+name,readFileSync('ht-early-candidate/generated/'+name));
+for(const name of ['build-report.json','test-report.json','collection-test-report.json','valuation-test-report.json','model-test-report.json','history-test-report.json'])save(out+'/evidence/'+name,readFileSync('ht-early-candidate/generated/'+name));
 save(out+'/README.md',readFileSync('ht-early-candidate/README.md'));
 const walk=p=>readdirSync(p,{withFileTypes:true}).flatMap(d=>d.isDirectory()?walk(p+'/'+d.name):[p+'/'+d.name]);
 const files=walk(out).map(p=>({path:p.slice(out.length+1),sha256:hash(readFileSync(p)),bytes:readFileSync(p).length}));

@@ -2,6 +2,7 @@ import {htTeamModel} from './model.mjs';
 import {snapshotForHT,htMarketLadder} from './valuation-adapter.mjs';
 import {assessHT} from './valuation.mjs';
 export function assessHTItem(item,context,now=Date.now()) {
+ context=item.htContext??context;
  const input=snapshotForHT(item),fixture=item.latest?.fixture;
  const model=htTeamModel(input,fixture,context);
  const markets=htMarketLadder(item);

@@ -3,6 +3,7 @@ import {readFileSync,writeFileSync} from 'node:fs';
 import vm from 'node:vm';
 import {createHTCollection} from './collection.mjs';
 import {createHTTemporal} from './temporal.mjs';
+import {createHTHistoryCache} from './history.mjs';
 import * as mobileFunctions from './mobile-collection.mjs';
 let now=1792526400000;
 class Clock extends Date {static now(){return now;}}
@@ -53,7 +54,7 @@ await check('early evidence has no strength probability, recommendation or Push 
   const gate=vm.createContext({});vm.runInContext(worker.match(/function h1Gate\([\s\S]*?\n}\n/)[0],gate);assert.equal(gate.h1Gate(e,1),false);
 });
 function makeMobile() {
-  const calls=[],timers=[],writes=[],errors=[],ctx=vm.createContext({Date:Clock,Math,Map,Set,Number,Object,Array,Promise,HTCollection:policy,HTTemporal:temporal,H1_COLLECTION:{pool:new Map(),generation:0},H1_WATCH_MAX_ITEMS:5,
+  const calls=[],timers=[],writes=[],errors=[],ctx=vm.createContext({Date:Clock,Math,Map,Set,Number,Object,Array,Promise,HTCollection:policy,HTTemporal:temporal,H1_COLLECTION:{pool:new Map(),generation:0,history:{beginCycle(){},contextFor:async base=>base}},H1_WATCH_MAX_ITEMS:5,
     loadHTCollectionContext:async()=>({at:now,rows:[]}),h1WatchState:{active:false,refreshing:false,items:[],cycle:0},ULTRA_HUB:{heartbeat:{at:now},entries:new Map()},ULTRA_HUB_POLICY:{BACKGROUND:{stats:18000}},
     document:{visibilityState:'visible'},els:{fkey:{value:'TEST_PLACEHOLDER'}},$:()=>({checked:true}),status:(el,msg,type)=>{if(type==='err')errors.push(msg);},showToast:()=>{},
     clearTimeout:()=>{},setTimeout:(f,ms)=>{timers.push(ms);return timers.length;},h1WatchNextInterval:()=>22000,updateH1WatchClock:()=>{},
@@ -157,7 +158,7 @@ await check('stop during stats request prevents follow-on event and market reque
   const p=m.ctx.fetchH1CollectionSnapshot({id:1},fixtures[0],0);await waiting;m.ctx.stopH1Watch();release([{total:{shots:4,sot:1,inbox:2,xg:.2}}]);
   assert.equal(await p,null);assert.equal(m.persist.length,0);
 });
-function makeBackend(source,enabled=true) {
+function makeBackend(source,enabled=true,coldHistory=false) {
   const calls=[],puts=[],records=new Map();
   const fullCore={
     statMap:()=>({stats:true}),watchStatsPresence:()=>presence,watchAggregate:()=>snap().metrics,handicapAggregate:()=>({...snap().metrics,dataTier:'PARTIAL'}),normalizeLiveMarkets:()=>[],
@@ -171,18 +172,26 @@ function makeBackend(source,enabled=true) {
     async scanControl(){return {enabled};}async listNotifyMatches(){return [...records].filter(([k])=>k.startsWith('match:')).map(([,v])=>normalize(v));}
     async putNotifyMatch(id,item){puts.push('match:'+id);records.set('match:'+id,normalize(item));}async deleteNotifyMatch(id){records.delete('match:'+id);}
     async api(path,params){calls.push({path,params});return path==='/fixtures'?[fixtures[0]]:[{observed:true}];}async send(){calls.push({path:'PUSH'});return true;}}
-  const ctx=vm.createContext({Date:Clock,Math,Map,Set,Number,TextEncoder,Response,Request,URL,DeepLinkWatcher:Base,base:{},createEngine:coreCtx.createEngine,createHTCollection,readHTContext:async()=>({at:now,rows:[]}),assessHTItem:()=>({state:'MODEL_WAIT'}),crossing:(prev,candidate)=>({state:prev||{},send:candidate!=null})});
+  const ctx=vm.createContext({Date:Clock,Math,Map,Set,Number,TextEncoder,Response,Request,URL,DeepLinkWatcher:Base,base:{},createEngine:coreCtx.createEngine,createHTCollection,createHTHistoryCache:coldHistory?createHTHistoryCache:()=>({beginCycle(){},contextFor:async base=>base}),readHTContext:async()=>({at:now,rows:[]}),assessHTItem:()=>({state:'MODEL_WAIT'}),crossing:(prev,candidate)=>({state:prev||{},send:candidate!=null})});
   const clean=source.replace(/^import .*\n/gm,'').replace('export class BackgroundWatcher','class BackgroundWatcher').replace('export default base;','');
   vm.runInContext(clean+'\nthis.TestWatcher=BackgroundWatcher;',ctx);
   return {watcher:new ctx.TestWatcher(),calls,puts,records};
 }
 const originalWorker=readFileSync(process.argv[2]||'worker_notify_v130.js','utf8');
-await check('backend early collection adds zero provider calls and zero persistence operations per replayed tick',async()=>{
+await check('backend collection reuses the original call/write path when HT history is already available',async()=>{
   const before=makeBackend(originalWorker),after=makeBackend(worker);
   await before.watcher.notifyTick();await after.watcher.notifyTick();
   assert.deepEqual(normalize(after.calls),normalize(before.calls));assert.deepEqual(after.puts,before.puts);
   const item=after.records.get('match:1');assert.equal(item.h1History.length,1);assert.equal(item.last.h1Mode,'EARLY_EVIDENCE');assert.equal(item.last.h1Score,null);assert.equal(item.ui.engines.H1.recommendation,'WAIT');
   assert.equal(before.records.get('match:1').h1History.length,0);
+});
+await check('backend cold HT history adds at most two quota-counted calls without D1 writes',async()=>{
+ const b=makeBackend(worker,true,true);await b.watcher.notifyTick();
+ assert.equal(b.calls.filter(x=>x.path==='/fixtures'&&x.params?.team).length,2);
+ assert.equal(b.puts.filter(x=>String(x).startsWith('match:')).length,1);
+});
+await check('history warm-up cannot exceed the existing notification API budget',async()=>{
+ const b=makeBackend(worker,true,true);b.watcher.env.NOTIFY_DAILY_BUDGET=1;await b.watcher.notifyTick();assert.equal(b.calls.length,1);
 });
 await check('backend OFF and missing scan permission fail closed without requests or writes',async()=>{
   for(const enabled of [false,undefined]){const m=makeBackend(worker,enabled===false?false:null);await m.watcher.notifyTick();assert.equal(m.calls.length,0);assert.equal(m.puts.length,0);}
