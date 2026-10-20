@@ -23,6 +23,8 @@ jobs:
         run: node ht-early-candidate/test-collection.mjs
       - name: Price HT contracts and verify score-time provenance
         run: node ht-early-candidate/test-valuation.mjs
+      - name: Verify HT model, context cache and connected contract pricing
+        run: node ht-early-candidate/test-model.mjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:

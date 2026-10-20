@@ -37,7 +37,7 @@ function patch(source,isMobile) {
     replace(old.slice(0,end),`${indent}function ${name}(${args}){return HTTemporal.${method}(${args});}`);
   }
   const marker=isMobile?'  function h1WatchFindBaseline(':'function findBaseline(';
-  const injection=isMobile?'  const HTTemporal=('+createHTTemporal.toString()+')();\n  const HTCollection=('+createHTCollection.toString()+')();\n  const H1_COLLECTION={pool:new Map(),generation:0};\n'+mobileCollection.fetchH1CollectionSnapshot.toString()+'\n':"const HTTemporal=createHTTemporal();\nconst HTCollection=createHTCollection();\n";
+  const injection=isMobile?'  const HTTemporal=('+createHTTemporal.toString()+')();\n  const HTCollection=('+createHTCollection.toString()+')();\n  const H1_COLLECTION={pool:new Map(),generation:0};\n'+mobileCollection.fetchH1CollectionSnapshot.toString()+'\n'+mobileCollection.loadHTCollectionContext.toString()+'\n'+"  Object.defineProperty(window,'FEHTCandidateBridge',{value:Object.freeze({read:()=>feUICopy({context:H1_COLLECTION.context??null,items:h1WatchState.items.map(it=>({id:it.id,home:it.home,away:it.away,league:it.league,latest:it.latest,history:it.history,resetAt:it.resetAt,cooldownUntil:it.cooldownUntil,lastMarketAt:it.lastMarketAt}))})}),writable:false,configurable:false});\n":"const HTTemporal=createHTTemporal();\nconst HTCollection=createHTCollection();\n";
   replace(marker,injection+marker);
   if(!isMobile)replace("import {createEngine as createBaseEngine} from './notify-core.js';","import {createEngine as createBaseEngine} from '../../../notify-core.js';\nimport {createHTTemporal} from '../../temporal.mjs';\nimport {createHTCollection} from '../../collection.mjs';");
   const oldEval=extract(out,'h1WatchEvaluate',isMobile?'  ':'');
@@ -62,10 +62,14 @@ function patch(source,isMobile) {
 function patchWorker(source) {
   let out=source;const changes=[];
   const replace=(before,after)=>{assert.equal(out.split(before).length,2,'WORKER_PATCH_NOT_UNIQUE');out=out.replace(before,after);changes.push({before,after});};
-  replace("import base,{BackgroundWatcher as DeepLinkWatcher} from './worker_notify_v128.js';","import base,{BackgroundWatcher as DeepLinkWatcher} from '../../../worker_notify_v128.js';\nimport {createHTCollection} from '../../collection.mjs';\nconst HTCollection=createHTCollection();");
+  replace("import base,{BackgroundWatcher as DeepLinkWatcher} from './worker_notify_v128.js';","import base,{BackgroundWatcher as DeepLinkWatcher} from '../../../worker_notify_v128.js';\nimport {createHTCollection} from '../../collection.mjs';\nimport {readHTContext} from '../../context.mjs';\nimport {assessHTItem} from '../../assess-item.mjs';\nconst HTCollection=createHTCollection();");
   replace("import {crossing} from './worker_notify.js';","import {crossing} from '../../../worker_notify.js';");
   replace('  async notifyTick(){','  async notifyTick(){\n    if(typeof this.scanControl!=="function"||(await this.scanControl())?.enabled!==true)return;');
   replace("const h1Route=['1H','LIVE'].includes(s.status)&&Number(s.minute)>=20&&Number(s.minute)<=45;","const h1Route=HTCollection.eligible(f);");
+  replace('if(!devices.length)return;','if(!devices.length)return;\n    this._htHistoryContext=await readHTContext(this.env.FOOTBALL_DB,Date.now(),this._htHistoryContext);');
+  replace('h1s={...slim,status:s.status,fresh_at:stamp,market:', 'h1s={...slim,fixture:f,market_rows:compact,market_at:stamp,status:s.status,fresh_at:stamp,market:');
+  replace('h1Eval=engine.h1WatchEvaluate(h1Item,h1s);','h1Eval=engine.h1WatchEvaluate(h1Item,h1s);\n              h1Eval.htValuation=assessHTItem({id,latest:h1s,history:item.h1History,resetAt:item.h1ResetAt||0,cooldownUntil:item.h1CooldownUntil||0},this._htHistoryContext,stamp);');
+
   replace('item.h1History=item.h1History.filter(x=>stamp-x.captured_at<=1800000).concat(slim).slice(-40);','item.h1History=item.h1History.filter(x=>stamp-x.captured_at<=1800000).concat({...slim,status:s.status,fresh_at:stamp}).slice(-40);');
   replace('if(!item.h1CooldownUntil||stamp>=item.h1CooldownUntil)status.mechanisms.h1++;','if(h1Eval.scoreMode==="EARLY_EVIDENCE")status.mechanisms.h1Early=(status.mechanisms.h1Early||0)+1;else if(!item.h1CooldownUntil||stamp>=item.h1CooldownUntil)status.mechanisms.h1++;');
   replace('status.signalEligible+=Number(!!h1Eval)+Number(s.status===\'2H\')+Number(hcReady);','status.signalEligible+=Number(!!h1Eval&&h1Eval.scoreMode!=="EARLY_EVIDENCE")+Number(s.status===\'2H\')+Number(hcReady);');

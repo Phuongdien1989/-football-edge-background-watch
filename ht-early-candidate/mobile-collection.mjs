@@ -1,3 +1,15 @@
+export async function loadHTCollectionContext() {
+  const now=Date.now(),cached=H1_COLLECTION.context;
+  if(cached&&now>=cached.at&&now-cached.at<(cached.error?60000:3600000))return cached;
+  try {
+    const data=await bgRequest('/api/db/fixture-history?limit=500');
+    if(data?.ok!==true||!Array.isArray(data.rows))throw Error('HT_HISTORY_RESPONSE_INVALID');
+    H1_COLLECTION.context={at:Date.now(),rows:data.rows.slice(0,500),source:'D1_FIXTURE_HISTORY'};
+  }catch(e){H1_COLLECTION.context={at:Date.now(),rows:[],error:String(e.message||e).slice(0,100)};}
+  if(typeof window!=='undefined')window.dispatchEvent(new Event('fe-ht-context-updated'));
+  return H1_COLLECTION.context;
+}
+
 // These functions are embedded inside the existing Mobile closure by build.mjs.
 // Dependencies deliberately refer to that app's shared HUB and existing HT tools.
 export async function fetchH1CollectionSnapshot(item,f,session) {
@@ -37,7 +49,7 @@ export async function fetchH1CollectionSnapshot(item,f,session) {
   }
   const markets=u?.liveOdds||[],events=eventsCompact(u?.eventsRaw||[]),q=groupCoverageScore('FT',{live_statistics:raw,events,live_odds:markets}),at=entry.fields.stats?.at;
   return {captured_at:at,fresh_at:at,minute:f.fixture.status.elapsed,status:f.fixture.status.short,goals:f.goals,metrics,stats_presence:presence,data_health:watchDataHealth(presence,null),
-    dq:q.score,integrity:q.integrity_score??null,market:h1WatchMarketInfo(markets,null),market_rows:markets,events,fixture:f,source:'HT_EARLY_SHARED_HUB'};
+    dq:q.score,integrity:q.integrity_score??null,market:h1WatchMarketInfo(markets,null),market_rows:markets,events,fixture:f,source:'HT_EARLY_SHARED_HUB',market_at:u?.marketAt??null};
 }
 
 export async function startH1Watch() {
@@ -45,9 +57,9 @@ export async function startH1Watch() {
   const isolation=feCaptureOtherEngines('H1');
   h1WatchInitAudio();
   if(!els.fkey.value.trim()){showToast('err','Chưa có Football API Key','Lưu API key trước.');return;}
-  H1_COLLECTION.generation++;h1WatchState.active=true;
+  H1_COLLECTION.generation++;h1WatchState.active=true;const session=H1_COLLECTION.generation;
   for(const item of h1WatchState.items||[])H1_COLLECTION.pool.set(Number(item.id),item);
-  try {await refreshH1Watch(true);}
+  try {await loadHTCollectionContext();if(h1WatchState.active&&session===H1_COLLECTION.generation)await refreshH1Watch(true);}
   finally {feRestoreOtherEngines(isolation,'START_H1_COLLECTION');}
 }
 

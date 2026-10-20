@@ -54,7 +54,7 @@ await check('early evidence has no strength probability, recommendation or Push 
 });
 function makeMobile() {
   const calls=[],timers=[],writes=[],errors=[],ctx=vm.createContext({Date:Clock,Math,Map,Set,Number,Object,Array,Promise,HTCollection:policy,HTTemporal:temporal,H1_COLLECTION:{pool:new Map(),generation:0},H1_WATCH_MAX_ITEMS:5,
-    h1WatchState:{active:false,refreshing:false,items:[],cycle:0},ULTRA_HUB:{heartbeat:{at:now},entries:new Map()},ULTRA_HUB_POLICY:{BACKGROUND:{stats:18000}},
+    loadHTCollectionContext:async()=>({at:now,rows:[]}),h1WatchState:{active:false,refreshing:false,items:[],cycle:0},ULTRA_HUB:{heartbeat:{at:now},entries:new Map()},ULTRA_HUB_POLICY:{BACKGROUND:{stats:18000}},
     document:{visibilityState:'visible'},els:{fkey:{value:'TEST_PLACEHOLDER'}},$:()=>({checked:true}),status:(el,msg,type)=>{if(type==='err')errors.push(msg);},showToast:()=>{},
     clearTimeout:()=>{},setTimeout:(f,ms)=>{timers.push(ms);return timers.length;},h1WatchNextInterval:()=>22000,updateH1WatchClock:()=>{},
     feCaptureOtherEngines:()=>({}),feRestoreOtherEngines:()=>{},h1WatchInitAudio:()=>{},feMarkEngineManualStop:()=>{},h1WatchReadHistory:()=>[],h1WatchWriteHistory:i=>writes.push(normalize(i.history)),
@@ -167,7 +167,7 @@ function makeBackend(source,enabled=true) {
     async scanControl(){return {enabled};}async listNotifyMatches(){return [...records].filter(([k])=>k.startsWith('match:')).map(([,v])=>normalize(v));}
     async putNotifyMatch(id,item){puts.push('match:'+id);records.set('match:'+id,normalize(item));}async deleteNotifyMatch(id){records.delete('match:'+id);}
     async api(path,params){calls.push({path,params});return path==='/fixtures'?[fixtures[0]]:[{observed:true}];}async send(){calls.push({path:'PUSH'});return true;}}
-  const ctx=vm.createContext({Date:Clock,Math,Map,Set,Number,TextEncoder,Response,Request,URL,DeepLinkWatcher:Base,base:{},createEngine:coreCtx.createEngine,createHTCollection,crossing:(prev,candidate)=>({state:prev||{},send:candidate!=null})});
+  const ctx=vm.createContext({Date:Clock,Math,Map,Set,Number,TextEncoder,Response,Request,URL,DeepLinkWatcher:Base,base:{},createEngine:coreCtx.createEngine,createHTCollection,readHTContext:async()=>({at:now,rows:[]}),assessHTItem:()=>({state:'MODEL_WAIT'}),crossing:(prev,candidate)=>({state:prev||{},send:candidate!=null})});
   const clean=source.replace(/^import .*\n/gm,'').replace('export class BackgroundWatcher','class BackgroundWatcher').replace('export default base;','');
   vm.runInContext(clean+'\nthis.TestWatcher=BackgroundWatcher;',ctx);
   return {watcher:new ctx.TestWatcher(),calls,puts,records};
