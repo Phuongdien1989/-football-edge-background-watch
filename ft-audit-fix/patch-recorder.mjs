@@ -3,7 +3,7 @@ export function patchRecorder(source,sourceHash){
  assert.match(sourceHash,/^[a-f0-9]{64}$/);
  let s=source;
  const once=(a,b)=>{assert.equal(s.split(a).length,2,'RECORDER_PATCH_ANCHOR '+a.slice(0,70));s=s.replace(a,b);};
- s="import {runFTOutcomePass} from './outcome-pass.mjs';\nimport {recordFTDecision} from './decision-trace.mjs';\nconst FT_REPLAY_CODE_HASH='"+sourceHash+"';\nimport {recordFTScan} from './worker-recorder.mjs';\n"+s;
+ s="import {runPendingFT} from './pending-discovery.mjs';\nimport {runFTOutcomePass} from './outcome-pass.mjs';\nimport {recordFTDecision} from './decision-trace.mjs';\nconst FT_REPLAY_CODE_HASH='"+sourceHash+"';\nimport {recordFTScan} from './worker-recorder.mjs';\n"+s;
  once("async notifyTick(){","async ftReplayOutcomePass(observations){return runFTOutcomePass(this,observations); }\n  async notifyTick(){");
  once("const fixtureStarted=Date.now();","const fixtureStarted=Date.now();const ftReplayContext={observation:null,evaluation:null,market_rows:null,devices:[],state:'NOT_EVALUATED',reason:'STATS_UNAVAILABLE'};");
  once("const ftCatalog=await api('/fixtures',{live:'all'},true);","const ftCatalog=await api('/fixtures',{live:'all'},true);const ftCatalogReceivedAt=Date.now();");
@@ -17,5 +17,6 @@ export function patchRecorder(source,sourceHash){
  once("goalEstimates[d.id]=goal;","goalEstimates[d.id]=goal;ftReplayContext.devices.push({device_slot:devices.indexOf(d),goal_estimate:goal??null,threshold:dp.goalThreshold??null,candidate:candidate??null,crossing_requested:check.send===true});");
  once("}catch(e){status.errors.push({fixture:id,error:errText(e)})}","}catch(e){ftReplayContext.state='ERROR';ftReplayContext.reason='SCAN_ERROR';ftReplayContext.evaluation=null;status.errors.push({fixture:id,error:errText(e)})}");
  once("item.lastAt=Date.now();const bytes=", "if(ftReplayContext.observation){try{this.ftReplayDecisionLast=await recordFTDecision(this,{...ftReplayContext,decision_at:Date.now(),source_hash:FT_REPLAY_CODE_HASH});}catch{this.ftReplayDecisionLast={status:'HOOK_FAILED'};}}\n        item.lastAt=Date.now();const bytes=");
+ once("status.apiToday=budget.used;status.durationMs=", "try{this.ftReplayDiscoveryLast=await runPendingFT(this);}catch{this.ftReplayDiscoveryLast={status:'HOOK_FAILED'};}\n    status.apiToday=budget.used;status.durationMs=");
  return s;
 }

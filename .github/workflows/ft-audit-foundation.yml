@@ -31,6 +31,8 @@ jobs:
       - run: node ft-audit-fix/test-worker-recorder.mjs
       - run: node ft-audit-fix/test-decision-trace.mjs
       - run: node ft-audit-fix/test-outcome-pass.mjs
+      - run: node ft-audit-fix/test-pending-discovery.mjs
+      - run: python3 ft-audit-fix/test-pending-sql.py
       - run: node ft-audit-fix/test-recorder-integration.mjs
       - run: node --check ft-audit-output/recorder-trial/worker_notify_v130.js
       - run: python3 ft-audit-fix/test-ledger-sql.py

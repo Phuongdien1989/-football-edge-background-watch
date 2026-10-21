@@ -6,7 +6,7 @@ const root=out+'/recorder-trial';
 cpSync(out+'/candidate',root,{recursive:true});
 const sourceHash=createHash('sha256').update(readFileSync(root+'/worker_notify_v130.js')).update(readFileSync(root+'/notify-core.js')).digest('hex');
 writeFileSync(root+'/worker_notify_v130.js',patchRecorder(readFileSync(root+'/worker_notify_v130.js','utf8'),sourceHash));
-const modules=['worker-recorder.mjs','decision-trace.mjs','outcome.mjs','outcome-pass.mjs','persistent-collector.mjs','observation.mjs','replay-ledger.mjs'];
+const modules=['worker-recorder.mjs','decision-trace.mjs','outcome.mjs','outcome-pass.mjs','pending-discovery.mjs','persistent-collector.mjs','observation.mjs','replay-ledger.mjs'];
 for(const name of modules)cpSync(new URL('./'+name,import.meta.url),root+'/'+name);
 const hash=p=>createHash('sha256').update(readFileSync(p)).digest('hex');
 writeFileSync(out+'/recorder-trial-manifest.json',JSON.stringify({deployed:false,source_hash:sourceHash,default_enabled:false,source_candidate_manifest:hash(out+'/manifest.json'),files:['worker_notify_v130.js',...modules].map(path=>({path,sha256:hash(root+'/'+path)})),schema_applied:false},null,2));
