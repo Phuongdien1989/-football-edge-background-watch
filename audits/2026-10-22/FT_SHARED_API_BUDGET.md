@@ -20,3 +20,5 @@ Scan reservation now adds one durable budget put per provider attempt when enabl
 One new observation + decision + outcome is 12 SQL statements; a discovery page adds one. The extra index also has write/storage costs not measured by mock statement counts.
 No Free-plan acceptance until actual D1 rows read/written (including indexes), real DO behavior and aggregate provider traffic are measured on a separate bounded test environment.
 Outstanding: verify production versions again before any release, provision disposable test schemas/indexes/budgets, execute remote integration, then report limits and request activation approval. No new model, rank or threshold is activated.
+
+Initial CI 39696442887 failed at shared usage 3 versus 6 because the integration storage mock did not serialize transactions during the four parallel detail requests. The mock is corrected to serialize; the expected count remains six. This correction does not validate real Cloudflare transaction behavior.
