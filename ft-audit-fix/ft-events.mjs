@@ -36,3 +36,43 @@ export function observeFTStats(item,metrics,receivedAt,sourceAt=null){
  changedAt:prev?.fingerprint===fingerprint?prev.changedAt:receivedAt,fingerprint};
  return true;
 }
+
+// Event identity is evidence of a change, never an inferred red-card total.
+// Empty/error responses cannot prove a red card was rescinded.
+function invalidateFT(item,reason,at,cooldown=false){
+ item.history=[];item.ftResetAt=at;
+ if(cooldown)item.ftCooldownUntil=Math.max(item.ftCooldownUntil||0,at+300000);
+ item.ftInvalidation={reasons:[reason],at,ended:false};
+ if(item.ui){
+  item.ui.engines={...item.ui.engines,FT:{...item.ui.engines?.FT,score:null,scoreMode:'DATA_INCOMPLETE',hardVeto:true,dataIncomplete:true,vetoReasons:[reason],best_over:null}};
+  item.ui.goal_estimates=Object.fromEntries(Object.keys(item.ui.goal_estimates||{}).map(k=>[k,{prob:null,n:0,source:reason}]));
+ }
+}
+export function observeFTRedEvents(item,events,health,receivedAt){
+ if(!['OK','EMPTY'].includes(health)||!Array.isArray(events)||!Number.isFinite(receivedAt))return false;
+ const prev=item.ftRedEvents;
+ if(prev&&receivedAt<prev.receivedAt)return false;
+ const keys=[...new Set(events.filter(e=>e?.type==='Card'&&['Red Card','Second Yellow card'].includes(e.detail)).map(e=>JSON.stringify([e.team?.id??null,e.player?.id??null,e.time?.elapsed??null,e.time?.extra??null,e.detail])))].sort();
+ if(!keys.length){
+  if(prev?.keys?.length&&!prev.unconfirmedAbsence){item.ftRedEvents={...prev,receivedAt,unconfirmedAbsence:true};invalidateFT(item,'FT_RED_EVENT_UNCONFIRMED',receivedAt,true);return true;}
+  return false;
+ }
+ const changed=JSON.stringify(prev?.keys||[])!==JSON.stringify(keys);
+ item.ftRedEvents={keys,receivedAt,unconfirmedAbsence:false};
+ if(changed){invalidateFT(item,'FT_RED_EVENT_CHANGE',receivedAt,true);return true;}
+ return false;
+}
+export function observeFTCatalog(item,present,receivedAt){
+ const phase=item.ftObservation?.phase||item.ui?.fixture?.fixture?.status?.short;
+ if(phase!=='2H'||!item.ui)return false;
+ if(present){
+  if(!item.ftCatalogMissing)return false;
+  item.ftCatalogMissing=false;
+  // A fresh snapshot and baseline must replace the invalidated decision.
+  return true;
+ }
+ if(item.ftCatalogMissing)return false;
+ item.ftCatalogMissing=true;item.ftCatalogMissingAt=receivedAt;
+ invalidateFT(item,'FT_CATALOG_UNCONFIRMED',receivedAt,false);
+ return true;
+}

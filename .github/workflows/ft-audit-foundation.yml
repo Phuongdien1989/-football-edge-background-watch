@@ -22,6 +22,7 @@ jobs:
       - run: node ft-audit-fix/build.mjs
       - run: node ft-audit-fix/test.mjs
       - run: node ft-audit-fix/test-events.mjs
+      - run: node ft-audit-fix/test-evidence.mjs
       - run: node ft-audit-fix/test-integration.mjs
       - run: node --check ft-audit-output/candidate/worker_notify_v130.js
       - run: node --check ft-audit-output/candidate/notify-core.js
