@@ -1,0 +1,72 @@
+name: Scan status recovery scoped release
+on:
+  push:
+    branches: [fix/scan-status-recovery-20261021]
+    paths: ['scan-status-fix/*.mjs', '.github/workflows/scan-status-recovery.yml']
+permissions: {contents: read, actions: read}
+concurrency:
+  group: fe-football-edge-mobile-production
+  cancel-in-progress: false
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    environment: football-edge-production
+    env: {WRANGLER_SEND_METRICS: 'false'}
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - uses: actions/download-artifact@v4
+        with:
+          name: football-edge-backend-ht-event-release
+          run-id: 39551380943
+          github-token: ${{ github.token }}
+          path: previous-backend
+      - name: Build two-file patch from verified production package
+        run: node scan-status-fix/build.mjs
+      - name: Reproduce stale error and verify recovery, GET, pause, restart and write budget
+        run: node scan-status-fix/test.mjs previous-backend/candidate
+      - run: node --check scan-status-release/candidate/worker_notify_v130.js
+      - run: node --check scan-status-release/candidate/worker_notify_v138_peak_window.js
+      - run: npm install --no-save wrangler@4
+      - name: Verify exact baseline, rollback and scanner paused
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node scan-status-fix/release.mjs prepare
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pre-scan-status-backup
+          path: |
+            scan-status-release/backup/
+            scan-status-release/manifest.json
+          retention-days: 90
+      - run: npx wrangler deploy --dry-run --config scan-status-release/candidate/.release.json
+      - name: Publish status only
+        id: deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node scan-status-fix/release.mjs deploy
+      - name: Verify production and unchanged Mobile, Desktop, bindings and scanner
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node scan-status-fix/release.mjs verify
+      - name: Restore preceding backend if acceptance fails
+        if: failure() && steps.deploy.outcome == 'success'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node scan-status-fix/release.mjs rollback
+      - name: Remove runtime config from evidence
+        if: always()
+        run: rm -f scan-status-release/candidate/.release.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: scan-status-recovery-evidence
+          path: scan-status-release/
+          retention-days: 90
