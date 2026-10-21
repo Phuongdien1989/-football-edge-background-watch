@@ -3,7 +3,8 @@ export function patchRecorder(source,sourceHash){
  assert.match(sourceHash,/^[a-f0-9]{64}$/);
  let s=source;
  const once=(a,b)=>{assert.equal(s.split(a).length,2,'RECORDER_PATCH_ANCHOR '+a.slice(0,70));s=s.replace(a,b);};
- s="import {recordFTDecision} from './decision-trace.mjs';\nconst FT_REPLAY_CODE_HASH='"+sourceHash+"';\nimport {recordFTScan} from './worker-recorder.mjs';\n"+s;
+ s="import {runFTOutcomePass} from './outcome-pass.mjs';\nimport {recordFTDecision} from './decision-trace.mjs';\nconst FT_REPLAY_CODE_HASH='"+sourceHash+"';\nimport {recordFTScan} from './worker-recorder.mjs';\n"+s;
+ once("async notifyTick(){","async ftReplayOutcomePass(observations){return runFTOutcomePass(this,observations); }\n  async notifyTick(){");
  once("const fixtureStarted=Date.now();","const fixtureStarted=Date.now();const ftReplayContext={observation:null,evaluation:null,market_rows:null,devices:[],state:'NOT_EVALUATED',reason:'STATS_UNAVAILABLE'};");
  once("const ftCatalog=await api('/fixtures',{live:'all'},true);","const ftCatalog=await api('/fixtures',{live:'all'},true);const ftCatalogReceivedAt=Date.now();");
  once("const rows=await api(path,params,name==='stats'||name==='half');","const rows=await api(path,params,name==='stats'||name==='half');ftSourceReceipts[name]=Date.now();");
