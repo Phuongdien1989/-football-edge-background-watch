@@ -1,0 +1,27 @@
+name: HT recent scanner read-only observation
+on:
+  push:
+    branches: [diag/ht-session-readonly-20261021]
+    paths: ['ht-early-candidate/read-recent-scan.mjs', '.github/workflows/ht-recent-scan-readonly.yml']
+permissions: {contents: read}
+jobs:
+  observe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: football-edge-production
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Observe stored scan state, no provider calls or Push sends
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node ht-early-candidate/read-recent-scan.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ht-recent-scan-readonly
+          path: ht-recent-scan-report.json
+          retention-days: 30
