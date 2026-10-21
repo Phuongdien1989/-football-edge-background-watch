@@ -5,11 +5,6 @@ const PAUSE_KEY='ft:replay:trial:pause:v1';
 export async function recordFTScan(owner,scan){
  if(owner.env?.FT_REPLAY_TRIAL_ENABLED!=='true')return {status:'DISABLED'};
  if(scan.fixture?.fixture?.status?.short!=='2H')return {status:'OUT_OF_SCOPE'};
- const epoch=owner.env.FT_REPLAY_TRIAL_EPOCH;
- const maxRecordBytes=Number(owner.env.FT_REPLAY_TRIAL_MAX_RECORD_BYTES);
- if(typeof epoch!=='string'||!epoch||!Number.isSafeInteger(maxRecordBytes)||maxRecordBytes<=0||!owner.env.FT_REPLAY_DB)return {status:'INVALID_CONFIG'};
- let state=states.get(owner);
- if(!state||state.epoch!==epoch){state={epoch,paused:false,loaded:false,tail:Promise.resolve()};states.set(owner,state);}
  // Clone before queuing, preserving the receipt-time evidence.
  let input;
  try{
@@ -19,6 +14,16 @@ export async function recordFTScan(owner,scan){
   }
   input=JSON.parse(JSON.stringify({id:scan.id,fixture_id:scan.fixture.fixture.id,decision_at:scan.capturedAt,fixture:scan.fixture,sources,model_version:null}));
  }catch{return {status:'INVALID_INPUT'};}
+ return persistFTRecord(owner,'OBSERVATION',input);
+}
+export async function persistFTRecord(owner,kind,payload){
+ if(owner.env?.FT_REPLAY_TRIAL_ENABLED!=='true')return {status:'DISABLED'};
+ const epoch=owner.env.FT_REPLAY_TRIAL_EPOCH;
+ const maxRecordBytes=Number(owner.env.FT_REPLAY_TRIAL_MAX_RECORD_BYTES);
+ if(typeof epoch!=='string'||!epoch||!Number.isSafeInteger(maxRecordBytes)||maxRecordBytes<=0||!owner.env.FT_REPLAY_DB)return {status:'INVALID_CONFIG'};
+ let state=states.get(owner);
+ if(!state||state.epoch!==epoch){state={epoch,paused:false,loaded:false,tail:Promise.resolve()};states.set(owner,state);}
+ let input;try{input=structuredClone(payload);}catch{return {status:'INVALID_INPUT'};}
  const task=state.tail.then(async()=>{
   if(state.paused)return {status:'PAUSED',reason:state.reason};
   if(!state.loaded){
@@ -28,7 +33,7 @@ export async function recordFTScan(owner,scan){
    }catch{state.paused=true;state.reason='PAUSE_READ_FAILED';return {status:'PAUSE_READ_FAILED'};}
   }
   let result;
-  try{result=await createPersistentCollector(owner.env.FT_REPLAY_DB,{enabled:true,maxRecordBytes}).capture(input);}
+  try{result=await createPersistentCollector(owner.env.FT_REPLAY_DB,{enabled:true,maxRecordBytes}).append(kind,input);}
   catch{result={status:'RECORDER_FAILED'};}
   if(['BUDGET_DENIED','BUDGET_UNAVAILABLE','RECORD_FAILED','RECORDER_FAILED'].includes(result.status)){
    state.paused=true;state.reason=result.status;

@@ -1,13 +1,20 @@
 import assert from 'node:assert/strict';
-export function patchRecorder(source){
+export function patchRecorder(source,sourceHash){
+ assert.match(sourceHash,/^[a-f0-9]{64}$/);
  let s=source;
  const once=(a,b)=>{assert.equal(s.split(a).length,2,'RECORDER_PATCH_ANCHOR '+a.slice(0,70));s=s.replace(a,b);};
- s="import {recordFTScan} from './worker-recorder.mjs';\n"+s;
+ s="import {recordFTDecision} from './decision-trace.mjs';\nconst FT_REPLAY_CODE_HASH='"+sourceHash+"';\nimport {recordFTScan} from './worker-recorder.mjs';\n"+s;
+ once("const fixtureStarted=Date.now();","const fixtureStarted=Date.now();const ftReplayContext={observation:null,evaluation:null,market_rows:null,devices:[],state:'NOT_EVALUATED',reason:'STATS_UNAVAILABLE'};");
  once("const ftCatalog=await api('/fixtures',{live:'all'},true);","const ftCatalog=await api('/fixtures',{live:'all'},true);const ftCatalogReceivedAt=Date.now();");
  once("const rows=await api(path,params,name==='stats'||name==='half');","const rows=await api(path,params,name==='stats'||name==='half');ftSourceReceipts[name]=Date.now();");
  once("ftSourceReceipts[name]=Date.now();health[name]=rows.length", "health[name]=rows.length");
  once("catch(e){health[name]='ERROR';","catch(e){ftSourceReceipts[name]=Date.now();health[name]='ERROR';");
  once("if(sourceWarnings.length){status.warnings.push(",
- "try{const capturedAt=Date.now();this.ftReplayLast=await recordFTScan(this,{id:String(id)+':'+capturedAt+':'+crypto.randomUUID(),fixture:f,fixtureReceivedAt:ftCatalogReceivedAt,capturedAt,health,receipts:ftSourceReceipts,payloads:{stats,events,odds,half}});}catch{this.ftReplayLast={status:'HOOK_FAILED'};}\n          if(sourceWarnings.length){status.warnings.push(");
+ "try{const capturedAt=Date.now(),observationId=String(id)+':'+capturedAt+':'+crypto.randomUUID();this.ftReplayLast=await recordFTScan(this,{id:observationId,fixture:f,fixtureReceivedAt:ftCatalogReceivedAt,capturedAt,health,receipts:ftSourceReceipts,payloads:{stats,events,odds,half}});if(['STORED','DUPLICATE'].includes(this.ftReplayLast.status))ftReplayContext.observation={id:observationId,fixture_id:id,decision_at:capturedAt};}catch{this.ftReplayLast={status:'HOOK_FAILED'};}\n          if(sourceWarnings.length){status.warnings.push(");
+
+ once("const goalEstimates={};","const goalEstimates={};ftReplayContext.state='EVALUATED';ftReplayContext.reason=null;ftReplayContext.evaluation=ft.eval;ftReplayContext.market_rows=compact;");
+ once("goalEstimates[d.id]=goal;","goalEstimates[d.id]=goal;ftReplayContext.devices.push({device_slot:devices.indexOf(d),goal_estimate:goal??null,threshold:dp.goalThreshold??null,candidate:candidate??null,crossing_requested:check.send===true});");
+ once("}catch(e){status.errors.push({fixture:id,error:errText(e)})}","}catch(e){ftReplayContext.state='ERROR';ftReplayContext.reason='SCAN_ERROR';ftReplayContext.evaluation=null;status.errors.push({fixture:id,error:errText(e)})}");
+ once("item.lastAt=Date.now();const bytes=", "if(ftReplayContext.observation){try{this.ftReplayDecisionLast=await recordFTDecision(this,{...ftReplayContext,decision_at:Date.now(),source_hash:FT_REPLAY_CODE_HASH});}catch{this.ftReplayDecisionLast={status:'HOOK_FAILED'};}}\n        item.lastAt=Date.now();const bytes=");
  return s;
 }

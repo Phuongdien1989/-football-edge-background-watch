@@ -10,20 +10,21 @@ const canonical=v=>{
 export const INSERT_SQL='INSERT INTO ft_replay_records_v1 (record_id,kind,observation_id,fixture_id,recorded_at,content_hash,payload_json) VALUES(?,?,?,?,?,?,?) ON CONFLICT(record_id) DO NOTHING';
 export const READ_SQL='SELECT content_hash FROM ft_replay_records_v1 WHERE record_id=?';
 export async function prepareRecord(kind,payload,maxBytes){
- if(!['OBSERVATION','OUTCOME'].includes(kind)||!payload||!Number.isSafeInteger(maxBytes)||maxBytes<=0)throw Error('INVALID_LEDGER_INPUT');
+ if(!['OBSERVATION','DECISION','OUTCOME'].includes(kind)||!payload||!Number.isSafeInteger(maxBytes)||maxBytes<=0)throw Error('INVALID_LEDGER_INPUT');
  // Enforce JSON semantics; undefined/nonfinite values cannot silently change meaning.
  const text=canonical(payload);
  let decoded;try{decoded=JSON.parse(text)}catch{throw Error('NON_JSON_PAYLOAD');}
  if(!Number.isSafeInteger(decoded.fixture_id)||decoded.fixture_id<=0)throw Error('INVALID_FIXTURE');
  const observation_id=kind==='OBSERVATION'?decoded.id:decoded.observation_id;
- const recorded_at=kind==='OBSERVATION'?decoded.decision_at:decoded.observed_at;
+ const recorded_at=kind==='OUTCOME'?decoded.observed_at:decoded.decision_at;
  if(typeof observation_id!=='string'||!observation_id||!Number.isSafeInteger(recorded_at)||recorded_at<=0)throw Error('INVALID_RECORD_IDENTITY');
  if(kind==='OBSERVATION'&&decoded.schema!=='FT_OBSERVATION_V1_DRAFT')throw Error('INVALID_OBSERVATION_SCHEMA');
+ if(kind==='DECISION'&&(decoded.schema!=='FT_DECISION_V1_DRAFT'||!['EVALUATED','NOT_EVALUATED','ERROR'].includes(decoded.state)))throw Error('INVALID_DECISION_SCHEMA');
  if(kind==='OUTCOME'&&(decoded.schema!=='FT_OUTCOME_V2_DRAFT'||decoded.state!=='RESOLVED'))throw Error('UNRESOLVED_OUTCOME');
  const bytes=new TextEncoder().encode(text);if(bytes.byteLength>maxBytes)throw Error('RECORD_TOO_LARGE');
  const content_hash=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',bytes)),x=>x.toString(16).padStart(2,'0')).join('');
  // Same observation key with changed contents is rejected; outcome revisions append.
- const record_id=kind==='OBSERVATION'?'OBS:'+observation_id:'OUT:'+observation_id+':'+recorded_at+':'+content_hash;
+ const record_id=kind==='OBSERVATION'?'OBS:'+observation_id:kind==='DECISION'?'DEC:'+observation_id+':'+recorded_at+':'+content_hash:'OUT:'+observation_id+':'+recorded_at+':'+content_hash;
  return {record_id,kind,observation_id,fixture_id:decoded.fixture_id,recorded_at,content_hash,payload_json:text,bytes:bytes.byteLength};
 }
 export async function appendRecord(db,kind,payload,{enabled=false,maxBytes}={}){
