@@ -21,6 +21,9 @@ jobs:
           path: baseline
       - run: node ft-audit-fix/build.mjs
       - run: node ft-audit-fix/test.mjs
+      - run: node ft-audit-fix/test-events.mjs
+      - run: node ft-audit-fix/test-integration.mjs
+      - run: node --check ft-audit-output/candidate/worker_notify_v130.js
       - run: node --check ft-audit-output/candidate/notify-core.js
       - uses: actions/upload-artifact@v4
         if: always()
@@ -29,6 +32,7 @@ jobs:
           path: ft-audit-output/
           retention-days: 90
   inventory:
+    if: false # Completed read-only inventory retained in checkpoint; event-only changes need no new D1 reads.
     runs-on: ubuntu-latest
     timeout-minutes: 6
     environment: football-edge-production
