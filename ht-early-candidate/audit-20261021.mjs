@@ -5,6 +5,7 @@ import {refreshH1Watch} from './mobile-collection.mjs';
 import {assessHTItem} from './assess-item.mjs';
 import {priceOver,settlement} from '../ft-overview/core.mjs';
 import {createHTSessionBook} from './recommendation-session.mjs';
+import {createHTEvents} from './events.mjs';
 const now=1792542600000,checks=[],findings=[];
 function check(name,fn){fn();checks.push({name,status:'PASS'});}
 const fixture={fixture:{id:990001,timestamp:Math.floor((now-18*60000)/1000)},teams:{home:{id:1},away:{id:2}}};
@@ -22,16 +23,16 @@ check('session waits on stale data and preserves original contract',()=>{const i
 check('session invalidates when updated score actually reaches it',()=>{const i=item(),b=createHTSessionBook();b.update(i,assessHTItem(i,context,now),now);i.latest.goals.home=1;assert.equal(b.update(i,assessHTItem(i,context,now+1000),now+1000).closeReason,'SCORE_CHANGED');});
 async function duplicateGoal(){
  const i=item(),history=[{fresh_at:now,captured_at:now,goals:{home:0,away:0}}],pool=new Map([[i.id,{...i,history}]]),f={...structuredClone(fixture),fixture:{...fixture.fixture,status:{short:'1H',elapsed:18}},goals:{home:1,away:0}};
- const c=vm.createContext({Date:class extends Date{static now(){return now+1000;}},Map,Set,Number,Math,JSON,Promise,HTCollection:{isEarly:()=>true,eligible:()=>true,plan:()=>[f],appendHistory:()=>({accepted:false})},
+ const c=vm.createContext({HTEvents:createHTEvents(),h1WatchWriteHistory(){},Date:class extends Date{static now(){return now+1000;}},Map,Set,Number,Math,JSON,Promise,HTCollection:{isEarly:()=>true,eligible:()=>true,plan:()=>[f],appendHistory:()=>({accepted:false})},
   H1_COLLECTION:{generation:1,pool,history:{beginCycle(){}}},H1_WATCH_MAX_ITEMS:5,h1WatchState:{active:true,refreshing:false,items:[],cycle:0},document:{visibilityState:'visible'},clearTimeout(){},ultraHeartbeat:async()=>({rows:[f]}),h1WatchEligible:()=>true,
   fetchH1CollectionSnapshot:async()=>({...i.latest,goals:{home:1,away:0},fixture:f}),mapLimit:async(a,n,fn)=>{for(const x of a)await fn(x);},renderH1Watch(){},status(){},$(){},ultraHubSummary(){return '';},scheduleH1Watch(){}});
  await vm.runInContext('('+refreshH1Watch.toString()+')',c)();return {observedGoal:f.goals.home,storedGoal:pool.get(i.id).latest.goals.home,resetAt:pool.get(i.id).resetAt??null};
 }
 const goal=await duplicateGoal();if(goal.observedGoal!==goal.storedGoal)findings.push({id:'HT-A01',severity:'HIGH',acceptance:'FAIL',reason:'Known new score discarded with duplicate stats timestamp; old recommendation not invalidated immediately',reproduction:goal});
-const html=readFileSync('previous-mobile/site/index.html','utf8');
+const html=readFileSync(process.env.HT_AUDIT_HTML||'previous-mobile/site/index.html','utf8');
 const resetSource=html.slice(html.indexOf('  function h1WatchResetEvent('),html.indexOf('  function h1WatchWhy('));
 assert(resetSource.includes('function h1WatchResetEvent'));
-const reset=vm.runInNewContext('('+resetSource.trim()+')');
+const reset=vm.runInNewContext('('+resetSource.trim()+')',{HTEvents:createHTEvents()});
 const previous={goals:{home:1,away:0},metrics:{total:{red:0}}},corrected={goals:{home:0,away:0},metrics:{total:{red:0}}};
 const correctionEvent=reset(previous,corrected);if(correctionEvent===null)findings.push({id:'HT-A02',severity:'HIGH',acceptance:'FAIL',reason:'VAR/score correction does not reset legacy HT continuity or cooldown',reproduction:{before:'1-0',after:'0-0',resetEvent:correctionEvent}});
 assert(!html.includes('rankHT('),'Ranking wiring changed; re-review required');

@@ -95,8 +95,10 @@ export async function refreshH1Watch(quiet=false) {
     for(const incoming of h1WatchState.items||[])if(ids.has(Number(incoming.id))&&incoming.serverRow&&incoming.latest?.source==='NOTIFY_SERVER') {
       const old=H1_COLLECTION.pool.get(Number(incoming.id));
       if(old&&Number(old.latest?.fresh_at||0)>=Number(incoming.latest?.fresh_at||0))continue;
+      if(old?.lastHTEvent&&Number(incoming.latest?.fresh_at||0)<=Number(old.resetAt||0))continue;
       const rows=new Map([...(old?.history||[]),...(incoming.history||[])].map(s=>[s.source_stats_at??s.fresh_at??s.captured_at,s]));
-      const item={...old,...incoming,history:[...rows.values()].sort((a,b)=>a.captured_at-b.captured_at).slice(-90)};
+      if(old)HTEvents.apply(old,incoming.latest,Date.now());
+      const item={...old,...incoming,resetAt:Math.max(old?.resetAt||0,incoming.resetAt||0),cooldownUntil:Math.max(old?.cooldownUntil||0,incoming.cooldownUntil||0),history:[...rows.values()].sort((a,b)=>a.captured_at-b.captured_at).slice(-90)};
       item.eval=h1WatchEvaluate(item,item.latest);h1WatchApplyState(item,item.latest,null);
       H1_COLLECTION.pool.set(Number(item.id),item);
     }
@@ -112,8 +114,13 @@ export async function refreshH1Watch(quiet=false) {
       const item=H1_COLLECTION.pool.get(f.fixture.id),oldState=item.state,previous=item.latest;
       item.lastProbeAt=Date.now();
       try {
+        // A known fixture event must not wait for a fresh statistics response.
+        const fixtureEvent=HTEvents.apply(item,{goals:f.goals,status:f.fixture.status.short,minute:f.fixture.status.elapsed,fixture:f},Date.now());
+        if(fixtureEvent){h1WatchWriteHistory(item);return;}
         const s=await fetchH1CollectionSnapshot(item,f,session);if(!alive()||!s)return;
         if(s.ended){item.state='ENDED';return;}
+        const event=HTEvents.apply(item,s,Date.now());
+        if(event){h1WatchWriteHistory(item);return;}
         const accepted=HTCollection.appendHistory(item.history,s,Date.now());
         if(!accepted.accepted){
           // A new quote must reach the card even when stats reuse the same source

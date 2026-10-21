@@ -5,6 +5,7 @@ import {execFileSync} from 'node:child_process';
 import {createHTTemporal} from './temporal.mjs';
 import {createHTHistoryCache} from './history.mjs';
 import {createHTCollection} from './collection.mjs';
+import {createHTEvents} from './events.mjs';
 import * as mobileCollection from './mobile-collection.mjs';
 const original=process.argv[2]||'ft-overview/frozen-original-mobile.html';
 const backendPath=process.argv[3]||'notify-core-h1.js';
@@ -39,13 +40,15 @@ function patch(source,isMobile) {
   }
   const marker=isMobile?'  function h1WatchFindBaseline(':'function findBaseline(';
   const injection=isMobile?'  const HTTemporal=('+createHTTemporal.toString()+')();\n  const HTCollection=('+createHTCollection.toString()+')();\n  const H1_COLLECTION={pool:new Map(),generation:0,history:('+createHTHistoryCache.toString()+')()};\n'+mobileCollection.fetchH1CollectionSnapshot.toString()+'\n'+mobileCollection.loadHTCollectionContext.toString()+'\n'+"  Object.defineProperty(window,'FEHTCandidateBridge',{value:Object.freeze({read:()=>feUICopy({context:H1_COLLECTION.context??null,items:h1WatchState.items.map(it=>({id:it.id,home:it.home,away:it.away,league:it.league,latest:it.latest,history:it.history,resetAt:it.resetAt,cooldownUntil:it.cooldownUntil,lastMarketAt:it.lastMarketAt,htContext:it.htContext}))})}),writable:false,configurable:false});\n":"const HTTemporal=createHTTemporal();\nconst HTCollection=createHTCollection();\n";
-  replace(marker,injection+marker);
+  replace(marker,(isMobile?'  const HTEvents=('+createHTEvents.toString()+')();\n':'')+injection+marker);
   if(!isMobile)replace("import {createEngine as createBaseEngine} from './notify-core.js';","import {createEngine as createBaseEngine} from '../../../notify-core.js';\nimport {createHTTemporal} from '../../temporal.mjs';\nimport {createHTCollection} from '../../collection.mjs';");
   const oldEval=extract(out,'h1WatchEvaluate',isMobile?'  ':'');
   const newEval=oldEval.replace('h1WatchEvaluate(item,s){','h1WatchEvaluate(item,s){\n    if(HTCollection.isEarly(s))return HTCollection.earlyEvaluation(item,s,HTTemporal);').replace('return {score,rawScore,','return {h1_temporal:true,accelValid:mom.accelValid,accelKind:mom.accelKind,score,rawScore,');
   assert.notEqual(oldEval,newEval);replace(oldEval,newEval);
   if(isMobile)replace('  function qsigTrend(e){','  function qsigTrend(e){\n    if(e?.h1_temporal)return HTTemporal.trend(e);');
   if(isMobile) {
+    const reset=extract(out,'h1WatchResetEvent','  ');
+    replace(reset.slice(0,reset.lastIndexOf('}')+1),'  function h1WatchResetEvent(prev,s){return HTEvents.classify(prev,s);}');
     const oldEligible=extract(out,'h1WatchEligible','  ');
     replace(oldEligible.slice(0,oldEligible.lastIndexOf('}')+1),'  function h1WatchEligible(f){return feLiveSourceValid(f)&&HTCollection.eligible(f);}');
     for(const name of ['startH1Watch','refreshH1Watch','scheduleH1Watch','stopH1Watch']) {
@@ -88,3 +91,4 @@ writeFileSync('ht-early-candidate/generated/backend/worker_notify_v130.js',w.out
 const report={status:'PASS',candidate_only:true,production_deployed:false,baseline_commit:'c929b091e448fd99d751360705fc29a488e7fbf3',mobile_baseline_sha256:hash(mobile),backend_baseline_blob:blob(backend),worker_baseline_blob:blob(worker),mobile_candidate_sha256:hash(m.out),backend_candidate_sha256:hash(b.out),worker_candidate_sha256:hash(w.out),shared_factory_sha256:hash(createHTTemporal.toString()),collection_factory_sha256:hash(createHTCollection.toString()),exact_scope_reconstruction:true,mobile_patches:m.patches,backend_patches:b.patches,worker_patches:w.patches};
 writeFileSync('ht-early-candidate/generated/build-report.json',JSON.stringify(report,null,2)+'\n');
 console.log(JSON.stringify({status:report.status,candidate_only:true,exact_scope_reconstruction:true}));
+

@@ -4,6 +4,7 @@ import vm from 'node:vm';
 import {createHTCollection} from './collection.mjs';
 import {createHTTemporal} from './temporal.mjs';
 import {createHTHistoryCache} from './history.mjs';
+import {createHTEvents} from './events.mjs';
 import * as mobileFunctions from './mobile-collection.mjs';
 let now=1792526400000;
 class Clock extends Date {static now(){return now;}}
@@ -54,7 +55,7 @@ await check('early evidence has no strength probability, recommendation or Push 
   const gate=vm.createContext({});vm.runInContext(worker.match(/function h1Gate\([\s\S]*?\n}\n/)[0],gate);assert.equal(gate.h1Gate(e,1),false);
 });
 function makeMobile() {
-  const calls=[],timers=[],writes=[],errors=[],ctx=vm.createContext({Date:Clock,Math,Map,Set,Number,Object,Array,Promise,HTCollection:policy,HTTemporal:temporal,H1_COLLECTION:{pool:new Map(),generation:0,history:{beginCycle(){},contextFor:async base=>base}},H1_WATCH_MAX_ITEMS:5,
+  const calls=[],timers=[],writes=[],errors=[],ctx=vm.createContext({HTEvents:createHTEvents(),Date:Clock,Math,Map,Set,Number,Object,Array,Promise,HTCollection:policy,HTTemporal:temporal,H1_COLLECTION:{pool:new Map(),generation:0,history:{beginCycle(){},contextFor:async base=>base}},H1_WATCH_MAX_ITEMS:5,
     loadHTCollectionContext:async()=>({at:now,rows:[]}),h1WatchState:{active:false,refreshing:false,items:[],cycle:0},ULTRA_HUB:{heartbeat:{at:now},entries:new Map()},ULTRA_HUB_POLICY:{BACKGROUND:{stats:18000}},
     document:{visibilityState:'visible'},els:{fkey:{value:'TEST_PLACEHOLDER'}},$:()=>({checked:true}),status:(el,msg,type)=>{if(type==='err')errors.push(msg);},showToast:()=>{},
     clearTimeout:()=>{},setTimeout:(f,ms)=>{timers.push(ms);return timers.length;},h1WatchNextInterval:()=>22000,updateH1WatchClock:()=>{},

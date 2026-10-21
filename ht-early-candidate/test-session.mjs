@@ -4,6 +4,7 @@ import vm from 'node:vm';
 import {createHTSessionBook,SESSION_MS} from './recommendation-session.mjs';
 import {assessHTItem} from './assess-item.mjs';
 import {createHTCollection} from './collection.mjs';
+import {createHTEvents} from './events.mjs';
 import {fetchH1CollectionSnapshot,refreshH1Watch} from './mobile-collection.mjs';
 let now=1792542600000,count=0;const cases=[];
 const check=async(name,fn)=>{await fn();cases.push({name,status:'PASS'});count++;};
@@ -45,7 +46,7 @@ await check('market failure does not make stale price fresh or erase valid stats
 await check('OFF prevents all market acquisition',async()=>{const a=acquisition({stopped:true,cached:false});assert.equal(await a.run(),null);assert.equal(a.calls(),0);});
 await check('market-only refresh keeps stats source identity and history unchanged',async()=>{
  const i=item(),before=i.latest.fresh_at,history=[{fresh_at:before}],pool=new Map([[i.id,{...i,history}]]),f=fixture();
- const c=vm.createContext({Date:class extends Date{static now(){return now;}},Map,Set,Number,Math,JSON,Promise,HTCollection:{isEarly:()=>true,eligible:()=>true,plan:()=>[f],appendHistory:()=>({accepted:false})},
+ const c=vm.createContext({HTEvents:createHTEvents(),Date:class extends Date{static now(){return now;}},Map,Set,Number,Math,JSON,Promise,HTCollection:{isEarly:()=>true,eligible:()=>true,plan:()=>[f],appendHistory:()=>({accepted:false})},
   H1_COLLECTION:{generation:1,pool,history:{beginCycle(){}}},H1_WATCH_MAX_ITEMS:5,h1WatchState:{active:true,refreshing:false,items:[],cycle:0},
   document:{visibilityState:'visible'},clearTimeout(){},ultraHeartbeat:async()=>({rows:[f]}),h1WatchEligible:()=>true,
   fetchH1CollectionSnapshot:async()=>({...i.latest,market_at:before+1000,market_rows:[{newQuote:true}]}),mapLimit:async(a,n,fn)=>{for(const x of a)await fn(x);},

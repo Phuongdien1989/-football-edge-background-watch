@@ -19,7 +19,9 @@ jobs:
           github-token: ${{ github.token }}
           path: previous-mobile
       - run: node ht-early-candidate/test-session.mjs
-      - name: Accept HT only if known event regressions are absent
+      - run: node ht-early-candidate/build-events-release.mjs
+      - name: Accept HT event fixes only if known regressions are absent
+        env: {HT_AUDIT_HTML: ht-event-release/site/index.html}
         run: node ht-early-candidate/audit-20261021.mjs
       - uses: actions/upload-artifact@v4
         if: always()

@@ -1,0 +1,76 @@
+name: HT event transport and VAR correction release
+on:
+  push:
+    branches: [feature/ht-review-session-20261021]
+    paths: ['ht-early-candidate/events.mjs', 'ht-early-candidate/mobile-collection.mjs', 'ht-early-candidate/*events*.mjs', '.github/workflows/ht-events-approved.yml']
+permissions: {contents: read, actions: read}
+concurrency:
+  group: fe-football-edge-mobile-production
+  cancel-in-progress: false
+jobs:
+  release:
+    if: startsWith(github.event.head_commit.message, 'release(ht-events):')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: football-edge-production
+    env: {WRANGLER_SEND_METRICS: 'false'}
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - uses: actions/download-artifact@v4
+        with:
+          name: football-edge-compact-ht-card-release
+          run-id: 39543122656
+          github-token: ${{ github.token }}
+          path: previous-mobile
+      - run: node ht-early-candidate/build-events-release.mjs
+      - run: node ht-early-candidate/test-events.mjs
+      - run: node ht-early-candidate/test-session.mjs
+      - name: Recheck both reproduced defects against candidate HTML
+        env: {HT_AUDIT_HTML: ht-event-release/site/index.html}
+        run: node ht-early-candidate/audit-20261021.mjs
+      - run: npm install --no-save wrangler@4 playwright@1.58.2
+      - run: npx playwright install --with-deps webkit
+      - run: node ht-early-candidate/test-ui-browser.cjs --preview
+      - name: Check existing services and exact rollback
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node ht-early-candidate/release-events.mjs prepare
+      - uses: actions/upload-artifact@v4
+        with:
+          name: football-edge-pre-ht-events-backup
+          path: |
+            ht-event-release/backup/
+            ht-event-release/manifest.json
+          retention-days: 90
+      - run: npx wrangler deploy --dry-run --config ht-event-release/wrangler.json
+      - name: Publish HT event guard
+        id: deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node ht-early-candidate/release-events.mjs deploy
+      - run: node ht-early-candidate/test-ui-browser.cjs
+      - name: Verify release and unchanged backend
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node ht-early-candidate/release-events.mjs verify
+      - name: Restore exact previous Mobile if acceptance fails
+        if: failure() && steps.deploy.outcome == 'success'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node ht-early-candidate/release-events.mjs rollback
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: football-edge-ht-event-release
+          path: |
+            ht-event-release/
+            ht-ui-release/qa/
+            ht-audit/
+          retention-days: 90
