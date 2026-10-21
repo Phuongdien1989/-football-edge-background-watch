@@ -4,6 +4,7 @@ import vm from 'node:vm';
 import {createHTCollection} from './collection.mjs';
 import {createHTTemporal} from './temporal.mjs';
 import {createHTHistoryCache} from './history.mjs';
+import {createHTEvents} from './events.mjs';
 import * as mobileFunctions from './mobile-collection.mjs';
 let now=1792526400000;
 class Clock extends Date {static now(){return now;}}
@@ -54,7 +55,7 @@ await check('early evidence has no strength probability, recommendation or Push 
   const gate=vm.createContext({});vm.runInContext(worker.match(/function h1Gate\([\s\S]*?\n}\n/)[0],gate);assert.equal(gate.h1Gate(e,1),false);
 });
 function makeMobile() {
-  const calls=[],timers=[],writes=[],errors=[],ctx=vm.createContext({Date:Clock,Math,Map,Set,Number,Object,Array,Promise,HTCollection:policy,HTTemporal:temporal,H1_COLLECTION:{pool:new Map(),generation:0,history:{beginCycle(){},contextFor:async base=>base}},H1_WATCH_MAX_ITEMS:5,
+  const calls=[],timers=[],writes=[],errors=[],ctx=vm.createContext({HTEvents:createHTEvents(),Date:Clock,Math,Map,Set,Number,Object,Array,Promise,HTCollection:policy,HTTemporal:temporal,H1_COLLECTION:{pool:new Map(),generation:0,history:{beginCycle(){},contextFor:async base=>base}},H1_WATCH_MAX_ITEMS:5,
     loadHTCollectionContext:async()=>({at:now,rows:[]}),h1WatchState:{active:false,refreshing:false,items:[],cycle:0},ULTRA_HUB:{heartbeat:{at:now},entries:new Map()},ULTRA_HUB_POLICY:{BACKGROUND:{stats:18000}},
     document:{visibilityState:'visible'},els:{fkey:{value:'TEST_PLACEHOLDER'}},$:()=>({checked:true}),status:(el,msg,type)=>{if(type==='err')errors.push(msg);},showToast:()=>{},
     clearTimeout:()=>{},setTimeout:(f,ms)=>{timers.push(ms);return timers.length;},h1WatchNextInterval:()=>22000,updateH1WatchClock:()=>{},
@@ -126,11 +127,11 @@ function makeAcquisition({activeStats=false}={}) {
   vm.runInContext(mobileFunctions.fetchH1CollectionSnapshot.toString(),ctx);
   return {...m,network,persist};
 }
-await check('actual shared HUB acquisition: quiet early fixture costs one stats probe, cached repeat costs zero',async()=>{
+await check('quiet early fixture independently obtains stats and price; cached repeat costs zero',async()=>{
   const m=makeAcquisition(),item={id:1,history:[]};
   const s=await m.ctx.fetchH1CollectionSnapshot(item,fixtures[0],0);
-  assert.equal(m.network.length,1);assert.equal(m.network[0].path,'/fixtures/statistics');assert.equal(s.fresh_at,now);
-  await m.ctx.fetchH1CollectionSnapshot(item,fixtures[0],0);assert.equal(m.network.length,1);
+  assert.equal(m.network.length,2);assert.equal(m.network[0].path,'/fixtures/statistics');assert.equal(m.network[1].path,'/odds/live');assert.equal(s.fresh_at,now);
+  await m.ctx.fetchH1CollectionSnapshot(item,fixtures[0],0);assert.equal(m.network.length,2);
 });
 await check('actual shared HUB acquisition deepens activity without duplicating stats or requesting half/player history',async()=>{
   const m=makeAcquisition({activeStats:true}),s=await m.ctx.fetchH1CollectionSnapshot({id:1,history:[]},fixtures[0],0);
@@ -139,7 +140,7 @@ await check('actual shared HUB acquisition deepens activity without duplicating 
 });
 await check('actual shared HUB reuses nested heartbeat statistics without another provider call',async()=>{
   const m=makeAcquisition(),f={...fixtures[0],statistics:[{total:{shots:0,sot:0,inbox:0,corners:0,xg:0,red:0}}]};
-  await m.ctx.fetchH1CollectionSnapshot({id:1,history:[]},f,0);assert.equal(m.network.length,0);
+  await m.ctx.fetchH1CollectionSnapshot({id:1,history:[]},f,0);assert.equal(m.network.length,1);assert.equal(m.network[0].path,'/odds/live');
 });
 await check('fresh verified server snapshot is reused without requests or a renewed timestamp',async()=>{
   const m=makeAcquisition(),s={...snap(8,now-10000),source:'NOTIFY_SERVER'},item={id:1,latest:s,serverRow:{source_health:{stats:'OK'}}};
@@ -207,3 +208,4 @@ await check('unrelated FT/HC entrypoints in Mobile remain byte-identical',()=>{
 });
 writeFileSync('ht-early-candidate/generated/collection-test-report.json',JSON.stringify({status:'PASS',tests:count,production_deployed:false,real_provider_calls:0,real_d1_writes:0,backend_replay:{extra_api_calls:0,extra_storage_operations:0},mobile:{max_detail_fixtures_per_existing_round:5,oldest_first_scout_slot:1,new_timers:0},remaining:['precise HT valuation before minute20','browser and real-phone acceptance','production rollout and real quota measurement']},null,2)+'\n');
 console.log(JSON.stringify({status:'PASS',tests:count}));
+

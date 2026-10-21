@@ -48,6 +48,23 @@ export async function fetchH1CollectionSnapshot(item,f,session) {
     // First stats probe is reused by ULTRA HUB; deepen only measured activity.
     u=await ultraLiveRaw(f,item,'H1',false);
     if(!alive())return null;
+  }else {
+    // Price acquisition has its own shared cache cadence, independent of shots.
+    // Keep the quiet path light: no new events/half/player calls or timers.
+    try {
+      await ultraField(entry,'market',ULTRA_HUB_POLICY.BACKGROUND.market,async()=>{
+        if(!alive())throw Error('HT_COLLECTION_STOPPED');
+        const rows=await football('/odds/live',{fixture:item.id},true);
+        if(!Array.isArray(rows))throw Error('HT_MARKET_INVALID_RESPONSE');
+        return rows;
+      },false);
+    }catch(e){item.htMarketError=String(e.message||e).slice(0,100);}
+    if(!alive())return null;
+    let liveRef={byId:{}};
+    try{liveRef=await getBetReference('live');}catch{}
+    if(!alive())return null;
+    u={liveOdds:oddsCompact(entry.fields.market?.data||[],true,{homeName:f.teams?.home?.name,awayName:f.teams?.away?.name,betRefs:{live:liveRef,prematch:{byId:{}}}}),
+      eventsRaw:entry.fields.events?.data||[],marketAt:entry.fields.market?.at??null};
   }
   const markets=u?.liveOdds||[],events=eventsCompact(u?.eventsRaw||[]),q=groupCoverageScore('FT',{live_statistics:raw,events,live_odds:markets}),at=entry.fields.stats?.at;
   return {captured_at:at,fresh_at:at,minute:f.fixture.status.elapsed,status:f.fixture.status.short,goals:f.goals,metrics,stats_presence:presence,data_health:watchDataHealth(presence,null),
@@ -78,8 +95,10 @@ export async function refreshH1Watch(quiet=false) {
     for(const incoming of h1WatchState.items||[])if(ids.has(Number(incoming.id))&&incoming.serverRow&&incoming.latest?.source==='NOTIFY_SERVER') {
       const old=H1_COLLECTION.pool.get(Number(incoming.id));
       if(old&&Number(old.latest?.fresh_at||0)>=Number(incoming.latest?.fresh_at||0))continue;
+      if(old?.lastHTEvent&&Number(incoming.latest?.fresh_at||0)<=Number(old.resetAt||0))continue;
       const rows=new Map([...(old?.history||[]),...(incoming.history||[])].map(s=>[s.source_stats_at??s.fresh_at??s.captured_at,s]));
-      const item={...old,...incoming,history:[...rows.values()].sort((a,b)=>a.captured_at-b.captured_at).slice(-90)};
+      if(old)HTEvents.apply(old,incoming.latest,Date.now());
+      const item={...old,...incoming,resetAt:Math.max(old?.resetAt||0,incoming.resetAt||0),cooldownUntil:Math.max(old?.cooldownUntil||0,incoming.cooldownUntil||0),history:[...rows.values()].sort((a,b)=>a.captured_at-b.captured_at).slice(-90)};
       item.eval=h1WatchEvaluate(item,item.latest);h1WatchApplyState(item,item.latest,null);
       H1_COLLECTION.pool.set(Number(item.id),item);
     }
@@ -95,10 +114,23 @@ export async function refreshH1Watch(quiet=false) {
       const item=H1_COLLECTION.pool.get(f.fixture.id),oldState=item.state,previous=item.latest;
       item.lastProbeAt=Date.now();
       try {
+        // A known fixture event must not wait for a fresh statistics response.
+        const fixtureEvent=HTEvents.apply(item,{goals:f.goals,status:f.fixture.status.short,minute:f.fixture.status.elapsed,fixture:f},Date.now());
+        if(fixtureEvent){h1WatchWriteHistory(item);return;}
         const s=await fetchH1CollectionSnapshot(item,f,session);if(!alive()||!s)return;
         if(s.ended){item.state='ENDED';return;}
+        const event=HTEvents.apply(item,s,Date.now());
+        if(event){h1WatchWriteHistory(item);return;}
         const accepted=HTCollection.appendHistory(item.history,s,Date.now());
-        if(!accepted.accepted)return;
+        if(!accepted.accepted){
+          // A new quote must reach the card even when stats reuse the same source
+          // observation. Do not append history or renew the stats timestamp.
+          const old=item.latest;
+          if(old&&s.fresh_at===old.fresh_at&&Date.now()-s.fresh_at<=55000&&s.status===old.status&&s.goals?.home===old.goals?.home&&s.goals?.away===old.goals?.away){
+            item.latest={...old,market_rows:s.market_rows,market_at:s.market_at??item.lastMarketAt??null,market:s.market};
+          }
+          return;
+        }
         const ev=h1WatchResetEvent(previous,s);
         item.latest=accepted.observation;item.history=accepted.history;item.initialDQ=s.dq;item.initialIntegrity=s.integrity;
         item.dataHealth=s.data_health;item.collectionActive=HTCollection.activity(s,previous);
@@ -147,3 +179,4 @@ export function stopH1Watch(silent=false) {
   h1WatchState.active=false;clearTimeout(h1WatchState.timer);h1WatchState.nextAt=0;updateH1WatchClock();
   if(!silent)status($('h1WatchStatus'),'Đã dừng HT collection. Lịch sử đã thu được giữ nguyên.','ok');
 }
+

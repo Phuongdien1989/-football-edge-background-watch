@@ -1,0 +1,85 @@
+name: HT market transport and five-minute review
+on:
+  push:
+    branches: [feature/ht-review-session-20261021]
+permissions: {contents: read, actions: read}
+concurrency:
+  group: fe-football-edge-mobile-production
+  cancel-in-progress: false
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - run: node ht-early-candidate/build.mjs
+      - run: node ht-early-candidate/test-collection.mjs
+      - run: node ht-early-candidate/test-session.mjs
+      - run: node --check ht-early-candidate/ui.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ht-session-source-tests
+          path: ht-early-candidate/generated/*report.json
+  release:
+    needs: test
+    if: >-
+      startsWith(github.event.head_commit.message, 'release(ht-session):')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: football-edge-production
+    env: {WRANGLER_SEND_METRICS: 'false'}
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - uses: actions/download-artifact@v4
+        with:
+          name: football-edge-ht-complete-candidate
+          run-id: 39491133238
+          github-token: ${{ github.token }}
+          path: accept-package
+      - run: node ht-early-candidate/build-session-release.mjs
+      - run: npm install --no-save wrangler@4 playwright@1.58.2
+      - run: npx playwright install --with-deps webkit
+      - name: Verify current HT deployment and recovery source
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node ht-early-candidate/release-session.mjs prepare
+      - name: Preserve current Mobile before publication
+        uses: actions/upload-artifact@v4
+        with:
+          name: football-edge-pre-session-mobile-backup
+          path: |
+            ht-session-release/backup/
+            ht-session-release/manifest.json
+          retention-days: 90
+      - run: npx wrangler deploy --dry-run --config ht-session-release/wrangler.json
+      - name: Publish Mobile-only session update
+        id: deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node ht-early-candidate/release-session.mjs deploy
+      - run: node ht-early-candidate/test-session-browser.cjs
+      - name: Verify released assets and untouched backend
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node ht-early-candidate/release-session.mjs verify
+      - name: Restore exact preceding Mobile on acceptance failure
+        if: failure() && steps.deploy.outcome == 'success'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node ht-early-candidate/release-session.mjs rollback
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: football-edge-ht-five-minute-session
+          path: ht-session-release/
+          retention-days: 90

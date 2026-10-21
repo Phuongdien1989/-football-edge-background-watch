@@ -1,0 +1,71 @@
+name: HT compact recommendation card
+on:
+  push:
+    branches: [feature/ht-review-session-20261021]
+    paths: ['ht-early-candidate/ui.mjs', 'ht-early-candidate/style.css', 'ht-early-candidate/*ui*.mjs', 'ht-early-candidate/test-ui-browser.cjs', '.github/workflows/ht-card-ui-approved.yml']
+permissions: {contents: read, actions: read}
+concurrency:
+  group: fe-football-edge-mobile-production
+  cancel-in-progress: false
+jobs:
+  release:
+    if: startsWith(github.event.head_commit.message, 'release(ht-ui):')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: football-edge-production
+    env: {WRANGLER_SEND_METRICS: 'false'}
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - uses: actions/download-artifact@v4
+        with:
+          name: football-edge-compact-ht-card-release
+          run-id: 39535215981
+          github-token: ${{ github.token }}
+          path: previous-mobile
+      - run: node --check ht-early-candidate/ui.mjs
+      - run: node ht-early-candidate/test-session.mjs
+      - run: node ht-early-candidate/build-ui-release.mjs
+      - run: npm install --no-save wrangler@4 playwright@1.58.2
+      - run: npx playwright install --with-deps webkit
+      - name: Verify layout and states before publication
+        run: node ht-early-candidate/test-ui-browser.cjs --preview
+      - name: Verify production and rollback
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node ht-early-candidate/release-ui.mjs prepare
+      - uses: actions/upload-artifact@v4
+        with:
+          name: football-edge-pre-ht-card-mobile-backup
+          path: |
+            ht-ui-release/backup/
+            ht-ui-release/manifest.json
+          retention-days: 90
+      - run: npx wrangler deploy --dry-run --config ht-ui-release/wrangler.json
+      - name: Publish approved HT presentation only
+        id: deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node ht-early-candidate/release-ui.mjs deploy
+      - run: node ht-early-candidate/test-ui-browser.cjs
+      - name: Verify published hashes and unchanged services
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node ht-early-candidate/release-ui.mjs verify
+      - name: Restore preceding Mobile on acceptance failure
+        if: failure() && steps.deploy.outcome == 'success'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node ht-early-candidate/release-ui.mjs rollback
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: football-edge-compact-ht-card-release
+          path: ht-ui-release/
+          retention-days: 90

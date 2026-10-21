@@ -1,0 +1,69 @@
+name: HT backend VAR correction release
+on:
+  push:
+    branches: [feature/ht-review-session-20261021]
+    paths: ['ht-early-candidate/*backend-events.mjs', '.github/workflows/ht-backend-events-approved.yml']
+permissions: {contents: read, actions: read}
+concurrency:
+  group: fe-football-edge-mobile-production
+  cancel-in-progress: false
+jobs:
+  release:
+    if: startsWith(github.event.head_commit.message, 'release(ht-backend-events):')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: football-edge-production
+    env: {WRANGLER_SEND_METRICS: 'false'}
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - uses: actions/download-artifact@v4
+        with:
+          name: football-edge-ht-complete-candidate
+          run-id: 39491133238
+          github-token: ${{ github.token }}
+          path: accept-package
+      - run: node ht-early-candidate/build-backend-events.mjs
+      - run: node ht-early-candidate/test-events.mjs
+      - run: npm install --no-save wrangler@4
+      - name: Verify scanner OFF, baseline, bindings and rollback
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node ht-early-candidate/release-backend-events.mjs prepare
+      - uses: actions/upload-artifact@v4
+        with:
+          name: football-edge-pre-backend-ht-events-backup
+          path: |
+            ht-backend-event-release/backup/
+            ht-backend-event-release/manifest.json
+          retention-days: 90
+      - run: npx wrangler deploy --dry-run --config ht-backend-event-release/candidate/.release.json
+      - name: Publish only backend HT correction handling
+        id: deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node ht-early-candidate/release-backend-events.mjs deploy
+      - name: Verify source, bindings and unchanged frontend versions
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node ht-early-candidate/release-backend-events.mjs verify
+      - name: Restore exact backend if acceptance fails
+        if: failure() && steps.deploy.outcome == 'success'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node ht-early-candidate/release-backend-events.mjs rollback
+      - name: Remove temporary runtime config from artifacts
+        if: always()
+        run: rm -f ht-backend-event-release/candidate/.release.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: football-edge-backend-ht-event-release
+          path: ht-backend-event-release/
+          retention-days: 90

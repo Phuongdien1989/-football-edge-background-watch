@@ -1,0 +1,57 @@
+name: HT mechanism acceptance audit
+on:
+  push:
+    branches: [feature/ht-review-session-20261021]
+    paths: ['ht-early-candidate/audit-*.mjs', '.github/workflows/ht-mechanism-audit.yml']
+permissions: {contents: read, actions: read}
+jobs:
+  mechanism:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - uses: actions/download-artifact@v4
+        with:
+          name: football-edge-compact-ht-card-release
+          run-id: 39543122656
+          github-token: ${{ github.token }}
+          path: previous-mobile
+      - run: node ht-early-candidate/test-session.mjs
+      - run: node ht-early-candidate/build-events-release.mjs
+      - name: Accept HT event fixes only if known regressions are absent
+        env: {HT_AUDIT_HTML: ht-event-release/site/index.html}
+        run: node ht-early-candidate/audit-20261021.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ht-mechanism-audit
+          path: ht-audit/
+          retention-days: 90
+  production-readonly:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: football-edge-production
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - uses: actions/download-artifact@v4
+        with:
+          name: football-edge-compact-ht-card-release
+          run-id: 39543122656
+          github-token: ${{ github.token }}
+          path: previous-mobile
+      - name: Verify current versions, assets and rollback using GET only
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node ht-early-candidate/audit-production-readonly.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ht-production-readonly-audit
+          path: ht-audit/
+          retention-days: 90

@@ -1,0 +1,16 @@
+name: HT decision contract preparation
+on:
+  push:
+    branches: [feature/ht-review-session-20261021]
+    paths: ['ht-early-candidate/decision-contract.mjs', 'ht-early-candidate/test-decision-contract.mjs', '.github/workflows/ht-decision-contract.yml']
+permissions: {contents: read}
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - run: node ht-early-candidate/test-decision-contract.mjs
+      - run: node ht-early-candidate/test-events.mjs
