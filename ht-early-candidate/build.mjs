@@ -67,6 +67,9 @@ function patch(source,isMobile) {
 function patchWorker(source) {
   let out=source;const changes=[];
   const replace=(before,after)=>{assert.equal(out.split(before).length,2,'WORKER_PATCH_NOT_UNIQUE');out=out.replace(before,after);changes.push({before,after});};
+  const reset=extract(source,'resetType');
+  replace(reset.slice(0,reset.lastIndexOf('}')+1),'function resetType(prev,cur){return ('+createHTEvents.toString()+')().classify(prev,cur);}');
+  replace("stamp+(ev==='GOAL'?120000:180000)","stamp+(['GOAL','SCORE_CORRECTION'].includes(ev)?120000:180000)");
   replace("import base,{BackgroundWatcher as DeepLinkWatcher} from './worker_notify_v128.js';","import base,{BackgroundWatcher as DeepLinkWatcher} from '../../../worker_notify_v128.js';\nimport {createHTCollection} from '../../collection.mjs';\nimport {readHTContext} from '../../context.mjs';\nimport {createHTHistoryCache} from '../../history.mjs';\nimport {assessHTItem} from '../../assess-item.mjs';\nconst HTCollection=createHTCollection();");
   replace("import {crossing} from './worker_notify.js';","import {crossing} from '../../../worker_notify.js';");
   replace('  async notifyTick(){','  async notifyTick(){\n    if(typeof this.scanControl!=="function"||(await this.scanControl())?.enabled!==true)return;');
