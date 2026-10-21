@@ -1,3 +1,4 @@
+import {reserveNotifyAttempt,notifyBudgetLimit} from './shared-api-budget.mjs';
 // Explicit trial entrypoint, never called by alarm/notifyTick automatically.
 import {recordFTOutcome} from './decision-trace.mjs';
 export const OUTCOME_BUDGET_KEY='ft:outcome:api-budget:v1';
@@ -32,6 +33,8 @@ export async function runFTOutcomePass(owner,observations,{clock=Date.now}={}){
     if(previous&&(previous.next_at>now||previous.attempts>=config.MAX_ATTEMPTS))return 'NOT_DUE';
     const budget=await tx.get(OUTCOME_BUDGET_KEY);
     if(!budget||!positive(budget.start)||!positive(budget.end)||!positive(budget.max_calls)||!Number.isSafeInteger(budget.used)||budget.used<0||now<budget.start||now>=budget.end||budget.used>=budget.max_calls||budget.last_at>now)return 'API_BUDGET_DENIED';
+    const shared=await reserveNotifyAttempt(tx,now,notifyBudgetLimit(owner.env));
+    if(shared.status!=='RESERVED')return shared.status;
     await tx.put(OUTCOME_BUDGET_KEY,{...budget,used:budget.used+1,last_at:now});
     await tx.put(key,{attempts:(previous?.attempts||0)+1,next_at:now+config.RETRY_MS,reserved_at:now});
     return 'RESERVED';
