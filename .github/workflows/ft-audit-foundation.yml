@@ -26,6 +26,7 @@ jobs:
       - run: node ft-audit-fix/test-integration.mjs
       - run: node ft-audit-fix/test-ledger.mjs
       - run: node ft-audit-fix/test-trial-collector.mjs
+      - run: node ft-audit-fix/test-persistent-collector.mjs
       - run: python3 ft-audit-fix/test-ledger-sql.py
       - run: node --check ft-audit-output/candidate/worker_notify_v130.js
       - run: node --check ft-audit-output/candidate/notify-core.js
