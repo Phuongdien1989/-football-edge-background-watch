@@ -48,6 +48,23 @@ export async function fetchH1CollectionSnapshot(item,f,session) {
     // First stats probe is reused by ULTRA HUB; deepen only measured activity.
     u=await ultraLiveRaw(f,item,'H1',false);
     if(!alive())return null;
+  }else {
+    // Price acquisition has its own shared cache cadence, independent of shots.
+    // Keep the quiet path light: no new events/half/player calls or timers.
+    try {
+      await ultraField(entry,'market',ULTRA_HUB_POLICY.BACKGROUND.market,async()=>{
+        if(!alive())throw Error('HT_COLLECTION_STOPPED');
+        const rows=await football('/odds/live',{fixture:item.id},true);
+        if(!Array.isArray(rows))throw Error('HT_MARKET_INVALID_RESPONSE');
+        return rows;
+      },false);
+    }catch(e){item.htMarketError=String(e.message||e).slice(0,100);}
+    if(!alive())return null;
+    let liveRef={byId:{}};
+    try{liveRef=await getBetReference('live');}catch{}
+    if(!alive())return null;
+    u={liveOdds:oddsCompact(entry.fields.market?.data||[],true,{homeName:f.teams?.home?.name,awayName:f.teams?.away?.name,betRefs:{live:liveRef,prematch:{byId:{}}}}),
+      eventsRaw:entry.fields.events?.data||[],marketAt:entry.fields.market?.at??null};
   }
   const markets=u?.liveOdds||[],events=eventsCompact(u?.eventsRaw||[]),q=groupCoverageScore('FT',{live_statistics:raw,events,live_odds:markets}),at=entry.fields.stats?.at;
   return {captured_at:at,fresh_at:at,minute:f.fixture.status.elapsed,status:f.fixture.status.short,goals:f.goals,metrics,stats_presence:presence,data_health:watchDataHealth(presence,null),
@@ -98,7 +115,15 @@ export async function refreshH1Watch(quiet=false) {
         const s=await fetchH1CollectionSnapshot(item,f,session);if(!alive()||!s)return;
         if(s.ended){item.state='ENDED';return;}
         const accepted=HTCollection.appendHistory(item.history,s,Date.now());
-        if(!accepted.accepted)return;
+        if(!accepted.accepted){
+          // A new quote must reach the card even when stats reuse the same source
+          // observation. Do not append history or renew the stats timestamp.
+          const old=item.latest;
+          if(old&&s.fresh_at===old.fresh_at&&Date.now()-s.fresh_at<=55000&&s.status===old.status&&s.goals?.home===old.goals?.home&&s.goals?.away===old.goals?.away){
+            item.latest={...old,market_rows:s.market_rows,market_at:s.market_at??item.lastMarketAt??null,market:s.market};
+          }
+          return;
+        }
         const ev=h1WatchResetEvent(previous,s);
         item.latest=accepted.observation;item.history=accepted.history;item.initialDQ=s.dq;item.initialIntegrity=s.integrity;
         item.dataHealth=s.data_health;item.collectionActive=HTCollection.activity(s,previous);
@@ -147,3 +172,4 @@ export function stopH1Watch(silent=false) {
   h1WatchState.active=false;clearTimeout(h1WatchState.timer);h1WatchState.nextAt=0;updateH1WatchClock();
   if(!silent)status($('h1WatchStatus'),'Đã dừng HT collection. Lịch sử đã thu được giữ nguyên.','ok');
 }
+

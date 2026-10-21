@@ -17,9 +17,9 @@ for(const entry of manifest.files) {
 let html=readFileSync('ht-early-candidate/generated/index.html','utf8');
 html=html.replace('</head>','<link rel="stylesheet" href="/ht-candidate/style.css"></head>').replace('</body>','<script type="module" src="/ht-candidate/ui.mjs"></script></body>');
 save(mobile+'/index.html',html);
-for(const name of ['model.mjs','context.mjs','assess-item.mjs','valuation.mjs','valuation-adapter.mjs','ui.mjs','style.css','demo.mjs','demo.html'])save(mobile+'/ht-candidate/'+name,readFileSync('ht-early-candidate/'+name));
+for(const name of ['model.mjs','context.mjs','assess-item.mjs','valuation.mjs','valuation-adapter.mjs','recommendation-session.mjs','ui.mjs','style.css','demo.mjs','demo.html'])save(mobile+'/ht-candidate/'+name,readFileSync('ht-early-candidate/'+name));
 save(out+'/preview/index.html',readFileSync('ht-early-candidate/demo.html'));
-for(const name of ['model.mjs','assess-item.mjs','valuation.mjs','valuation-adapter.mjs','ui.mjs','style.css','demo.mjs'])save(out+'/preview/ht-candidate/'+name,readFileSync('ht-early-candidate/'+name));
+for(const name of ['model.mjs','assess-item.mjs','valuation.mjs','valuation-adapter.mjs','recommendation-session.mjs','ui.mjs','style.css','demo.mjs'])save(out+'/preview/ht-candidate/'+name,readFileSync('ht-early-candidate/'+name));
 save(out+'/preview/ft-overview/core.mjs',readFileSync('ft-overview/core.mjs'));
 for(const name of readdirSync(baseline).filter(n=>/\.(?:js|mjs|sql)$/.test(n)||n==='wrangler.toml')) {
  const bytes=readFileSync(baseline+'/'+name);save(out+'/backup/backend/'+name,bytes);save(backend+'/'+name,bytes);
@@ -41,3 +41,4 @@ const walk=p=>readdirSync(p,{withFileTypes:true}).flatMap(d=>d.isDirectory()?wal
 const files=walk(out).map(p=>({path:p.slice(out.length+1),sha256:hash(readFileSync(p)),bytes:readFileSync(p).length}));
 const report={status:'PASS',source_commit:process.env.GITHUB_SHA,candidate_only:true,production_deployed:false,backend_source_baseline:'da5242bb41b2401271f52dda17b0e2208e7e3819',mobile_source_baseline:'723ae37eac825ef1fe8285c8395826b09eba35c5',backup_is_source_and_assets_not_database:true,files};
 save(out+'/manifest.json',JSON.stringify(report,null,2));console.log(JSON.stringify({status:'PASS',files:files.length,production_deployed:false}));
+
