@@ -1,5 +1,5 @@
 import {resolveFTOutcome} from './outcome.mjs';
-import {persistFTRecord} from './worker-recorder.mjs';
+import {persistFTRecord,persistFTStagedPair} from './worker-recorder.mjs';
 const time=x=>Number.isSafeInteger(x)&&x>0;
 export function buildFTDecision({observation,decision_at,state,reason=null,evaluation=null,market_rows=null,devices=[],source_hash}){
  if(!observation||typeof observation.id!=='string'||!observation.id||!Number.isSafeInteger(observation.fixture_id)||observation.fixture_id<=0||!time(observation.decision_at)||!time(decision_at)||decision_at<observation.decision_at)throw Error('INVALID_DECISION_LINK');
@@ -11,6 +11,7 @@ export function buildFTDecision({observation,decision_at,state,reason=null,evalu
 export async function recordFTDecision(owner,input){
  if(owner.env?.FT_REPLAY_TRIAL_ENABLED!=='true')return {status:'DISABLED'};
  let decision;try{decision=buildFTDecision(input);}catch{return {status:'INVALID_DECISION'};}
+ if(owner.env.FT_REPLAY_PAIR_TRIAL_ENABLED==='true')return persistFTStagedPair(owner,decision);
  return persistFTRecord(owner,'DECISION',decision);
 }
 export function linkFTReplay(observation,decision,outcome){
