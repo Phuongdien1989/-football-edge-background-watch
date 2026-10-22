@@ -1,5 +1,6 @@
 import {runFTOutcomePass,OUTCOME_BUDGET_KEY} from './outcome-pass.mjs';
 import {ftReplaySqlRemaining,ftReplayQueryDB} from './replay-sql-budget.mjs';
+import {PAIR_PAGE_SQL,verifyFTPairRow} from './pair-outcome-replay.mjs';
 export const DISCOVERY_KEY='ft:outcome:discovery:v1';
 export const PAGE_SQL=`WITH page AS MATERIALIZED (
  SELECT record_id,observation_id,fixture_id,payload_json
@@ -13,7 +14,6 @@ SELECT page.*,
 FROM page ORDER BY record_id`;
 const pos=x=>Number.isSafeInteger(x)&&x>0;
 export async function runPendingFT(owner,{clock=Date.now}={}){
- if(owner.env?.FT_REPLAY_PAIR_TRIAL_ENABLED==='true')return {status:'PAIR_OUTCOME_NOT_WIRED'};
  if(owner.env?.FT_OUTCOME_DISCOVERY_ENABLED!=='true'||owner.env?.FT_OUTCOME_TRIAL_ENABLED!=='true'||owner.env?.FT_REPLAY_TRIAL_ENABLED!=='true')return {status:'DISABLED'};
  if(typeof owner.scanControl!=='function'||(await owner.scanControl())?.enabled!==true)return {status:'SCANNER_OFF'};
  const pageSize=Number(owner.env.FT_OUTCOME_TRIAL_PAGE_SIZE),interval=Number(owner.env.FT_OUTCOME_TRIAL_DISCOVERY_INTERVAL_MS),lease=Number(owner.env.FT_OUTCOME_TRIAL_DISCOVERY_LEASE_MS);
@@ -36,22 +36,30 @@ export async function runPendingFT(owner,{clock=Date.now}={}){
  if(reserved.status!=='RESERVED')return reserved;
  let nextCursor=reserved.cursor,report;
  try{
-  const response=await ftReplayQueryDB(owner).prepare(PAGE_SQL).bind(reserved.cursor,pageSize).all();
+  const pairMode=owner.env.FT_REPLAY_PAIR_TRIAL_ENABLED==='true';
+  const response=await ftReplayQueryDB(owner).prepare(pairMode?PAIR_PAGE_SQL:PAGE_SQL).bind(reserved.cursor,pageSize).all();
   if(!Array.isArray(response.results)||response.results.length>pageSize)throw Error('INVALID_PAGE');
   const page=response.results,pending=[],incomplete=[],invalid=[];
   for(const row of page){
-   if(typeof row.record_id!=='string'||row.record_id<=nextCursor)throw Error('INVALID_CURSOR_ORDER');
-   nextCursor=row.record_id;
+   const rowId=pairMode?row.observation_id:row.record_id;
+   if(typeof rowId!=='string'||rowId<=nextCursor)throw Error('INVALID_CURSOR_ORDER');
+   nextCursor=rowId;
    if(row.has_outcome)continue;
    try{
-    const observation=JSON.parse(row.payload_json);
-    if(observation.id!==row.observation_id||observation.fixture_id!==row.fixture_id||observation.schema!=='FT_OBSERVATION_V1_DRAFT')throw Error('INVALID_OBSERVATION');
-    pending.push(observation);if(!row.has_decision)incomplete.push(observation.id);
-   }catch{invalid.push(row.record_id);}
+    if(pairMode){
+     const verified=await verifyFTPairRow(row,{maxRecordBytes:Number(owner.env.FT_REPLAY_TRIAL_MAX_RECORD_BYTES)});
+     if(verified.status!=='VALID_PAIR')throw Error(verified.reason);
+     pending.push(verified.observation);
+    }else{
+     const observation=JSON.parse(row.payload_json);
+     if(observation.id!==row.observation_id||observation.fixture_id!==row.fixture_id||observation.schema!=='FT_OBSERVATION_V1_DRAFT')throw Error('INVALID_OBSERVATION');
+     pending.push(observation);if(!row.has_decision)incomplete.push(observation.id);
+    }
+   }catch{invalid.push(rowId);}
   }
   if(page.length===0)nextCursor=''; // Wrap on an empty page, bounded to one page query per pass.
-  const result=pending.length?await runFTOutcomePass(owner,pending,{clock}):{status:'NO_PENDING_IN_PAGE',api_calls:0};
-  return report={status:'PAGE_PROCESSED',page_rows:page.length,missing_decision:incomplete,invalid_rows:invalid,result};
+  const result=pending.length?await runFTOutcomePass(owner,pending,{clock,source:pairMode?'PAIR_DISCOVERY_VALIDATED':'LEGACY_DISCOVERY'}):{status:'NO_PENDING_IN_PAGE',api_calls:0};
+  return report={status:'PAGE_PROCESSED',ledger:pairMode?'PAIR':'LEGACY',page_rows:page.length,missing_decision:incomplete,invalid_rows:invalid,result};
  }catch{return report={status:'DISCOVERY_FAILED'};}
  finally{
   try{await storage.transaction(async tx=>{
