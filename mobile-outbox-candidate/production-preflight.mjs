@@ -13,9 +13,13 @@ const hash=data=>createHash('sha256').update(data).digest('hex');
 const cfBase='https://api.cloudflare.com/client/v4/accounts/'+encodeURIComponent(account)+'/workers/scripts/';
 function save(path,bytes){mkdirSync(dirname(path),{recursive:true});writeFileSync(path,bytes);}
 async function cf(path){
- const r=await fetch(cfBase+name+'/'+path,{headers:{Authorization:'Bearer '+token},signal:AbortSignal.timeout(30000)});
- const j=await r.json().catch(()=>({}));assert(r.ok&&j.success,'CF_READ_'+path+'_'+r.status);
- return j.result;
+ let last;
+ for(let attempt=1;attempt<=3;attempt++){
+  try{const r=await fetch(cfBase+name+'/'+path,{headers:{Authorization:'Bearer '+token},signal:AbortSignal.timeout(25000)});
+   const j=await r.json().catch(()=>({}));assert(r.ok&&j.success,'CF_READ_'+path+'_'+r.status);return j.result;
+  }catch(e){last=e;if(attempt<3)await new Promise(resolve=>setTimeout(resolve,1200*attempt));}
+ }
+ throw Error('CF_READ_RETRY_EXHAUSTED_'+path+'_'+String(last?.message||last).slice(0,100));
 }
 async function active(){
  const v=(await cf('deployments')).deployments?.[0]?.versions;
