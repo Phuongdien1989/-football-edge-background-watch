@@ -1,4 +1,5 @@
 // GET only the PUBLIC Mobile home page. Read local returned HTML in CI; never print it.
+// One-time source audit following failed empty Cloudflare script-content probe.
 // No auth, D1 SQL, API-football, scanner controls, or production mutations.
 import {createHash} from 'node:crypto';
 import {mkdirSync,writeFileSync} from 'node:fs';
