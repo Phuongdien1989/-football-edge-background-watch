@@ -2,6 +2,7 @@
 // to an independently timestamped full-match O/U live bookmaker quote.
 // Never convert goal_ft, a 0–100 strength score, or per-device probabilities
 // to a full regulation final-goals distribution. Never rank or recommend here.
+import {inspectFTObservation} from './replay-integrity.mjs';
 const goodTime=t=>Number.isSafeInteger(t)&&t>0;
 const finite=n=>typeof n==='number'&&Number.isFinite(n);
 const validLine=n=>finite(n)&&n>=0&&n<=30&&Math.abs(n*4-Math.round(n*4))<1e-8;
@@ -65,6 +66,7 @@ export function extractFTPricingEvidence({observation,decision}={}){
  if(observation.fixture?.fixture?.id!==observation.fixture_id||
  observation.fixture?.fixture?.status?.short!=='2H'||
  observation.fixture?.score?.fulltime!=null)return no('NOT_VALID_LIVE_SECOND_HALF_FIXTURE');
+ if(inspectFTObservation(observation).status==='REJECT')return no('FORECAST_INPUT_INTEGRITY_REJECT');
  const source=observation.sources?.odds;
  if(source?.status!=='OK'||!goodTime(source.received_at)||source.received_at>observation.decision_at||
  source.source_at!=null&&(!goodTime(source.source_at)||source.source_at>source.received_at))return no('LIVE_ODDS_SOURCE_RECEIPT_UNVERIFIED');
