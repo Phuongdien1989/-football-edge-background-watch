@@ -17,7 +17,7 @@ export function evaluateManualScanGate({analytics,live,utcDay,now,plannedMaxWrit
  const observedAt=Date.parse(analytics?.at||'');
  const time=Date.parse(now||'');
  if(!Number.isFinite(time)||!Number.isFinite(observedAt)||observedAt>time+60000||time-observedAt>20*60*1000)reasons.push('ANALYTICS_NOT_FRESH_ENOUGH');
- if(live?.status!=='PASS'||live?.backend?.status!=='OK'||live?.mobile?.status!=='OK'||live?.health?.status!=='OK'||live?.rollback?.status!=='OK'||live?.rollback?.exists!==true)reasons.push('LIVE_VERSION_CHECK_INCOMPLETE');
+ if(live?.status!=='PASS'||live?.backend?.status!=='OK'||live?.mobile?.status!=='OK'||live?.health?.status!=='OK'||live?.rollback?.status!=='OK'||live?.rollback?.exists!==true||live?.mobile_rollback?.status!=='OK'||live?.mobile_rollback?.exists!==true)reasons.push('LIVE_VERSION_CHECK_INCOMPLETE');
  const deployedBackend=live?.backend?.versions;
  if(!Array.isArray(deployedBackend)||deployedBackend.length!==1||deployedBackend[0]?.percentage!==100||deployedBackend[0]?.id!=='e7d2090c-d0e1-4f58-9f5a-4360acd2ced3')reasons.push('BACKEND_VERSION_DRIFT');
  const deployedMobile=live?.mobile?.versions;
