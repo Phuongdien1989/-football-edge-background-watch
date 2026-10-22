@@ -29,6 +29,7 @@ jobs:
       - run: node ft-audit-fix/test-trial-collector.mjs
       - run: node ft-audit-fix/test-persistent-collector.mjs
       - run: node ft-audit-fix/test-ft-pair-collector.mjs
+      - run: python3 ft-audit-fix/test-ft-pair-sqlite.py
       - run: node ft-audit-fix/test-replay-integrity.mjs
       - run: node ft-audit-fix/test-capture-plan.mjs
       - run: node ft-audit-fix/test-replay-validation-report.mjs
