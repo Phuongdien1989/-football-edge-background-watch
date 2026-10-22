@@ -1,4 +1,5 @@
 // Limited independent read-only probes.
+// One-shot verification of both deployed rollback artifacts on 2026-10-22.
 // Bounded post-Mobile-release GET-only verification. No scan or D1 operations. No D1 SQL or mutable Cloudflare endpoints.
 // Fail-closed on unknown; each endpoint reported independently. This is the last read attempt for this checkpoint.
 import {mkdirSync,writeFileSync} from 'node:fs';
