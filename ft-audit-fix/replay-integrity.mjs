@@ -16,6 +16,11 @@ export function inspectFTObservation(o){
  if(!score(f?.goals))errors.push('INVALID_LIVE_SCORE');
  if(elapsed!=null&&(!Number.isFinite(elapsed)||elapsed<45||elapsed>90))warnings.push('NONSTANDARD_LIVE_ELAPSED');
  if(f?.score?.fulltime!=null)errors.push('FULLTIME_SCORE_LEAKAGE');
+ // The independently captured fixture source must not smuggle a later final result.
+ // Provider snapshots may arrive as a fixture object or a one-element fixtures list.
+ const sourceFixture=o?.sources?.fixture?.data;
+ const fixtureSnapshots=Array.isArray(sourceFixture)?sourceFixture:[sourceFixture];
+ if(fixtureSnapshots.some(row=>row?.score?.fulltime!=null||finalStates.has(row?.fixture?.status?.short)))errors.push('SOURCE_FIXTURE_FUTURE_LABEL_LEAKAGE');
  if(o?.outcome!=null||o?.final_score!=null)errors.push('FUTURE_LABEL_IN_OBSERVATION');
  for(const name of ['fixture',...optional]){
   const s=o?.sources?.[name];
@@ -47,5 +52,6 @@ export function inspectFTOutcome(o,d,result){
  if(result?.schema!=='FT_OUTCOME_V2_DRAFT'||result?.state!=='RESOLVED'||result?.settlement_basis!=='FULL_MATCH_REGULATION'||result?.observation_id!==o?.id||result?.fixture_id!==o?.fixture_id)errors.push('INVALID_OUTCOME_IDENTITY');
  if(!positive(result?.observed_at)||result.observed_at<d?.decision_at||!positive(result?.resolved_at)||result.resolved_at<result.observed_at)errors.push('OUTCOME_CHRONOLOGY');
  if(!score(result?.score))errors.push('OUTCOME_SCORE_INVALID');
+ if(!['FT','AET','PEN'].includes(result?.status))errors.push('OUTCOME_NOT_FINAL_REGULATION_STATUS');
  return {status:errors.length?'REJECT':warnings.length?'REVIEW':'ACCEPT',errors:unique(errors),warnings:unique(warnings),forecast_accuracy:null,roi:null,regulation_only:true};
 }
