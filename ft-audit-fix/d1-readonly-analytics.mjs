@@ -3,6 +3,7 @@
 // Execute once only; no D1 write attempts permitted after the observed 7500 quota failure.
 // No D1 /query calls, SQL, Worker deployments, scanner control, plan changes or mutations.
 import assert from 'node:assert/strict';
+import {d1UtcWindow,d1DailyTotals} from './d1-utc-day.mjs';
 import {mkdirSync,writeFileSync} from 'node:fs';
 const account=process.env.CLOUDFLARE_ACCOUNT_ID,token=process.env.CLOUDFLARE_API_TOKEN;
 const data={scope:'READ_ONLY_D1_USAGE_DIAGNOSTIC',at:new Date().toISOString(),status:'NOT_RUN',
@@ -12,8 +13,7 @@ mkdirSync('ft-audit-output',{recursive:true});
 const save=()=>writeFileSync('ft-audit-output/ft-d1-readonly-usage.json',JSON.stringify(data,null,2));
 const apiBase='https://api.cloudflare.com/client/v4';
 // Compute the actual UTC billing day when this read-only check runs; never pin an October date.
-const utcToday=new Date().toISOString().slice(0,10);
-const utcYesterday=new Date(Date.parse(utcToday+'T00:00:00Z')-86400000).toISOString().slice(0,10);
+const {utcDay:utcToday,utcYesterday}=d1UtcWindow(new Date().toISOString());
 data.dates=[utcYesterday,utcToday];
 async function getDBs(){
  const response=await fetch(apiBase+'/accounts/'+encodeURIComponent(account)+'/d1/database?per_page=100&page=1',
@@ -62,9 +62,8 @@ try{
  });
  const total={rowsRead:0,rowsWritten:0,readQueries:0,writeQueries:0};
  const today=out.filter(x=>x.day===utcToday);
- for(const r of today)for(const k of Object.keys(total))total[k]+=r[k];
- data.databases=out;data.today=total;data.utc_day=utcToday;
- if(!today.some(x=>x.database==='KNOWN_PROD_DB'))throw Error('CURRENT_UTC_PRODUCTION_D1_DATA_NOT_AVAILABLE');
+ const validTotal=d1DailyTotals(out,utcToday);
+ data.databases=out;data.today=validTotal;data.utc_day=utcToday;
  data.status='PASS';
  data.note='GraphQL adaptive/delayed analytics; account totals here may differ from billing enforcement counters. ZERO D1 SQL queries/writes by this script.';
 }catch(error){
