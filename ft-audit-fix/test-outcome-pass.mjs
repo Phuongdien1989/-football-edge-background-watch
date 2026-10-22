@@ -17,6 +17,7 @@ function harness({reply=[f()],enabled=true,scanner=true,fail=false,budget=true}=
 }
 const run=(o,rows)=>runFTOutcomePass(o,rows,{clock:()=>now});
 let checks=0;async function test(name,fn){await fn();checks++;console.log('PASS '+name);}
+await test('pair mode refuses unsupported outcome path before provider',async()=>{const h=harness(),o=h.owner();o.env.FT_REPLAY_PAIR_TRIAL_ENABLED='true';assert.equal((await run(o,[obs()])).status,'PAIR_OUTCOME_NOT_WIRED');assert.equal(h.metrics().api,0);});
 await test('disabled does no I/O',async()=>{const h=harness({enabled:false});assert.equal((await run(h.owner(),[obs()])).status,'DISABLED');assert.deepEqual(h.metrics(),{api:0,sql:0,doPuts:0});});
 await test('scanner off prevents result fetch',async()=>{const h=harness({scanner:false});assert.equal((await run(h.owner(),[obs()])).status,'SCANNER_OFF');assert.equal(h.metrics().api,0);});
 await test('insufficient SQL room prevents provider fetch',async()=>{const h=harness(),o=h.owner();o.env.FT_REPLAY_TRIAL_SQL_BUDGET_PER_INVOCATION='3';const r=await run(o,[obs()]);assert.equal(r.status,'SQL_LIMIT_DEFERRED');assert.deepEqual(h.metrics(),{api:0,sql:0,doPuts:0});});
