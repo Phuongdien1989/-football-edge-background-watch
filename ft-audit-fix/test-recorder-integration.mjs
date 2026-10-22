@@ -55,4 +55,22 @@ await test('opt-in notifyTick discovers and resolves without supplied observatio
  const cost={scope:'TRANSFORMED_NOTIFY_TICK_WITH_MOCKED_PROVIDER_AND_STORES',baseline:baselineCost,trial:{api_calls:r.calls.length,sql_statements:sql-beforeSQL,storage_ops:r.storageOps,logical_match_puts:r.writes},excluded:['real D1 billed rows/index writes','inherited Worker I/O','actual match-store backend','other watcher objects'],production_validated:false};writeFileSync(out+'/trial-total-cost.json',JSON.stringify(cost,null,2));console.log('TRIAL_COST '+JSON.stringify(cost));
  assert.equal([...rows.values()].filter(x=>x.payload.schema==='FT_OUTCOME_V2_DRAFT').length,1);
 });
+await test('sidecar SQL cap defers replay without dropping normal Notify scan',async()=>{
+ rows.clear();deny=false;const start=sql;
+ const r=await run(after,fixture,[],[],{env:{...env,FT_REPLAY_TRIAL_SQL_BUDGET_PER_INVOCATION:'3'}});
+ assert.equal(r.replay.status,'SQL_LIMIT_DEFERRED');
+ assert.equal(r.calls.length,5);
+ assert.equal(r.decision,undefined);
+ assert.equal(sql-start,0);
+ assert.equal(r.writes,1);
+});
+await test('sidecar SQL cap covers observation and decision in a single scan',async()=>{
+ rows.clear();deny=false;const start=sql;
+ const r=await run(after,fixture,[],[],{env:{...env,FT_REPLAY_TRIAL_SQL_BUDGET_PER_INVOCATION:'4'}});
+ assert.equal(r.replay.status,'STORED');
+ assert.equal(r.decision.status,'SQL_LIMIT_DEFERRED');
+ assert.equal(sql-start,4);
+ assert.equal(r.calls.length,5);
+ assert.equal(r.writes,1);
+});
 writeFileSync(out+'/recorder-integration-tests.json'   ,JSON.stringify({status:'PASS',checks,worker:'transformed baseline Worker',provider:'mock',D1:'mock',production_validated:false},null,2));
