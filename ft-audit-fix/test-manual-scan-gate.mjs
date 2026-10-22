@@ -6,7 +6,8 @@ const live={status:'PASS',at:'2026-10-23T01:07:00Z',
  backend:{status:'OK',versions:[{id:'e7d2090c-d0e1-4f58-9f5a-4360acd2ced3',percentage:100}]},
  mobile:{status:'OK',versions:[{id:'e1beb5bf-3617-4c54-805a-623cfafd7411',percentage:100}]},
  health:{status:'OK',http:200,deploy_commit:'3cd210d2d74aff547de4587ab4a3c96b982a728c',enabled:false,manual_enabled:false,next_alarm:null},
- rollback:{status:'OK',exists:true}};
+ rollback:{status:'OK',exists:true},
+ mobile_rollback:{status:'OK',exists:true}};
 let tests=0;
 const run=(name,args,expect)=>{const actual=decide({analytics,live,utcDay,now,...args});assert.equal(actual.decision,expect,name+': '+JSON.stringify(actual.reasons));tests++;};
 run('fresh healthy and under budget',{},'REVIEW_FOR_MANUAL_SHORT_SCAN');
@@ -14,6 +15,9 @@ run('old day only',{utcDay:'2026-10-24'},'NO_GO');
 run('quota exceeded',{analytics:{...analytics,databases:[{day:utcDay,database:'KNOWN_PROD_DB',rowsWritten:100001}]}},'NO_GO');
 run('headroom not enough',{analytics:{...analytics,databases:[{day:utcDay,database:'KNOWN_PROD_DB',rowsWritten:99500}]}},'NO_GO');
 run('unknown live',{live:{}},'NO_GO');
+run('missing Mobile rollback',{live:{...live,mobile_rollback:null}},'NO_GO');
+run('Mobile rollback missing at Cloudflare',{live:{...live,mobile_rollback:{status:'OK',exists:false}}},'NO_GO');
+run('backend rollback missing',{live:{...live,rollback:{status:'OK',exists:false}}},'NO_GO');
 run('scanner already enabled',{live:{...live,health:{...live.health,enabled:true}}},'NO_GO');
 run('manual already enabled',{live:{...live,health:{...live.health,manual_enabled:true}}},'NO_GO');
 run('alarm scheduled',{live:{...live,health:{...live.health,next_alarm:'2026-10-23T01:09:00Z'}}},'NO_GO');
