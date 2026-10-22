@@ -1,4 +1,5 @@
 // Safe one-shot D1 query-insights GraphQL inspection. No D1 SQL or mutation.
+// Quota blocked: diagnosis-only query, no automatic restart after this one attempt.
 // Never print raw SQL/bound values/account IDs; only table/operation + aggregate metrics.
 import assert from 'node:assert/strict';
 import {mkdirSync,writeFileSync} from 'node:fs';
