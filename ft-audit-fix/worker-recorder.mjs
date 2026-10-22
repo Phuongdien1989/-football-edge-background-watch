@@ -1,5 +1,6 @@
 // Recorder-trial Worker hook only. Disabled without explicit trial configuration.
 import {createPersistentCollector} from './persistent-collector.mjs';
+import {ftReplaySqlRemaining,ftReplayQueryDB} from './replay-sql-budget.mjs';
 const states=new WeakMap();
 const PAUSE_KEY='ft:replay:trial:pause:v1';
 export async function recordFTScan(owner,scan){
@@ -32,8 +33,9 @@ export async function persistFTRecord(owner,kind,payload){
     if(saved?.epoch===epoch){state.paused=true;state.reason=saved.reason;return {status:'PAUSED',reason:saved.reason};}
    }catch{state.paused=true;state.reason='PAUSE_READ_FAILED';return {status:'PAUSE_READ_FAILED'};}
   }
+  if(ftReplaySqlRemaining(owner)<4)return {status:'SQL_LIMIT_DEFERRED',reason:'REPLAY_INVOCATION_BUDGET'};
   let result;
-  try{result=await createPersistentCollector(owner.env.FT_REPLAY_DB,{enabled:true,maxRecordBytes}).append(kind,input);}
+  try{result=await createPersistentCollector(ftReplayQueryDB(owner),{enabled:true,maxRecordBytes}).append(kind,input);}
   catch{result={status:'RECORDER_FAILED'};}
   if(['BUDGET_DENIED','BUDGET_UNAVAILABLE','RECORD_FAILED','RECORDER_FAILED'].includes(result.status)){
    state.paused=true;state.reason=result.status;
