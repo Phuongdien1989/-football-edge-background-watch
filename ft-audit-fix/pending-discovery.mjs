@@ -1,4 +1,5 @@
 import {runFTOutcomePass,OUTCOME_BUDGET_KEY} from './outcome-pass.mjs';
+import {ftReplaySqlRemaining,ftReplayQueryDB} from './replay-sql-budget.mjs';
 export const DISCOVERY_KEY='ft:outcome:discovery:v1';
 export const PAGE_SQL=`WITH page AS MATERIALIZED (
  SELECT record_id,observation_id,fixture_id,payload_json
@@ -17,6 +18,7 @@ export async function runPendingFT(owner,{clock=Date.now}={}){
  const pageSize=Number(owner.env.FT_OUTCOME_TRIAL_PAGE_SIZE),interval=Number(owner.env.FT_OUTCOME_TRIAL_DISCOVERY_INTERVAL_MS),lease=Number(owner.env.FT_OUTCOME_TRIAL_DISCOVERY_LEASE_MS);
  if(![pageSize,interval,lease,Number(owner.env.FT_OUTCOME_TRIAL_MAX_OBSERVATIONS)].every(pos)||pageSize>Number(owner.env.FT_OUTCOME_TRIAL_MAX_OBSERVATIONS)||!owner.env.FT_REPLAY_DB||typeof owner.ctx?.storage?.transaction!=='function')return {status:'INVALID_CONFIG'};
  const now=clock();if(!pos(now))return {status:'INVALID_CLOCK'};
+ if(ftReplaySqlRemaining(owner)<1)return {status:'SQL_LIMIT_DEFERRED'};
  const token=crypto.randomUUID(),storage=owner.ctx.storage;
  let reserved;
  try{reserved=await storage.transaction(async tx=>{
@@ -33,7 +35,7 @@ export async function runPendingFT(owner,{clock=Date.now}={}){
  if(reserved.status!=='RESERVED')return reserved;
  let nextCursor=reserved.cursor,report;
  try{
-  const response=await owner.env.FT_REPLAY_DB.prepare(PAGE_SQL).bind(reserved.cursor,pageSize).all();
+  const response=await ftReplayQueryDB(owner).prepare(PAGE_SQL).bind(reserved.cursor,pageSize).all();
   if(!Array.isArray(response.results)||response.results.length>pageSize)throw Error('INVALID_PAGE');
   const page=response.results,pending=[],incomplete=[],invalid=[];
   for(const row of page){
