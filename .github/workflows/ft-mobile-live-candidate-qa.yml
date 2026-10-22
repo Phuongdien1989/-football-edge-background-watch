@@ -4,6 +4,7 @@ on:
     branches: [fix/ft-foundation-20261021]
     paths:
       - 'mobile-outbox-candidate/build_live_mobile_20261022.mjs'
+      - 'ft-audit-fix/test-mobile-live-diff-scope.mjs'
       - '.github/workflows/ft-mobile-live-candidate-qa.yml'
 permissions: {contents: read}
 concurrency: {group: ft-mobile-live-20261022-offline-candidate, cancel-in-progress: false}
@@ -42,6 +43,8 @@ jobs:
         run: |
           npm install --no-save --no-package-lock fake-indexeddb@6
           node tests/test-mobile-outbox-candidate.mjs
+      - name: Verify exact HTML delta and canonical baseline/candidate SHA
+        run: node ft-audit-fix/test-mobile-live-diff-scope.mjs
       - name: Assert no frontend sections outside intended functions altered
         run: |
           node --input-type=module <<'JS'
