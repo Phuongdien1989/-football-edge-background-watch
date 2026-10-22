@@ -1,0 +1,34 @@
+name: FT D1 top writes read-only
+on:
+  push:
+    branches: [fix/ft-foundation-20261021]
+    paths:
+      - 'ft-audit-fix/d1-readonly-top-writes.mjs'
+      - '.github/workflows/ft-d1-top-writes.yml'
+permissions: {contents: read}
+concurrency:
+  group: ft-d1-top-writes-once
+  cancel-in-progress: false
+jobs:
+  top_writes:
+    if: contains(github.event.head_commit.message, '[ft-d1-topwrites-once]') && github.run_attempt == 1
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: football-edge-production
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Read only D1 query groups via GraphQL Analytics
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          FT_D1_SQL_INSIGHTS_ONCE: READ_ONLY
+        run: node ft-audit-fix/d1-readonly-top-writes.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ft-d1-top-writes-readonly
+          path: ft-audit-output/ft-d1-top-write-groups.json
+          retention-days: 30
