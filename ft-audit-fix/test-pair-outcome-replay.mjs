@@ -33,6 +33,45 @@ await test('forged canceled result cannot be LINKED or counted as lost selection
  assert.equal(x.linked_count,0);assert.equal(x.replay_counts.INVALID_LINK,1);
  assert.equal(x.accuracy,null);assert.equal(x.roi,null);
 });
+await test('replay reports verified raw odds while refusing fake model fair pricing',async()=>{
+ const v=[{value:'Over',handicap:2.5,odd:1.9,main:true},{value:'Under',handicap:2.5,odd:1.95,main:true}];
+ const o2=structuredClone(o);o2.id='42:70:raw-quoted';
+ o2.sources.odds={status:'OK',received_at:n-2900,source_at:null,
+  data:[{fixture:{id:42},odds:[{id:5,name:'Over/Under',values:v}]}]};
+ const d2=buildFTDecision({observation:o2,decision_at:n-2000,state:'EVALUATED',
+  evaluation:{score:76,scoreMode:'FULL'},source_hash:'e'.repeat(64),
+  market_rows:[{source:'live',fixture_id:42,category:'over_under',bet_id:5,
+   bet:'Over/Under',feed_bet_name:'Over/Under',bet_reference:{mapped_by:'BET_ID_REFERENCE',canonical_name:'Over/Under'},
+   integrity:{valid:true},feed_status:{},values:v}],
+  devices:[{device_slot:0,goal_estimate:{prob:73,n:0,source:'MODEL',basis:'MODEL'}}]});
+ const q=await prepareFTPair(o2,d2,20000);
+ const out2={...r,observation_id:o2.id};
+ const result=await auditFTPairOutcomeRows([q],[out2]);
+ assert.equal(result.valid_pairs,1);assert.equal(result.linked_count,1);
+ assert.equal(result.market_evidence.verified_full_match_ou_quote_pairs,1);
+ assert.equal(result.market_evidence.blocked_or_missing_quote_pairs,0);
+ assert.equal(result.market_evidence.proven_model_final_total_distributions,0);
+ assert.equal(result.market_evidence.priced_pairs,0);
+ assert.equal(result.market_evidence.executable_quotes,0);
+ assert.equal(result.roi,null);
+});
+await test('replay does not certify normalized quote when odds raw differs',async()=>{
+ const v=[{value:'Over',handicap:2.5,odd:1.9,main:true},{value:'Under',handicap:2.5,odd:1.95,main:true}];
+ const sourceO=structuredClone(o);sourceO.id='42:70:raw-different';
+ sourceO.sources.odds={status:'OK',received_at:n-2900,source_at:null,
+  data:[{fixture:{id:42},odds:[{id:5,name:'Over/Under',values:[{...v[0],odd:1.7},v[1]]}]}]};
+ const d2=buildFTDecision({observation:sourceO,decision_at:n-2000,state:'EVALUATED',
+  evaluation:{score:76,scoreMode:'FULL'},source_hash:'f'.repeat(64),
+  market_rows:[{source:'live',fixture_id:42,category:'over_under',bet_id:5,
+   bet:'Over/Under',feed_bet_name:'Over/Under',bet_reference:{mapped_by:'BET_ID_REFERENCE',canonical_name:'Over/Under'},
+   integrity:{valid:true},feed_status:{},values:v}]});
+ const q=await prepareFTPair(sourceO,d2,20000);
+ const result=await auditFTPairOutcomeRows([q],[]);
+ assert.equal(result.valid_pairs,1);
+ assert.equal(result.market_evidence.verified_full_match_ou_quote_pairs,0);
+ assert.equal(result.market_evidence.blocked_or_missing_quote_pairs,1);
+ assert.equal(result.market_evidence.priced_pairs,0);
+});
 await test('missing outcome distinguished from model loss',async()=>{const x=await auditFTPairOutcomeRows([row],[]);assert.equal(x.linked_count,0);assert.equal(x.replay_counts.MISSING_OUTCOME,1)});
 await test('outcome before decision excluded',async()=>{const bad={...r,observed_at:d.decision_at-1};const x=await auditFTPairOutcomeRows([row],[bad]);assert.equal(x.linked_count,0);assert.equal(x.replay_counts.INVALID_LINK,1)});
 await test('invalid pair excluded from denominator',async()=>{const x=await auditFTPairOutcomeRows([{...row,content_hash:'x'}],[r]);assert.equal(x.valid_pairs,0);assert.equal(x.invalid_pairs,1)});
