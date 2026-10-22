@@ -1,4 +1,4 @@
-// 2026-10-22 live Mobile candidate (not deployed). Retains original builder transformations;
+// 2026-10-22 live Mobile candidate (not deployed). One-shot offline QA. Retains original builder transformations;
 // strictly pins PUBLIC Mobile SHA from authenticated no-write production source inspection.
 // Deterministic offline Mobile candidate patch. No deployment, no network.
 import {createHash} from 'node:crypto';
