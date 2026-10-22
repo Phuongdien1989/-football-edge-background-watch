@@ -1,4 +1,5 @@
 // One-shot, pre-authorized isolated D1 REST measurement. Never a Worker deployment.
+// EXECUTION GATE: pinned existing test UUID, one attempt, retained rows, no production mutation.
 // Strict UUID+name allowlist; preserves test schema/data, no deletes, no resets, no provider.
 import assert from 'node:assert/strict';
 import {mkdirSync,writeFileSync} from 'node:fs';
