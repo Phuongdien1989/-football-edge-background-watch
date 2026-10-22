@@ -5,6 +5,8 @@ on:
     paths:
       - 'ft-audit-fix/manual-scan-gate.mjs'
       - 'ft-audit-fix/test-manual-scan-gate.mjs'
+      - 'ft-audit-fix/d1-utc-day.mjs'
+      - 'ft-audit-fix/test-d1-utc-day.mjs'
       - '.github/workflows/ft-manual-scan-gate-qa.yml'
 permissions: {contents: read}
 jobs:
@@ -20,3 +22,4 @@ jobs:
         run: |
           node --check ft-audit-fix/manual-scan-gate.mjs
           node ft-audit-fix/test-manual-scan-gate.mjs
+          node ft-audit-fix/test-d1-utc-day.mjs
