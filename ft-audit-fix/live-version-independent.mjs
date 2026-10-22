@@ -1,4 +1,5 @@
-// Limited independent read-only probes. No D1 SQL or mutable Cloudflare endpoints.
+// Limited independent read-only probes.
+// Last bounded execution for this checkpoint. No D1 SQL or mutable Cloudflare endpoints.
 // Fail-closed on unknown; each endpoint reported independently. This is the last read attempt for this checkpoint.
 import {mkdirSync,writeFileSync} from 'node:fs';
 const account=process.env.CLOUDFLARE_ACCOUNT_ID,token=process.env.CLOUDFLARE_API_TOKEN;
