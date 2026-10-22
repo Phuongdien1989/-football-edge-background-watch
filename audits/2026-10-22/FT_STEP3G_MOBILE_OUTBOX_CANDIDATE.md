@@ -40,3 +40,10 @@
 
 ## Outcome
 **3G implementation/offline QA: PASS. Production release: HOLD.** Safe checkpoint saved; mobile candidate build source is ready for independent approval, not a production patch.
+
+## Final cross-type ACK and release review bundle
+- [Final build, source-scope audit and shared-ACK CI PASS](https://github.com/Phuongdien1989/-football-edge-background-watch/actions/runs/39788931079).
+- **5 additional PASS** across LIVE_SNAPSHOT, QSIG_RESULT, ENTRY+LIVE mixed batch, late ACK for QSIG, and empty ACK; these run in a fake IndexedDB transaction, with no real D1 operations.
+- Verified hashes unchanged: original `005a74b4768a00f92ac462592b3de63106b2a4db35732103f6095cfed9fdb46d`; candidate `d5dd7761ea2296aab2762564457f92c778c1065f3112bba61e6cdd0a13535752`; the entire unmodified HTML is reconstructed after reversing the three allowed code changes.
+- **Candidate + rollback review ZIP:** [GitHub Actions artifact](https://github.com/Phuongdien1989/-football-edge-background-watch/actions/runs/39788931079/artifacts/12430666044) contains `football-edge-mobile-outbox-review-20261022.zip`, with `mobile-candidate.html`, `rollback-original.html`, `README.txt` and `SHA256SUMS.txt`. This artifact can be downloaded from GitHub; it is not a production release and is retained for 90 days.
+- App currently active source was only checked at audit time. Always re-verify current Mobile SHA/version and have a fresh rollback before any later release.
