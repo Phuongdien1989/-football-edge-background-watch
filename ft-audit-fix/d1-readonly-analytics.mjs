@@ -1,4 +1,5 @@
 // Strictly read-only account-level D1 analytics. GraphQL query + GET only.
+// Execute once only; no D1 write attempts permitted after the observed 7500 quota failure.
 // No D1 /query calls, SQL, Worker deployments, scanner control, plan changes or mutations.
 import assert from 'node:assert/strict';
 import {mkdirSync,writeFileSync} from 'node:fs';
