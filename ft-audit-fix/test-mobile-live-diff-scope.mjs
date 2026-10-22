@@ -1,0 +1,42 @@
+// NO-DEPLOY exact-source mobile safety gate. Detects ANY unintended change outside
+// entry enqueue function, added atomic ACK helper, and the sync ACK one-liner.
+import assert from 'node:assert/strict';
+import {readFileSync,mkdirSync,writeFileSync} from 'node:fs';
+import {createHash} from 'node:crypto';
+const original=readFileSync('mobile-outbox-candidate/baseline.html','utf8');
+const changed=readFileSync('mobile-outbox-candidate/candidate_mobile.html','utf8');
+const start="  async function feDbQueueEntryDecision(r,{schedule=true}={}){";
+const end="  async function feDbQueueLiveSnapshot(r,{schedule=true}={}){";
+const ackStart="  async function feDbAckBatch(sentRows){";
+const ackEnd="  async function feDbSyncStateGet(id){";
+const oldLine="if(!res?.ok)throw new Error(res?.error||'D1 sync failed');await feDbSyncStateMark(rows);await feDbOutboxDelete(rows);sent+=Number(res.accepted||rows.length);";
+const newLine="if(res?.ok!==true||!Number.isInteger(res.accepted)||res.accepted!==rows.length||Number(res.ignored||0)!==0)throw new Error(res?.error||'D1 sync ACK incomplete or invalid; retaining outbox for retry');await feDbAckBatch(rows);sent+=res.accepted;";
+function only(h,s){assert.equal(h.split(s).length,2,'SOURCE_BOUNDARY_NOT_UNIQUE_'+s.slice(0,50));return h.indexOf(s);}
+for(const s of [start,end,ackEnd,oldLine])only(original,s);
+for(const s of [start,end,ackStart,ackEnd,newLine])only(changed,s);
+assert.equal(original.includes(ackStart),false,'ORIGINAL_ACK_ALREADY_PATCHED');
+assert.equal(changed.includes(oldLine),false,'STILL_NONATOMIC_ACK');
+const originalStart=only(original,start),originalEnd=only(original,end);
+const newStart=only(changed,start),newEnd=only(changed,end);
+assert.equal(original.slice(0,originalStart),changed.slice(0,newStart),'HTML_BEFORE_ENTRY_CHANGED');
+const oldSection=original.slice(originalStart,originalEnd);
+const newSection=changed.slice(newStart,newEnd);
+const functionCount=[...oldSection.matchAll(/^  (?:async )?function [A-Za-z][\w]*\(/gm)].length;
+assert.equal(functionCount,1,'UNEXPECTED_MULTIPLE_ENTRY_AREA_FUNCTIONS');
+assert(newSection.includes('feDbEntryFingerprint'),'ENTRY_FINGERPRINT_MISSING');
+assert(newSection.includes('feDbQueueEntryDecision'),'ENTRY_QUEUE_MISSING');
+const ackStartIx=only(changed,ackStart),ackEndIx=only(changed,ackEnd);
+assert(ackEndIx>ackStartIx,'ACK_INSERTION_NOT_IN_EXPECTED_LOCATION');
+const newAckBlock=changed.slice(ackStartIx,ackEndIx);
+assert(newAckBlock.includes("db.transaction([FE_DB_SYNC_STORE,FE_DB_OUTBOX_STORE],'readwrite')"),'NOT_ONE_IDB_TRANSACTION');
+let restore=changed.slice(0,newStart)+oldSection+changed.slice(newEnd);
+const ix=only(restore,ackStart),iy=only(restore,ackEnd);
+restore=restore.slice(0,ix)+restore.slice(iy);
+restore=restore.replace(newLine,oldLine);
+assert.equal(restore,original,'UNAUTHORIZED_CHANGES_OUTSIDE_ENTRY_AND_ACK');
+const sha=b=>createHash('sha256').update(b).digest('hex');
+assert.equal(sha(original),'005a74b4768a00f92ac462592b3de63106b2a4db35732103f6095cfed9fdb46d','MOBILE_SOURCE_SHA_DRIFT');
+assert.equal(sha(changed),'d5dd7761ea2296aab2762564457f92c778c1065f3112bba61e6cdd0a13535752','CANDIDATE_SHA_DRIFT');
+const result={status:'PASS',scope:'EXACT_HTML_DIFF',unchanged_entire_rest:true,source_pin:sha(original),candidate_pin:sha(changed),allowed_regions:['ENTRY_QUEUE','ATOMIC_ACK_INSERTION','SYNC_ACK_CALL'],unintended_ui_changes:0,production_deploy:false};
+mkdirSync('ft-audit-output',{recursive:true});writeFileSync('ft-audit-output/ft-mobile-live-diff-scope.json',JSON.stringify(result,null,2));
+console.log('FE_MOBILE_LIVE_EXACT_SCOPE_PASS '+JSON.stringify(result));
