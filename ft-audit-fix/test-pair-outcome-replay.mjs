@@ -36,7 +36,7 @@ await test('forged canceled result cannot be LINKED or counted as lost selection
 await test('replay reports verified raw odds while refusing fake model fair pricing',async()=>{
  const v=[{value:'Over',handicap:2.5,odd:1.9,main:true},{value:'Under',handicap:2.5,odd:1.95,main:true}];
  const o2=structuredClone(o);o2.id='42:70:raw-quoted';
- o2.sources.odds={status:'OK',received_at:n-2900,source_at:null,
+ o2.sources.odds={status:'OK',received_at:n-3500,source_at:null,
   data:[{fixture:{id:42},odds:[{id:5,name:'Over/Under',values:v}]}]};
  const d2=buildFTDecision({observation:o2,decision_at:n-2000,state:'EVALUATED',
   evaluation:{score:76,scoreMode:'FULL'},source_hash:'e'.repeat(64),
@@ -58,7 +58,7 @@ await test('replay reports verified raw odds while refusing fake model fair pric
 await test('replay does not certify normalized quote when odds raw differs',async()=>{
  const v=[{value:'Over',handicap:2.5,odd:1.9,main:true},{value:'Under',handicap:2.5,odd:1.95,main:true}];
  const sourceO=structuredClone(o);sourceO.id='42:70:raw-different';
- sourceO.sources.odds={status:'OK',received_at:n-2900,source_at:null,
+ sourceO.sources.odds={status:'OK',received_at:n-3500,source_at:null,
   data:[{fixture:{id:42},odds:[{id:5,name:'Over/Under',values:[{...v[0],odd:1.7},v[1]]}]}]};
  const d2=buildFTDecision({observation:sourceO,decision_at:n-2000,state:'EVALUATED',
   evaluation:{score:76,scoreMode:'FULL'},source_hash:'f'.repeat(64),
