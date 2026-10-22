@@ -1,4 +1,5 @@
 import {reserveNotifyAttempt,notifyBudgetLimit} from './shared-api-budget.mjs';
+import {ftReplaySqlRemaining} from './replay-sql-budget.mjs';
 // Explicit trial entrypoint, never called by alarm/notifyTick automatically.
 import {recordFTOutcome} from './decision-trace.mjs';
 export const OUTCOME_BUDGET_KEY='ft:outcome:api-budget:v1';
@@ -23,6 +24,9 @@ export async function runFTOutcomePass(owner,observations,{clock=Date.now}={}){
  for(const [id,items]of groups){
   if(visited>=config.MAX_FIXTURES||report.write_attempts>=config.MAX_WRITES){report.deferred_fixtures++;continue;}
   visited++;
+  // Need room for one outcome reservation plus immutable insert/read (4 SQL calls).
+  // Avoid wasting provider API quota when this invocation cannot store any result.
+  if(ftReplaySqlRemaining(owner)<4){report.status='SQL_LIMIT_DEFERRED';report.results.push({fixture_id:id,status:'SQL_LIMIT_DEFERRED'});return report;}
   const now=clock();
   if(!positive(now)||items.some(x=>x.decision_at>now)){report.results.push({fixture_id:id,status:'INVALID_CLOCK'});continue;}
   let reserved;
@@ -52,6 +56,7 @@ export async function runFTOutcomePass(owner,observations,{clock=Date.now}={}){
    report.write_attempts++;
    const result=await recordFTOutcome(owner,observation,rows[0],receivedAt,receivedAt);
    report.results.push({observation_id:observation.id,fixture_id:id,...result});
+   if(result.status==='SQL_LIMIT_DEFERRED'){report.status='SQL_LIMIT_DEFERRED';return report;}
    if(['BUDGET_DENIED','BUDGET_UNAVAILABLE','PAUSED','RECORD_FAILED','PAUSE_READ_FAILED'].includes(result.status)){
     report.status='STORAGE_BLOCKED';return report;
    }
