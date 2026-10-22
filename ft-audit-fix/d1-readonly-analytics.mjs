@@ -7,10 +7,14 @@ import {mkdirSync,writeFileSync} from 'node:fs';
 const account=process.env.CLOUDFLARE_ACCOUNT_ID,token=process.env.CLOUDFLARE_API_TOKEN;
 const data={scope:'READ_ONLY_D1_USAGE_DIAGNOSTIC',at:new Date().toISOString(),status:'NOT_RUN',
  account_writes:0,d1_sql_queries:0,provider_calls:0,worker_deploys:0,queries_attempted:0,
- dates:['2026-10-21','2026-10-22'],databases:[],errors:[],note:'Analytics may lag and uses adaptive sampling. This is not a query-level billing invoice.'};
+ dates:[],databases:[],errors:[],note:'Analytics may lag and uses adaptive sampling. This is not a query-level billing invoice.'};
 mkdirSync('ft-audit-output',{recursive:true});
 const save=()=>writeFileSync('ft-audit-output/ft-d1-readonly-usage.json',JSON.stringify(data,null,2));
 const apiBase='https://api.cloudflare.com/client/v4';
+// Compute the actual UTC billing day when this read-only check runs; never pin an October date.
+const utcToday=new Date().toISOString().slice(0,10);
+const utcYesterday=new Date(Date.parse(utcToday+'T00:00:00Z')-86400000).toISOString().slice(0,10);
+data.dates=[utcYesterday,utcToday];
 async function getDBs(){
  const response=await fetch(apiBase+'/accounts/'+encodeURIComponent(account)+'/d1/database?per_page=100&page=1',
   {headers:{Authorization:'Bearer '+token},signal:AbortSignal.timeout(16000)});
@@ -57,9 +61,11 @@ try{
   return {day:x.dimensions.date,database:tags.get(id)||'UNLISTED_DB',...m};
  });
  const total={rowsRead:0,rowsWritten:0,readQueries:0,writeQueries:0};
- const today=out.filter(x=>x.day==='2026-10-22');
+ const today=out.filter(x=>x.day===utcToday);
  for(const r of today)for(const k of Object.keys(total))total[k]+=r[k];
- data.databases=out;data.today=total;data.status='PASS';
+ data.databases=out;data.today=total;data.utc_day=utcToday;
+ if(!today.some(x=>x.database==='KNOWN_PROD_DB'))throw Error('CURRENT_UTC_PRODUCTION_D1_DATA_NOT_AVAILABLE');
+ data.status='PASS';
  data.note='GraphQL adaptive/delayed analytics; account totals here may differ from billing enforcement counters. ZERO D1 SQL queries/writes by this script.';
 }catch(error){
  data.status='FAIL';data.errors.push({message:error.message,detail:error.details??null});process.exitCode=1;
