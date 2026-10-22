@@ -24,7 +24,15 @@ const decision={schema:'FT_DECISION_V1_DRAFT',observation_id:observation.id,fixt
  source_hash:'a'.repeat(64),market_rows:[market()],
  devices:[{device_slot:0,goal_estimate:{prob:71,n:0,source:'MODEL',basis:'MODEL'}}]};
 let tests=0;const test=(title,fn)=>{fn();tests++;console.log('PASS '+title)};
-const call=(o=observation,d=decision)=>bridge({observation:o,decision:d});
+const call=(o=observation,d=decision,keepRaw=false)=>{
+ // Real source is the unnormalized API response, not a manufactured market price.
+ // Test harness uses the same selected inputs to simulate that raw input by default.
+ const raw=(Array.isArray(d?.market_rows)?d.market_rows:[]).map(m=>({
+  fixture:{id:m.fixture_id},odds:[{id:m.bet_id,name:m.feed_bet_name,values:m.values}]
+ }));
+ const source=keepRaw?o:{...o,sources:{...o.sources,odds:{...o.sources.odds,data:raw}}};
+ return bridge({observation:source,decision:d});
+};
 test('real normalized Over/Under pair is evidence but NO artificial fair price',()=>{
  const x=call();assert.equal(x.status,'EVIDENCE_READY_UNPRICED');
  assert.equal(x.bookmaker_quote.line,2.5);assert.equal(x.bookmaker_quote.over_odds,1.95);
@@ -37,6 +45,26 @@ test('goal_ft probability 71 never treated as final total goals probability',()=
  assert.equal(x.signal.device_goal_signals[0].sample_n,0);
  assert.match(x.signal.signal_contract,/NOT_A_FINISHING_GOALS_PMF/);
  assert.equal(x.pricing.status,'UNPRICED');
+});
+test('raw live odds fixture identity is required',()=>{
+ const x=call({...observation,sources:{...observation.sources,odds:{...observation.sources.odds,
+  data:[{fixture:{id:43},odds:[{id:5,name:'Over/Under',values:vals()}]}]}}},decision,true);
+ assert.equal(x.reason,'NORMALIZED_MARKET_NOT_RECONCILED_WITH_RAW_ODDS');
+});
+test('normalized Over quote with changed price fails raw cross-check',()=>{
+ const x=call({...observation,sources:{...observation.sources,odds:{...observation.sources.odds,
+  data:[{fixture:{id:42},odds:[{id:5,name:'Over/Under',values:vals(2.5,1.5,1.9)}]}]}}},decision,true);
+ assert.equal(x.reason,'NORMALIZED_MARKET_NOT_RECONCILED_WITH_RAW_ODDS');
+});
+test('raw second half market cannot be promoted to FT even with corrected normalized category',()=>{
+ const x=call({...observation,sources:{...observation.sources,odds:{...observation.sources.odds,
+  data:[{fixture:{id:42},odds:[{id:5,name:'Second Half Over/Under',values:vals()}]}]}}},decision,true);
+ assert.equal(x.reason,'NORMALIZED_MARKET_NOT_RECONCILED_WITH_RAW_ODDS');
+});
+test('raw bookmaker bet id different is rejected',()=>{
+ const x=call({...observation,sources:{...observation.sources,odds:{...observation.sources.odds,
+  data:[{fixture:{id:42},odds:[{id:999,name:'Over/Under',values:vals()}]}]}}},decision,true);
+ assert.equal(x.reason,'NORMALIZED_MARKET_NOT_RECONCILED_WITH_RAW_ODDS');
 });
 test('FT score 78 never converted into probability of Over 2.5',()=>{const x=call();assert.equal(x.signal.goal_ft_score,78);assert.equal(x.pricing.ev,null)});
 test('missing odds source blocked',()=>assert.equal(call({...observation,sources:{...observation.sources,odds:{status:'MISSING'}}}).reason,'LIVE_ODDS_SOURCE_RECEIPT_UNVERIFIED'));
