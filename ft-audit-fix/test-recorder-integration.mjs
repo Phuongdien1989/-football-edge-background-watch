@@ -63,7 +63,7 @@ await test('sidecar SQL cap defers replay without dropping normal Notify scan',a
  const r=await run(after,fixture,[],[],{env:{...env,FT_REPLAY_TRIAL_SQL_BUDGET_PER_INVOCATION:'3'}});
  assert.equal(r.replay.status,'DEFERRED_CAPTURE_BUDGET');
  assert.equal(r.calls.length,5);
- assert.equal(r.decision,undefined);
+ assert.equal(r.decision,null);
  assert.equal(sql-start,0);
  assert.equal(r.writes,1);
 });
@@ -71,7 +71,7 @@ await test('sidecar SQL cap covers observation and decision in a single scan',as
  rows.clear();deny=false;const start=sql;
  const r=await run(after,fixture,[],[],{env:{...env,FT_REPLAY_TRIAL_SQL_BUDGET_PER_INVOCATION:'4'}});
  assert.equal(r.replay.status,'DEFERRED_CAPTURE_BUDGET');
- assert.equal(r.decision,undefined);
+ assert.equal(r.decision,null);
  assert.equal(sql-start,0);
  assert.equal(r.calls.length,5);
  assert.equal(r.writes,1);
@@ -98,7 +98,7 @@ await test('atomic pair trial defers on SQL cap but never stores half a pair',as
  rows.clear();deny=false;const beforeSql=sql;
  const r=await run(after,fixture,[],[],{env:{...env,FT_REPLAY_PAIR_TRIAL_ENABLED:'true',FT_REPLAY_TRIAL_SQL_BUDGET_PER_INVOCATION:'2'}});
  assert.equal(r.replay.status,'DEFERRED_CAPTURE_BUDGET');
- assert.equal(r.decision,undefined);
+ assert.equal(r.decision,null);
  assert.equal(sql-beforeSql,0);
  const manifest=r.storage.get('ft:replay:capture-plan:v1')?.history?.at(-1);
  assert.equal(manifest?.attempts?.[0]?.storage_confirmed,false);
