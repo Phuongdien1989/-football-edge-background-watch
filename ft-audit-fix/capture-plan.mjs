@@ -13,12 +13,12 @@ export function planFTCaptureBatch(candidates,{maxPairs=0,cursor=0,prioritySeats
   items.push({fixture_id:x.fixture_id,priority:x.priority===true});
  }
  items.sort((a,b)=>a.fixture_id-b.fixture_id);
- const n=items.length,slots=Math.min(maxPairs,n),chosen=new Set();
+ const n=items.length,slots=Math.min(maxPairs,n),chosen=new Set(),prioritySelected=[];
  // Admission of priority signals is explicitly bounded: the remaining budget
  // always samples across ALL fixtures, including unranked/unrecommended ones.
  const priorityItems=items.filter(x=>x.priority);
  const priorityCount=Math.min(prioritySeats,slots,priorityItems.length);
- for(let k=0;k<priorityCount;k++)chosen.add(priorityItems[(cursor+k)%priorityItems.length].fixture_id);
+ for(let k=0;k<priorityCount;k++){const id=priorityItems[(cursor+k)%priorityItems.length].fixture_id;chosen.add(id);prioritySelected.push(id);}
  const coverageSlots=slots-chosen.size;
  // Round-robin cursor persists across ticks when the owner opts into storage.
  const start=n?cursor%n:0;
@@ -32,6 +32,6 @@ export function planFTCaptureBatch(candidates,{maxPairs=0,cursor=0,prioritySeats
  return {schema:'FT_CAPTURE_PLAN_V1_DRAFT',selected,deferred,source_count:n,
   max_pairs:maxPairs,selected_count:selected.length,deferred_count:deferred.length,
   nextCursor:n?(cursor+Math.max(1,coverageSlots))%n:0,
-  priority_selected:selected.filter(id=>items.find(x=>x.fixture_id===id).priority),
+  priority_selected:prioritySelected,
   reasons:deferred.length?['SQL_CAPACITY_DEFERRED_NOT_REPLAYABLE_FROM_LATER_SNAPSHOT']:[]};
 }
