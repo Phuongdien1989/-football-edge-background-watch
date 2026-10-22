@@ -3,13 +3,14 @@ import {runPendingFT,PAGE_SQL} from './pending-discovery.mjs';
 import {runFTOutcomePass,OUTCOME_BUDGET_KEY} from './outcome-pass.mjs';
 import {recordFTDecision} from './decision-trace.mjs';
 import {recordFTScan} from './worker-recorder.mjs';
-import {beginFTReplaySqlInvocation} from './replay-sql-budget.mjs';
+import {beginFTReplaySqlInvocation,ftReplaySqlRemaining} from './replay-sql-budget.mjs';
+import {planFTCaptureBatch} from './capture-plan.mjs';
 import assert from 'node:assert/strict';import {readFileSync,writeFileSync} from 'node:fs';
 import {observeFT,observeFTStats,observeFTRedEvents,observeFTCatalog} from './ft-events.mjs';
 const baseline=process.argv[2]||'baseline',out=process.argv[3]||'ft-audit-output';
 const {createEngine}=await import('data:text/javascript;base64,'+Buffer.from(readFileSync(out+'/candidate/notify-core.js','utf8')).toString('base64'));
 function load(path){let source=readFileSync(path,'utf8').replace(/^import .*;\s*$/gm,'').replace('export class BackgroundWatcher','class BackgroundWatcher').replace('export default base;','return BackgroundWatcher;');
- return new Function('DeepLinkWatcher','base','createHTCollection','readHTContext','createHTHistoryCache','assessHTItem','createEngine','crossing','observeFT','observeFTStats','observeFTRedEvents','observeFTCatalog','recordFTScan','recordFTDecision','runFTOutcomePass','runPendingFT','reserveScanAttempt','beginFTReplaySqlInvocation',source)(class{}, {},()=>({eligible:()=>false}),async()=>({}),()=>({beginCycle(){}}),()=>null,createEngine,()=>({state:{},send:false}),observeFT,observeFTStats,observeFTRedEvents,observeFTCatalog,recordFTScan,recordFTDecision,runFTOutcomePass,runPendingFT,reserveScanAttempt,beginFTReplaySqlInvocation);}
+ return new Function('DeepLinkWatcher','base','createHTCollection','readHTContext','createHTHistoryCache','assessHTItem','createEngine','crossing','observeFT','observeFTStats','observeFTRedEvents','observeFTCatalog','recordFTScan','recordFTDecision','runFTOutcomePass','runPendingFT','reserveScanAttempt','beginFTReplaySqlInvocation','ftReplaySqlRemaining','planFTCaptureBatch',source)(class{}, {},()=>({eligible:()=>false}),async()=>({}),()=>({beginCycle(){}}),()=>null,createEngine,()=>({state:{},send:false}),observeFT,observeFTStats,observeFTRedEvents,observeFTCatalog,recordFTScan,recordFTDecision,runFTOutcomePass,runPendingFT,reserveScanAttempt,beginFTReplaySqlInvocation,ftReplaySqlRemaining,planFTCaptureBatch);}
 const before=load(out+'/candidate/worker_notify_v130.js'),after=load(out+'/recorder-trial/worker_notify_v130.js');
 const f=(goals,phase='2H')=>({fixture:{id:42,status:{short:phase,elapsed:75}},goals,teams:{home:{id:1,name:'A'},away:{id:2,name:'B'}}});
 async function run(C,fixture,stats=[],events=[],options={}){
@@ -59,7 +60,7 @@ await test('opt-in notifyTick discovers and resolves without supplied observatio
 await test('sidecar SQL cap defers replay without dropping normal Notify scan',async()=>{
  rows.clear();deny=false;const start=sql;
  const r=await run(after,fixture,[],[],{env:{...env,FT_REPLAY_TRIAL_SQL_BUDGET_PER_INVOCATION:'3'}});
- assert.equal(r.replay.status,'SQL_LIMIT_DEFERRED');
+ assert.equal(r.replay.status,'DEFERRED_CAPTURE_BUDGET');
  assert.equal(r.calls.length,5);
  assert.equal(r.decision,undefined);
  assert.equal(sql-start,0);
@@ -68,9 +69,9 @@ await test('sidecar SQL cap defers replay without dropping normal Notify scan',a
 await test('sidecar SQL cap covers observation and decision in a single scan',async()=>{
  rows.clear();deny=false;const start=sql;
  const r=await run(after,fixture,[],[],{env:{...env,FT_REPLAY_TRIAL_SQL_BUDGET_PER_INVOCATION:'4'}});
- assert.equal(r.replay.status,'STORED');
- assert.equal(r.decision.status,'SQL_LIMIT_DEFERRED');
- assert.equal(sql-start,4);
+ assert.equal(r.replay.status,'DEFERRED_CAPTURE_BUDGET');
+ assert.equal(r.decision,undefined);
+ assert.equal(sql-start,0);
  assert.equal(r.calls.length,5);
  assert.equal(r.writes,1);
 });
