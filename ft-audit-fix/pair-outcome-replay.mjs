@@ -4,6 +4,7 @@
 import {prepareFTPair} from './ft-pair-collector.mjs';
 import {inspectFTObservation,inspectFTOutcome} from './replay-integrity.mjs';
 import {auditFTReplay} from './replay-coverage.mjs';
+import {extractFTPricingEvidence} from './ft-pricing-evidence-bridge.mjs';
 export const PAIR_PAGE_SQL=`SELECT p.observation_id,p.fixture_id,p.observed_at,p.decision_at,p.content_hash,
  p.observation_json,p.decision_json,
  EXISTS(SELECT 1 FROM ft_replay_records_v1 AS o INDEXED BY ft_replay_by_observation_kind
@@ -36,6 +37,8 @@ export async function verifyFTPairRow(row,{maxRecordBytes=20000}={}){
 export async function auditFTPairOutcomeRows(pairs,outcomes,{maxRecordBytes=20000}={}){
  if(!Array.isArray(pairs)||!Array.isArray(outcomes))throw Error('INVALID_PAIR_AUDIT_INPUT');
  const records=[],issues=[],seen=new Set(),validatedPairs=new Map();
+ const marketEvidence={verified_full_match_ou_quote_pairs:0,blocked_or_missing_quote_pairs:0,
+  proven_model_final_total_distributions:0,priced_pairs:0,executable_quotes:0};
  for(const pair of pairs){
   const key=pair?.observation_id;
   if(typeof key!=='string'||seen.has(key)){issues.push({observation_id:key??null,reason:'DUPLICATE_OR_BAD_PAIR_KEY'});continue;}
@@ -43,6 +46,11 @@ export async function auditFTPairOutcomeRows(pairs,outcomes,{maxRecordBytes=2000
   const verify=await verifyFTPairRow(pair,{maxRecordBytes});
   if(verify.status!=='VALID_PAIR'){issues.push({observation_id:key,reason:verify.reason});continue;}
   validatedPairs.set(key,verify);
+  const evidence=extractFTPricingEvidence({observation:verify.observation,decision:verify.decision});
+  if(evidence.status==='EVIDENCE_READY_UNPRICED')marketEvidence.verified_full_match_ou_quote_pairs++;
+  else marketEvidence.blocked_or_missing_quote_pairs++;
+  // Legacy goal_ft is binary; it is NEVER a regulation final-total PMF. This
+  // count must remain zero until a separate calibrated model contract exists.
   records.push(verify.observation,verify.decision);
  }
  for(const outcome of outcomes)records.push(outcome);
@@ -61,6 +69,8 @@ export async function auditFTPairOutcomeRows(pairs,outcomes,{maxRecordBytes=2000
  return {schema:'FT_PAIR_OUTCOME_AUDIT_V1_DRAFT',
   valid_pairs:validatedPairs.size,invalid_pairs:issues.length,issues,
   replay_counts:replay.counts,linked_count:replay.counts.LINKED||0,
-  linked_integrity_rejects:integrityRejected,accuracy:null,roi:null,calibration:null,
+  linked_integrity_rejects:integrityRejected,market_evidence:marketEvidence,
+  model_contract:'BINARY_GOAL_FT_CANNOT_PRICE_ASIAN_FULL_MATCH_OU',
+  accuracy:null,roi:null,calibration:null,
   status:'EVIDENCE_AUDIT_ONLY',releaseGate:'BLOCKED'};
 }
