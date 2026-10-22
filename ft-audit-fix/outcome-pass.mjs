@@ -5,6 +5,7 @@ import {recordFTOutcome} from './decision-trace.mjs';
 export const OUTCOME_BUDGET_KEY='ft:outcome:api-budget:v1';
 const positive=x=>Number.isSafeInteger(x)&&x>0;
 export async function runFTOutcomePass(owner,observations,{clock=Date.now}={}){
+ if(owner.env?.FT_REPLAY_PAIR_TRIAL_ENABLED==='true')return {status:'PAIR_OUTCOME_NOT_WIRED',api_calls:0};
  if(owner.env?.FT_OUTCOME_TRIAL_ENABLED!=='true'||owner.env?.FT_REPLAY_TRIAL_ENABLED!=='true')return {status:'DISABLED',api_calls:0};
  if(typeof owner.scanControl!=='function'||(await owner.scanControl())?.enabled!==true)return {status:'SCANNER_OFF',api_calls:0};
  const config=Object.fromEntries(['MAX_OBSERVATIONS','MAX_FIXTURES','MAX_WRITES','RETRY_MS','MAX_ATTEMPTS'].map(k=>[k,Number(owner.env['FT_OUTCOME_TRIAL_'+k])]));
