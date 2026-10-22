@@ -13,7 +13,8 @@ concurrency:
   cancel-in-progress: false
 jobs:
   mobile_only_release:
-    if: startsWith(github.event.head_commit.message, 'release(fe-mobile-outbox): owner-approved Mobile-only production')
+    if: >-
+      startsWith(github.event.head_commit.message, 'release(fe-mobile-outbox): owner-approved Mobile-only production')
     runs-on: ubuntu-latest
     timeout-minutes: 15
     environment: football-edge-production
