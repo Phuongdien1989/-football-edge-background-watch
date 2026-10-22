@@ -1,4 +1,5 @@
 name: Football Edge owner-approved Mobile Outbox ONLY release
+# Owner approved Mobile-only production release, with version drift and rollback controls.
 on:
   push:
     branches: [fix/ft-foundation-20261021]
