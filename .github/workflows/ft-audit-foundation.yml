@@ -28,6 +28,7 @@ jobs:
       - run: node ft-audit-fix/test-ledger.mjs
       - run: node ft-audit-fix/test-trial-collector.mjs
       - run: node ft-audit-fix/test-persistent-collector.mjs
+      - run: node ft-audit-fix/test-replay-sql-budget.mjs
       - run: node ft-audit-fix/test-worker-recorder.mjs
       - run: node ft-audit-fix/test-decision-trace.mjs
       - run: node ft-audit-fix/test-outcome-pass.mjs
