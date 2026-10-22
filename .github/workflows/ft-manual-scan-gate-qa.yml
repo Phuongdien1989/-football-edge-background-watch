@@ -1,0 +1,22 @@
+name: FE manual scanner GO NO-GO pure offline QA
+on:
+  push:
+    branches: [fix/ft-foundation-20261021]
+    paths:
+      - 'ft-audit-fix/manual-scan-gate.mjs'
+      - 'ft-audit-fix/test-manual-scan-gate.mjs'
+      - '.github/workflows/ft-manual-scan-gate-qa.yml'
+permissions: {contents: read}
+jobs:
+  safe_gate_test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Test fail-closed gate without credentials, mutations or external requests
+        run: |
+          node --check ft-audit-fix/manual-scan-gate.mjs
+          node ft-audit-fix/test-manual-scan-gate.mjs
