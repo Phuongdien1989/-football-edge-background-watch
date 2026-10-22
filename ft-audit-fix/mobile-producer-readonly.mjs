@@ -1,4 +1,5 @@
-// Read-only MOBILE Worker script source check. Not a traffic-level replay diagnosis.
+// Read-only MOBILE Worker script source check.
+// Execute exactly once; no source bytes are printed or transmitted as an artifact. Not a traffic-level replay diagnosis.
 // Never print Worker source (which may contain embedded secrets). Only boolean marker report.
 import {createHash} from 'node:crypto';
 import {mkdirSync,writeFileSync} from 'node:fs';
