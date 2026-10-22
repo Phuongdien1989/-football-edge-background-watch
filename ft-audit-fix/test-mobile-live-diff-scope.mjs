@@ -1,4 +1,4 @@
-// NO-DEPLOY exact-source mobile safety gate. Detects ANY unintended change outside
+// NO-DEPLOY exact-source mobile safety gate. Re-run pinned QA once. Detects ANY unintended change outside
 // entry enqueue function, added atomic ACK helper, and the sync ACK one-liner.
 import assert from 'node:assert/strict';
 import {readFileSync,mkdirSync,writeFileSync} from 'node:fs';
