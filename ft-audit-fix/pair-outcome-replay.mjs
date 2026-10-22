@@ -2,7 +2,7 @@
 // The distinct PAIR table holds a complete immutable Observation+Decision snapshot;
 // regulation outcomes remain append-only OUTCOME rows in ft_replay_records_v1.
 import {prepareFTPair} from './ft-pair-collector.mjs';
-import {inspectFTOutcome} from './replay-integrity.mjs';
+import {inspectFTObservation,inspectFTOutcome} from './replay-integrity.mjs';
 import {auditFTReplay} from './replay-coverage.mjs';
 export const PAIR_PAGE_SQL=`SELECT p.observation_id,p.fixture_id,p.observed_at,p.decision_at,p.content_hash,
  p.observation_json,p.decision_json,
@@ -24,6 +24,8 @@ export async function verifyFTPairRow(row,{maxRecordBytes=20000}={}){
   if(observation.fixture?.fixture?.id!==row.fixture_id||
     observation.fixture?.fixture?.status?.short!=='2H')throw Error('NOT_LIVE_FT_OBSERVATION');
   if(observation.fixture?.score?.fulltime!=null||observation.outcome!=null)throw Error('FUTURE_SCORE_LEAKAGE');
+  const checked=inspectFTObservation(observation);
+  if(checked.status==='REJECT')throw Error('PAIR_OBSERVATION_INTEGRITY_REJECT_'+checked.errors.slice(0,2).join('_'));
   for(const x of Object.values(observation.sources||{})){
    if(x?.received_at!=null&&x.received_at>observation.decision_at)throw Error('FUTURE_SOURCE_RECEIPT');
    if(x?.source_at!=null&&x.source_at>x.received_at)throw Error('INVALID_SOURCE_CLOCK');
