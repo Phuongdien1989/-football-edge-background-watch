@@ -16,6 +16,7 @@ function harness(page=[row]){
 }
 const run=(o,t=now)=>runPendingFT(o,{clock:()=>t});
 let checks=0;async function test(name,fn){await fn();checks++;console.log('PASS '+name);}
+await test('pair-ledger mode refuses old discovery query before D1 or API',async()=>{const h=harness(),o=h.owner();o.env.FT_REPLAY_PAIR_TRIAL_ENABLED='true';assert.equal((await run(o)).status,'PAIR_OUTCOME_NOT_WIRED');assert.equal(h.counts().reads,0);assert.equal(h.counts().api,0);});
 await test('disabled and scanner off make no discovery query',async()=>{const h=harness(),o=h.owner();o.env.FT_OUTCOME_DISCOVERY_ENABLED='false';assert.equal((await run(o)).status,'DISABLED');o.env.FT_OUTCOME_DISCOVERY_ENABLED='true';o.scanControl=async()=>({enabled:false});assert.equal((await run(o)).status,'SCANNER_OFF');assert.equal(h.counts().reads,0);});
 await test('pending record discovered and missing decision preserved',async()=>{const h=harness(),r=await run(h.owner());assert.deepEqual(r.missing_decision,['a']);assert.equal(r.result.results[0].status,'STORED');assert.deepEqual(h.counts(),{reads:1,api:1,sql:4});assert.equal(h.memory.get(DISCOVERY_KEY).cursor,'OBS:a');});
 await test('restart respects discovery interval',async()=>{const h=harness();await run(h.owner());assert.equal((await run(h.owner())).status,'NOT_DUE');assert.equal(h.counts().reads,1);});
