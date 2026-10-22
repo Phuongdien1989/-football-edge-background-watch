@@ -1,3 +1,4 @@
+// Final review QA: no deployment, no D1 SQL.
 import assert from 'node:assert/strict';
 import {readFileSync,mkdirSync,writeFileSync} from 'node:fs';
 import vm from 'node:vm';
