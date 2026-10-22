@@ -51,8 +51,10 @@ export async function auditFTPairOutcomeRows(pairs,outcomes,{maxRecordBytes=2000
   const pair=validatedPairs.get(result.id);
   const finalRows=outcomes.filter(x=>x.observation_id===result.id);
   const latestTime=Math.max(...finalRows.map(x=>x.observed_at||0));
-  const latest=finalRows.find(x=>x.observed_at===latestTime);
-  if(!pair||!latest||inspectFTOutcome(pair.observation,pair.decision,latest).status==='REJECT')integrityRejected++;
+  const finalists=finalRows.filter(x=>x.observed_at===latestTime);
+  // Never certify a linked replay by arbitrarily selecting the first tied
+  // outcome revision. Reject the linked cohort if ANY latest revision fails.
+  if(!pair||!finalists.length||finalists.some(x=>inspectFTOutcome(pair.observation,pair.decision,x).status==='REJECT'))integrityRejected++;
  }
  return {schema:'FT_PAIR_OUTCOME_AUDIT_V1_DRAFT',
   valid_pairs:validatedPairs.size,invalid_pairs:issues.length,issues,
