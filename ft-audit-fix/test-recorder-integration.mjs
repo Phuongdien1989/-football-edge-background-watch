@@ -3,12 +3,13 @@ import {runPendingFT,PAGE_SQL} from './pending-discovery.mjs';
 import {runFTOutcomePass,OUTCOME_BUDGET_KEY} from './outcome-pass.mjs';
 import {recordFTDecision} from './decision-trace.mjs';
 import {recordFTScan} from './worker-recorder.mjs';
+import {beginFTReplaySqlInvocation} from './replay-sql-budget.mjs';
 import assert from 'node:assert/strict';import {readFileSync,writeFileSync} from 'node:fs';
 import {observeFT,observeFTStats,observeFTRedEvents,observeFTCatalog} from './ft-events.mjs';
 const baseline=process.argv[2]||'baseline',out=process.argv[3]||'ft-audit-output';
 const {createEngine}=await import('data:text/javascript;base64,'+Buffer.from(readFileSync(out+'/candidate/notify-core.js','utf8')).toString('base64'));
 function load(path){let source=readFileSync(path,'utf8').replace(/^import .*;\s*$/gm,'').replace('export class BackgroundWatcher','class BackgroundWatcher').replace('export default base;','return BackgroundWatcher;');
- return new Function('DeepLinkWatcher','base','createHTCollection','readHTContext','createHTHistoryCache','assessHTItem','createEngine','crossing','observeFT','observeFTStats','observeFTRedEvents','observeFTCatalog','recordFTScan','recordFTDecision','runFTOutcomePass','runPendingFT','reserveScanAttempt',source)(class{}, {},()=>({eligible:()=>false}),async()=>({}),()=>({beginCycle(){}}),()=>null,createEngine,()=>({state:{},send:false}),observeFT,observeFTStats,observeFTRedEvents,observeFTCatalog,recordFTScan,recordFTDecision,runFTOutcomePass,runPendingFT,reserveScanAttempt);}
+ return new Function('DeepLinkWatcher','base','createHTCollection','readHTContext','createHTHistoryCache','assessHTItem','createEngine','crossing','observeFT','observeFTStats','observeFTRedEvents','observeFTCatalog','recordFTScan','recordFTDecision','runFTOutcomePass','runPendingFT','reserveScanAttempt','beginFTReplaySqlInvocation',source)(class{}, {},()=>({eligible:()=>false}),async()=>({}),()=>({beginCycle(){}}),()=>null,createEngine,()=>({state:{},send:false}),observeFT,observeFTStats,observeFTRedEvents,observeFTCatalog,recordFTScan,recordFTDecision,runFTOutcomePass,runPendingFT,reserveScanAttempt,beginFTReplaySqlInvocation);}
 const before=load(out+'/candidate/worker_notify_v130.js'),after=load(out+'/recorder-trial/worker_notify_v130.js');
 const f=(goals,phase='2H')=>({fixture:{id:42,status:{short:phase,elapsed:75}},goals,teams:{home:{id:1,name:'A'},away:{id:2,name:'B'}}});
 async function run(C,fixture,stats=[],events=[],options={}){
