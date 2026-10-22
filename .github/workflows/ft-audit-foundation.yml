@@ -30,6 +30,7 @@ jobs:
       - run: node ft-audit-fix/test-persistent-collector.mjs
       - run: node ft-audit-fix/test-pair-outcome-replay.mjs
       - run: node ft-audit-fix/test-ft-total-settlement.mjs
+      - run: node ft-audit-fix/test-ft-pricing-evidence-bridge.mjs
       - run: node ft-audit-fix/test-ft-pair-collector.mjs
       - run: python3 ft-audit-fix/test-ft-pair-sqlite.py
       - run: node ft-audit-fix/test-replay-integrity.mjs
