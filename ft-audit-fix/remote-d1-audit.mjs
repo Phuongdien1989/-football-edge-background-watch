@@ -12,10 +12,10 @@ mkdirSync('ft-audit-output',{recursive:true});
 const save=()=>writeFileSync('ft-audit-output/remote-d1-audit.json',JSON.stringify(report,null,2));
 async function api(path,body){
  assert(report.http_calls<70,'HTTP_BOUND');report.http_calls++;
- if(body)assert(path==='/d1/database'||(databaseId&&path==='/d1/database/'+databaseId+'/query'),'WRITE_TARGET_DENIED');
+ if(body)assert(databaseId&&path==='/d1/database/'+databaseId+'/query','WRITE_TARGET_DENIED');
  const r=await fetch('https://api.cloudflare.com/client/v4/accounts/'+encodeURIComponent(account)+path,{method:body?'POST':'GET',headers:{Authorization:'Bearer '+token,...(body?{'Content-Type':'application/json'}:{})},...(body?{body:JSON.stringify(body)}:{}),signal:AbortSignal.timeout(20000)});
  const j=await r.json();
- if(!r.ok||!j.success){const e=Error('CF_HTTP_'+r.status);e.details={path:path.replace(account,'ACCOUNT'),status:r.status,codes:(j.errors||[]).map(x=>x.code)};throw e;}
+ if(!r.ok||!j.success){const e=Error('CF_HTTP_'+r.status);e.details={path:path.replace(account,'ACCOUNT'),status:r.status,codes:(j.errors||[]).map(x=>x.code),messages:(j.errors||[]).map(x=>String(x.message||'').split(token).join('[TOKEN]').split(account).join('[ACCOUNT]').slice(0,500))};throw e;}
  return j;
 }
 async function query(sql,params=[]){
@@ -41,16 +41,16 @@ try{
  const listed=await api('/d1/database?per_page=100&page=1');
  assert(Array.isArray(listed.result),'INVALID_DATABASE_LIST');
  report.existing_database_count=listed.result_info?.total_count??listed.result.length;
- assert(report.existing_database_count<10&&listed.result.length<10,'FREE_DATABASE_CAPACITY_UNCONFIRMED');
- assert(/^\d+$/.test(process.env.GITHUB_RUN_ID||''),'RUN_ID_REQUIRED');
- databaseName='fe-ft-replay-audit-'+process.env.GITHUB_RUN_ID;
- assert(!listed.result.some(x=>x.name===databaseName),'TEST_DATABASE_ALREADY_EXISTS');
- const created=(await api('/d1/database',{name:databaseName,primary_location_hint:'apac'})).result;
- assert(created.name===databaseName&&/^[a-f0-9-]{36}$/.test(created.uuid),'TEST_DATABASE_IDENTITY');
- assert(!listed.result.some(x=>x.uuid===created.uuid),'EXISTING_DATABASE_RETURNED');
- databaseId=created.uuid;report.test_database={id:databaseId,name:databaseName,retained:true};save();
+ // Resume only the exact isolated database created by run 39699021468.
+ databaseName='fe-ft-replay-audit-39699021468';
+ databaseId='e82758f2-e533-44a6-b42d-4821d120e082';
+ assert(listed.result.some(x=>x.name===databaseName&&x.uuid===databaseId),'ISOLATED_DATABASE_IDENTITY_REQUIRED');
+ report.test_database={id:databaseId,name:databaseName,retained:true,reused:true};save();
+ phase='empty_database_preflight';
+ const tables=(await query("SELECT name FROM sqlite_master WHERE type='table' AND name IN ('ft_replay_records_v1','ft_replay_budget_v1')")).results;
+ assert(tables.length===0,'SCHEMA_ALREADY_PRESENT_REVIEW_REQUIRED');
  phase='schema';
- for(const f of ['replay-ledger.sql','persistent-budget.sql','pending-index.sql'])await query(readFileSync(new URL('./'+f,import.meta.url),'utf8'));
+ for(const f of ['replay-ledger.sql','persistent-budget.sql','pending-index.sql'])await query(readFileSync(new URL('./'+f,import.meta.url),'utf8').replace(/^\s*--.*$/gm,'').trim());
  const now=Date.now();
  await query('INSERT INTO ft_replay_budget_v1(id,window_start,window_end,max_records,max_bytes) VALUES(1,?,?,6,200000)',[now-1000,now+600000]);
  const f=(home,status='2H')=>({fixture:{id:42,status:{short:status}},goals:{home,away:0},score:{fulltime:{home,away:0}}});
