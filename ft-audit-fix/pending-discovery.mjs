@@ -13,6 +13,7 @@ SELECT page.*,
 FROM page ORDER BY record_id`;
 const pos=x=>Number.isSafeInteger(x)&&x>0;
 export async function runPendingFT(owner,{clock=Date.now}={}){
+ if(owner.env?.FT_REPLAY_PAIR_TRIAL_ENABLED==='true')return {status:'PAIR_OUTCOME_NOT_WIRED'};
  if(owner.env?.FT_OUTCOME_DISCOVERY_ENABLED!=='true'||owner.env?.FT_OUTCOME_TRIAL_ENABLED!=='true'||owner.env?.FT_REPLAY_TRIAL_ENABLED!=='true')return {status:'DISABLED'};
  if(typeof owner.scanControl!=='function'||(await owner.scanControl())?.enabled!==true)return {status:'SCANNER_OFF'};
  const pageSize=Number(owner.env.FT_OUTCOME_TRIAL_PAGE_SIZE),interval=Number(owner.env.FT_OUTCOME_TRIAL_DISCOVERY_INTERVAL_MS),lease=Number(owner.env.FT_OUTCOME_TRIAL_DISCOVERY_LEASE_MS);
