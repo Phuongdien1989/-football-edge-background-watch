@@ -19,6 +19,7 @@ const run=(o,rows)=>runFTOutcomePass(o,rows,{clock:()=>now});
 let checks=0;async function test(name,fn){await fn();checks++;console.log('PASS '+name);}
 await test('disabled does no I/O',async()=>{const h=harness({enabled:false});assert.equal((await run(h.owner(),[obs()])).status,'DISABLED');assert.deepEqual(h.metrics(),{api:0,sql:0,doPuts:0});});
 await test('scanner off prevents result fetch',async()=>{const h=harness({scanner:false});assert.equal((await run(h.owner(),[obs()])).status,'SCANNER_OFF');assert.equal(h.metrics().api,0);});
+await test('insufficient SQL room prevents provider fetch',async()=>{const h=harness(),o=h.owner();o.env.FT_REPLAY_TRIAL_SQL_BUDGET_PER_INVOCATION='3';const r=await run(o,[obs()]);assert.equal(r.status,'SQL_LIMIT_DEFERRED');assert.deepEqual(h.metrics(),{api:0,sql:0,doPuts:0});});
 await test('one fixture fetch fans out to two observations',async()=>{const h=harness(),r=await run(h.owner(),[obs('a'),obs('b')]);assert.equal(r.api_calls,1);assert.equal(h.rows.size,2);assert.equal(h.metrics().sql,8);assert.equal(h.metrics().doPuts,3);});
 await test('duplicate observation in batch not double written',async()=>{const h=harness();await run(h.owner(),[obs(),obs()]);assert.equal(h.rows.size,1);assert.equal(h.metrics().sql,4);});
 await test('new instance respects reserved retry delay',async()=>{const h=harness();await run(h.owner(),[obs()]);const r=await run(h.owner(),[obs()]);assert.equal(r.results[0].status,'NOT_DUE');assert.equal(h.metrics().api,1);});
