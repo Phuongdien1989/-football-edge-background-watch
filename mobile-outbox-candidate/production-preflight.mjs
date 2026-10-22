@@ -27,17 +27,22 @@ async function active(){
  return v[0].version_id;
 }
 async function publicFile(path){
- const url=origin+(path==='index.html'?'/':'/'+path);
- const r=await fetch(url,{headers:{'Cache-Control':'no-cache'},signal:AbortSignal.timeout(30000),redirect:'error'});
- assert.equal(r.status,200,'PUBLIC_ASSET_HTTP_'+path+'_'+r.status);
- return new Uint8Array(await r.arrayBuffer());
+ const url=origin+(path==='index.html'?'/':'/'+path);let last;
+ for(let attempt=1;attempt<=2;attempt++){
+  try{
+   const r=await fetch(url,{headers:{'Cache-Control':'no-cache'},signal:AbortSignal.timeout(22000),redirect:'error'});
+   assert.equal(r.status,200,'PUBLIC_ASSET_HTTP_'+path+'_'+r.status);
+   return new Uint8Array(await r.arrayBuffer());
+  }catch(e){last=e;if(attempt<2)await new Promise(resolve=>setTimeout(resolve,1600));}
+ }
+ throw Error('PUBLIC_ASSET_READ_FAILED_'+path+'_'+String(last?.message||last).slice(0,90));
 }
 const report={status:'FAIL',scope:'MOBILE_ONLY_OWNER_APPROVED_RELEASE',source_commit:process.env.GITHUB_SHA,production_deployed:false,scanner_changes:0,provider_calls:0,D1_queries:0,D1_writes:0};
 try{
  assert(account&&token,'CLOUDFLARE_AUTH_MISSING');
  assert(process.env.FE_MOBILE_OUTBOX_RELEASE_APPROVED==='true','APPROVAL_GATE_MISSING');
- const before=await active();assert.equal(before,expectedVersion,'MOBILE_VERSION_DRIFT');
- const metadata=await cf('versions/'+before);
+ report.phase='ACTIVE_VERSION';const before=await active();assert.equal(before,expectedVersion,'MOBILE_VERSION_DRIFT');
+ report.phase='VERSION_METADATA';const metadata=await cf('versions/'+before);
  assert(Array.isArray(metadata.resources?.bindings)&&metadata.resources.bindings.every(b=>b.type==='assets'),'MOBILE_BINDINGS_CHANGED');
  const baseline=readFileSync('mobile-outbox-candidate/baseline.html');
  const candidate=readFileSync('mobile-outbox-candidate/candidate_mobile.html');
@@ -45,7 +50,7 @@ try{
  assert.equal(hash(candidate),pinnedCandidate,'CANDIDATE_DRIFT');
  const manifest=[];
  for(const f of files){
-  const bytes=await publicFile(f);
+  report.phase='ASSET_'+f;const bytes=await publicFile(f);
   if(f==='index.html')assert.equal(hash(bytes),pinnedSource,'PRODUCTION_HTML_DRIFT');
   save(directory+'/backup/'+f,bytes);save(directory+'/site/'+f,bytes);
   manifest.push({path:f,sha256:hash(bytes),bytes:bytes.length});
