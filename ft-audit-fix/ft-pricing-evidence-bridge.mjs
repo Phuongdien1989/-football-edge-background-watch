@@ -70,7 +70,7 @@ function rawLiveOddsConfirm(sourceRows,fixtureId,quote){
     const side=sideFromSelection(v?.value??v?.name??v?.label);
     const line=lineFromSelection({handicap:v?.handicap,value:v?.value??v?.name??v?.label});
     const rawOdd=v?.odd??v?.price;
-    const odd=typeof rawOdd==='number'?rawOdd:typeof rawOdd==='string'&&/^(?:\\d+)(?:\\.\\d+)?$/.test(rawOdd.trim())?Number(rawOdd):NaN;
+    const odd=typeof rawOdd==='number'?rawOdd:typeof rawOdd==='string'&&/^(?:[0-9]+)(?:[.][0-9]+)?$/.test(rawOdd.trim())?Number(rawOdd):NaN;
     if(!side||line!==quote.line||!finite(odd))continue;
     if(side==='OVER'&&Math.abs(odd-quote.over_odds)<1e-9)sides.add('OVER');
     if(side==='UNDER'&&Math.abs(odd-quote.under_odds)<1e-9)sides.add('UNDER');
