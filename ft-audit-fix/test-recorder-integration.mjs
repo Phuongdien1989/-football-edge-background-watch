@@ -3,6 +3,7 @@ import {runPendingFT,PAGE_SQL} from './pending-discovery.mjs';
 import {runFTOutcomePass,OUTCOME_BUDGET_KEY} from './outcome-pass.mjs';
 import {recordFTDecision} from './decision-trace.mjs';
 import {recordFTScan} from './worker-recorder.mjs';
+import {PAIR_INSERT_SQL,PAIR_READ_SQL} from './ft-pair-collector.mjs';
 import {beginFTReplaySqlInvocation,ftReplaySqlRemaining} from './replay-sql-budget.mjs';
 import {planFTCaptureBatch} from './capture-plan.mjs';
 import assert from 'node:assert/strict';import {readFileSync,writeFileSync} from 'node:fs';
@@ -20,7 +21,7 @@ async function run(C,fixture,stats=[],events=[],options={}){
 }
 
 const fixture=f({home:1,away:0}),rows=new Map();let sql=0,reservations=0,deny=false;
-const db={prepare(q){return {bind(...a){return {async all(){sql++;assert.equal(q,PAGE_SQL);return {results:[...rows.entries()].filter(([id])=>id.startsWith('OBS:')&&id>a[0]).sort(([a],[b])=>a.localeCompare(b)).slice(0,a[1]).map(([record_id,r])=>({record_id,observation_id:r.payload.id,fixture_id:r.payload.fixture_id,payload_json:JSON.stringify(r.payload),has_decision:[...rows.values()].some(x=>x.payload.schema==='FT_DECISION_V1_DRAFT'&&x.payload.observation_id===r.payload.id)?1:0,has_outcome:[...rows.values()].some(x=>x.payload.schema==='FT_OUTCOME_V2_DRAFT'&&x.payload.observation_id===r.payload.id)?1:0}))};},async first(){sql++;if(q.startsWith('UPDATE ft_replay_budget_v1')){reservations++;return deny?null:{used_records:reservations};}return rows.get(a[0])||null;},async run(){sql++;rows.set(a[0],{content_hash:a[5],payload:JSON.parse(a[6])});return {meta:{changes:1}};}};}};}};
+const db={prepare(q){return {bind(...a){return {async all(){sql++;assert.equal(q,PAGE_SQL);return {results:[...rows.entries()].filter(([id])=>id.startsWith('OBS:')&&id>a[0]).sort(([a],[b])=>a.localeCompare(b)).slice(0,a[1]).map(([record_id,r])=>({record_id,observation_id:r.payload.id,fixture_id:r.payload.fixture_id,payload_json:JSON.stringify(r.payload),has_decision:[...rows.values()].some(x=>x.payload.schema==='FT_DECISION_V1_DRAFT'&&x.payload.observation_id===r.payload.id)?1:0,has_outcome:[...rows.values()].some(x=>x.payload.schema==='FT_OUTCOME_V2_DRAFT'&&x.payload.observation_id===r.payload.id)?1:0}))};},async first(){sql++;if(q.startsWith('UPDATE ft_replay_budget_v1')){reservations++;return deny?null:{used_records:reservations};}return rows.get(q===PAIR_READ_SQL?'PAIR:'+a[0]:a[0])||null;},async run(){sql++;if(q===PAIR_INSERT_SQL){const key='PAIR:'+a[0],prior=rows.get(key);if(!prior)rows.set(key,{content_hash:a[4],payload:JSON.parse(a[5]),decision:JSON.parse(a[6])});return {meta:{changes:prior?0:1,rows_written:prior?0:1}};}rows.set(a[0],{content_hash:a[5],payload:JSON.parse(a[6])});return {meta:{changes:1}};}};}};}};
 const env={FT_REPLAY_TRIAL_ENABLED:'true',FT_REPLAY_TRIAL_EPOCH:'integration-1',FT_REPLAY_TRIAL_MAX_RECORD_BYTES:'20000',FT_REPLAY_DB:db};
 let baselineCost;let checks=0;async function test(name,fn){await fn();checks++;console.log('PASS '+name);}
 await test('disabled trial Worker preserves scan API and logical writes',async()=>{const a=await run(before,fixture),b=await run(after,fixture);assert.deepEqual(a.calls,b.calls);assert.equal(a.writes,b.writes);assert.equal(b.replay.status,'DISABLED');assert.equal(sql,0);baselineCost={api_calls:a.calls.length,storage_ops:a.storageOps,logical_match_puts:a.writes};});
@@ -74,5 +75,27 @@ await test('sidecar SQL cap covers observation and decision in a single scan',as
  assert.equal(sql-start,0);
  assert.equal(r.calls.length,5);
  assert.equal(r.writes,1);
+});
+await test('atomic pair trial stores Observation and Decision together in one row',async()=>{
+ rows.clear();deny=false;const beforeSql=sql;
+ const r=await run(after,fixture,[],[],{env:{...env,FT_REPLAY_PAIR_TRIAL_ENABLED:'true'}});
+ assert.equal(r.replay.status,'PAIR_STAGED');
+ assert.equal(r.decision.status,'PAIR_STORED');
+ assert.equal(sql-beforeSql,3);
+ assert.equal(r.calls.length,5);
+ assert.equal(r.writes,1);
+ const pairs=[...rows.entries()].filter(([id])=>id.startsWith('PAIR:'));
+ assert.equal(pairs.length,1);
+ assert.equal(pairs[0][1].payload.id,pairs[0][1].decision.observation_id);
+ assert.equal([...rows.keys()].filter(k=>k.startsWith('OBS:')||k.startsWith('DEC:')).length,0);
+});
+await test('atomic pair trial defers on SQL cap but never stores half a pair',async()=>{
+ rows.clear();deny=false;const beforeSql=sql;
+ const r=await run(after,fixture,[],[],{env:{...env,FT_REPLAY_PAIR_TRIAL_ENABLED:'true',FT_REPLAY_TRIAL_SQL_BUDGET_PER_INVOCATION:'2'}});
+ assert.equal(r.replay.status,'DEFERRED_CAPTURE_BUDGET');
+ assert.equal(r.decision,undefined);
+ assert.equal(sql-beforeSql,0);
+ assert.equal(r.calls.length,5);
+ assert.equal(rows.size,0);
 });
 writeFileSync(out+'/recorder-integration-tests.json'   ,JSON.stringify({status:'PASS',checks,worker:'transformed baseline Worker',provider:'mock',D1:'mock',production_validated:false},null,2));
