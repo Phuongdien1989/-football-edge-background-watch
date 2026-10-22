@@ -27,7 +27,7 @@ async function active(){
  return v[0].version_id;
 }
 async function publicFile(path){
- const url=origin+(path==='index.html'?'/':'/'+path);let last;
+ const url=origin+(path==='index.html'?'/':path.endsWith('/index.html')?'/'+path.slice(0,-10):'/'+path);let last;
  for(let attempt=1;attempt<=2;attempt++){
   try{
    const r=await fetch(url,{headers:{'Cache-Control':'no-cache'},signal:AbortSignal.timeout(22000),redirect:'error'});
