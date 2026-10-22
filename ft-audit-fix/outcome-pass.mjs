@@ -4,7 +4,7 @@ import {ftReplaySqlRemaining} from './replay-sql-budget.mjs';
 import {recordFTOutcome} from './decision-trace.mjs';
 export const OUTCOME_BUDGET_KEY='ft:outcome:api-budget:v1';
 const positive=x=>Number.isSafeInteger(x)&&x>0;
-export async function runFTOutcomePass(owner,observations,{clock=Date.now}={}){
+export async function runFTOutcomePass(owner,observations,{clock=Date.now,source='DIRECT'}={}){
  if(owner.env?.FT_REPLAY_PAIR_TRIAL_ENABLED==='true'&&source!=='PAIR_DISCOVERY_VALIDATED')return {status:'PAIR_DISCOVERY_REQUIRED',api_calls:0};
  if(owner.env?.FT_OUTCOME_TRIAL_ENABLED!=='true'||owner.env?.FT_REPLAY_TRIAL_ENABLED!=='true')return {status:'DISABLED',api_calls:0};
  if(typeof owner.scanControl!=='function'||(await owner.scanControl())?.enabled!==true)return {status:'SCANNER_OFF',api_calls:0};
