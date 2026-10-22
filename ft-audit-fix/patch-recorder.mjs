@@ -3,9 +3,9 @@ export function patchRecorder(source,sourceHash){
  assert.match(sourceHash,/^[a-f0-9]{64}$/);
  let s=source;
  const once=(a,b)=>{assert.equal(s.split(a).length,2,'RECORDER_PATCH_ANCHOR '+a.slice(0,70));s=s.replace(a,b);};
- s="import {beginFTReplaySqlInvocation} from './replay-sql-budget.mjs';\\nimport {reserveScanAttempt} from './shared-api-budget.mjs';\nimport {runPendingFT} from './pending-discovery.mjs';\nimport {runFTOutcomePass} from './outcome-pass.mjs';\nimport {recordFTDecision} from './decision-trace.mjs';\nconst FT_REPLAY_CODE_HASH='"+sourceHash+"';\nimport {recordFTScan} from './worker-recorder.mjs';\n"+s;
+ s="import {beginFTReplaySqlInvocation} from './replay-sql-budget.mjs';\nimport {reserveScanAttempt} from './shared-api-budget.mjs';\nimport {runPendingFT} from './pending-discovery.mjs';\nimport {runFTOutcomePass} from './outcome-pass.mjs';\nimport {recordFTDecision} from './decision-trace.mjs';\nconst FT_REPLAY_CODE_HASH='"+sourceHash+"';\nimport {recordFTScan} from './worker-recorder.mjs';\n"+s;
  once("if(budget.used>=budgetMax)throw Error('NOTIFY_DAILY_BUDGET_REACHED');budget.used++;return this.api(path,params,strict)", "if(this.env.FT_OUTCOME_TRIAL_ENABLED==='true'){budget=await reserveScanAttempt(this);}else{if(budget.used>=budgetMax)throw Error('NOTIFY_DAILY_BUDGET_REACHED');budget.used++;}return this.api(path,params,strict)");
- once("async notifyTick(){","async ftReplayOutcomePass(observations){return runFTOutcomePass(this,observations); }\n  async notifyTick(){");
+ once("async notifyTick(){","async ftReplayOutcomePass(observations){beginFTReplaySqlInvocation(this);return runFTOutcomePass(this,observations); }\n  async notifyTick(){beginFTReplaySqlInvocation(this);");
  once("const fixtureStarted=Date.now();","const fixtureStarted=Date.now();const ftReplayContext={observation:null,evaluation:null,market_rows:null,devices:[],state:'NOT_EVALUATED',reason:'STATS_UNAVAILABLE'};");
  once("const ftCatalog=await api('/fixtures',{live:'all'},true);","const ftCatalog=await api('/fixtures',{live:'all'},true);const ftCatalogReceivedAt=Date.now();");
  once("const rows=await api(path,params,name==='stats'||name==='half');","const rows=await api(path,params,name==='stats'||name==='half');ftSourceReceipts[name]=Date.now();");
