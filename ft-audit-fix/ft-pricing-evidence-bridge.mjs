@@ -56,6 +56,30 @@ function normalizedQuote(m,fixtureId){
  if(!chosen)return {reason:paired.length>1?'AMBIGUOUS_FT_MAIN_LINE':'NO_COMPLETE_FT_OVER_UNDER_PAIR'};
  return {quote:chosen};
 }
+function rawLiveOddsConfirm(sourceRows,fixtureId,quote){
+ if(!Array.isArray(sourceRows)||quote.bet_id==null)return false;
+ const reference=String(quote.bet_id);
+ for(const response of sourceRows){
+  if(response?.fixture?.id!==fixtureId||!Array.isArray(response.odds))continue;
+  for(const bet of response.odds){
+   if(String(bet?.id??'')!==reference||scopeReject.test(String(bet?.name??'')))continue;
+   if(!Array.isArray(bet?.values))continue;
+   const sides=new Set();
+   for(const v of bet.values){
+    if(v?.suspended===true)continue;
+    const side=sideFromSelection(v?.value??v?.name??v?.label);
+    const line=lineFromSelection({handicap:v?.handicap,value:v?.value??v?.name??v?.label});
+    const rawOdd=v?.odd??v?.price;
+    const odd=typeof rawOdd==='number'?rawOdd:typeof rawOdd==='string'&&/^(?:\\d+)(?:\\.\\d+)?$/.test(rawOdd.trim())?Number(rawOdd):NaN;
+    if(!side||line!==quote.line||!finite(odd))continue;
+    if(side==='OVER'&&Math.abs(odd-quote.over_odds)<1e-9)sides.add('OVER');
+    if(side==='UNDER'&&Math.abs(odd-quote.under_odds)<1e-9)sides.add('UNDER');
+   }
+   if(sides.size===2)return true;
+  }
+ }
+ return false;
+}
 export function extractFTPricingEvidence({observation,decision}={}){
  if(observation?.schema!=='FT_OBSERVATION_V1_DRAFT'||decision?.schema!=='FT_DECISION_V1_DRAFT'||
  typeof observation.id!=='string'||!observation.id||
@@ -95,6 +119,7 @@ export function extractFTPricingEvidence({observation,decision}={}){
  if(valid.length!==1)return no(valid.length>1?'MULTIPLE_FT_MARKETS_WITHOUT_BOOKMAKER_ID':'NO_COMPLETE_TRUSTED_FT_QUOTE',
    {signal,market_reasons:reject,accepted_quote_candidates:valid.length});
  const quote=valid[0];
+ if(!rawLiveOddsConfirm(source.data,observation.fixture_id,quote))return no('NORMALIZED_MARKET_NOT_RECONCILED_WITH_RAW_ODDS',{signal,market_reasons:reject});
  // The legacy normalizer does not preserve bookmaker identity or explicit live
  // settlement convention; a price snapshot is evidence, NOT an executable bet.
  return {schema:'FT_PRICING_EVIDENCE_3K_DRAFT',status:'EVIDENCE_READY_UNPRICED',
