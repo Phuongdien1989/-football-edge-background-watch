@@ -16,7 +16,7 @@ async function versions(){
  return vs[0].version_id;
 }
 async function web(f){
- const p=f==='index.html'?'/':'/'+f;
+ const p=f==='index.html'?'/':f.endsWith('/index.html')?'/'+f.slice(0,-10):'/'+f;
  const r=await fetch('https://'+name+'.ngophuonghuy.workers.dev'+p,{headers:{'Cache-Control':'no-cache'},signal:AbortSignal.timeout(25000),redirect:'error'});
  assert.equal(r.status,200,'PUBLIC_CHECK_'+f+'_'+r.status);
  return new Uint8Array(await r.arrayBuffer());
