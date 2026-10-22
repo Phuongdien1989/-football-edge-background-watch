@@ -1,4 +1,5 @@
 // Read-only ACTIVE deployment and rollback diagnosis for Football Edge 2026-10-22.
+// ONE-SHOT EXECUTION; never mutates D1, Worker or scan status.
 // Uses Cloudflare GET and public backend health only; never D1 SQL/GraphQL query, deploy, scan control or mutation.
 import {mkdirSync,writeFileSync} from 'node:fs';
 const account=process.env.CLOUDFLARE_ACCOUNT_ID,token=process.env.CLOUDFLARE_API_TOKEN;
