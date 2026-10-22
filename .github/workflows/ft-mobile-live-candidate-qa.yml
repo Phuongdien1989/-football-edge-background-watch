@@ -5,6 +5,7 @@ on:
     paths:
       - 'mobile-outbox-candidate/build_live_mobile_20261022.mjs'
       - 'ft-audit-fix/test-mobile-live-diff-scope.mjs'
+      - 'ft-audit-fix/test-mobile-shared-ack-qa.mjs'
       - '.github/workflows/ft-mobile-live-candidate-qa.yml'
 permissions: {contents: read}
 concurrency: {group: ft-mobile-live-20261022-offline-candidate, cancel-in-progress: false}
@@ -45,6 +46,8 @@ jobs:
           node tests/test-mobile-outbox-candidate.mjs
       - name: Verify exact HTML delta and canonical baseline/candidate SHA
         run: node ft-audit-fix/test-mobile-live-diff-scope.mjs
+      - name: Verify shared outbox ACK remains safe for QSIG and LIVE events
+        run: node ft-audit-fix/test-mobile-shared-ack-qa.mjs
       - name: Assert no frontend sections outside intended functions altered
         run: |
           node --input-type=module <<'JS'
@@ -63,6 +66,27 @@ jobs:
           mkdirSync('ft-audit-output',{recursive:true});writeFileSync('ft-audit-output/mobile-live-candidate-qa.json',JSON.stringify(qa,null,2));
           console.log('FE_MOBILE_CANDIDATE_QA '+JSON.stringify(qa));
           JS
+      - name: Package paired source and candidate ZIP — release review only, NOT deployed
+        run: |
+          mkdir -p ft-audit-output/mobile-review
+          cp mobile-outbox-candidate/baseline.html ft-audit-output/mobile-review/rollback-original.html
+          cp mobile-outbox-candidate/candidate_mobile.html ft-audit-output/mobile-review/mobile-candidate.html
+          cat > ft-audit-output/mobile-review/README.txt <<'TXT'
+          Football Edge Mobile Outbox candidate, 2026-10-22.
+          CANDIDATE: mobile-candidate.html (tested, NOT DEPLOYED).
+          ROLLBACK: rollback-original.html (current public Mobile HTML at audit time).
+          No backend D1, scanner, HT/HC/TOP/Push production changes authorized.
+          Release only after owner approval and live version/SHA revalidation.
+          TXT
+          cd ft-audit-output/mobile-review
+          sha256sum mobile-candidate.html rollback-original.html > SHA256SUMS.txt
+          zip -q ../football-edge-mobile-outbox-review-20261022.zip mobile-candidate.html rollback-original.html README.txt SHA256SUMS.txt
+          test -s ../football-edge-mobile-outbox-review-20261022.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ft-mobile-outbox-20261022-candidate-and-rollback
+          path: ft-audit-output/football-edge-mobile-outbox-review-20261022.zip
+          retention-days: 90
       - uses: actions/upload-artifact@v4
         if: always()
         with:
