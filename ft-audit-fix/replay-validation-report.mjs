@@ -25,11 +25,22 @@ export function makeFTValidationReport({records,manifests=[]}={}){
    detail.push({id:o.id,fixture_id:o.fixture_id,observation_status:ev.status,decision_status:r.status,decision_state:ds[0].state,can_score_market:false});
   }else detail.push({id:o.id,fixture_id:o.fixture_id,observation_status:ev.status,decision_status:ds.length?'AMBIGUOUS':'MISSING',can_score_market:false});
  }
- let totalScanned=0,totalSelected=0,totalDeferred=0,manifestInvalid=0;
+ let totalScanned=0,totalSelected=0,totalDeferred=0,manifestInvalid=0,selectedHookConfirmed=0,selectedHookFailed=0,selectedHookUnknown=0;
  for(const m of manifests){
   if(!m||!Array.isArray(m.selected)||!Array.isArray(m.deferred)||!Number.isSafeInteger(m.at)||m.at<=0||!['SCANNED_FT_ONLY'].includes(m.scope)){manifestInvalid++;continue;}
   const ids=[...m.selected,...m.deferred];
   if(ids.some(x=>!Number.isSafeInteger(x)||x<=0)||new Set(ids).size!==ids.length){manifestInvalid++;continue;}
+  const attempts=m.attempts;
+  if(attempts!=null&&(!Array.isArray(attempts)||attempts.some(a=>!Number.isSafeInteger(a?.fixture_id)||!ids.includes(a.fixture_id))||new Set(attempts.map(a=>a.fixture_id)).size!==attempts.length)){manifestInvalid++;continue;}
+  const attempted=new Map((attempts||[]).map(a=>[a.fixture_id,a]));
+  for(const selectedId of m.selected){
+   const record=attempted.get(selectedId);
+   if(!record){selectedHookUnknown++;continue;}
+   const paired=record.capture_status==='PAIR_STAGED'&&record.decision_status==='PAIR_STORED';
+   const legacy=['STORED','DUPLICATE'].includes(record.capture_status)&&['STORED','DUPLICATE'].includes(record.decision_status);
+   if(record.storage_confirmed===true&&(paired||legacy))selectedHookConfirmed++;
+   else selectedHookFailed++;
+  }
   totalScanned+=ids.length;totalSelected+=m.selected.length;totalDeferred+=m.deferred.length;
  }
  const resolved=links.counts.LINKED||0,observations=obs.size;
@@ -39,7 +50,7 @@ export function makeFTValidationReport({records,manifests=[]}={}){
   status:'EVIDENCE_AUDIT_ONLY',
   replay:{total_observations:observations,linked_count:resolved,linked_pct:percent(resolved,observations),counts:links.counts,linked_but_invalid_observation:linkedButNotEvidenceValidated},
   quality:{accepted,review,reject,provider_source_age_unknown:unknownSourceAt,missing_or_unusable_odds:missingMarket},
-  capture:{observed_manifests:manifests.length-manifestInvalid,manifest_invalid:manifestInvalid,scanned_candidates:totalScanned,selected_for_attempt:totalSelected,deferred_without_historical_snapshot:totalDeferred,selected_capture_successes:'NOT_MEASURED',recovery_successes:'NOT_MEASURED'},
+  capture:{observed_manifests:manifests.length-manifestInvalid,manifest_invalid:manifestInvalid,scanned_candidates:totalScanned,selected_for_attempt:totalSelected,deferred_without_historical_snapshot:totalDeferred,selected_capture_successes:'NOT_INDEPENDENTLY_VERIFIED',selected_hook_confirmed:selectedHookConfirmed,selected_hook_failed:selectedHookFailed,selected_hook_unknown:selectedHookUnknown,hook_confirmation_scope:'TRIAL_RESULT_NOT_REMOTE_D1_AUDIT',recovery_successes:'NOT_MEASURED'},
   integrity_issues:links.issues.length,
   evidence_details:detail,
   calibration:null,accuracy:null,roi:null,push_delivery:'NOT_OBSERVED',
