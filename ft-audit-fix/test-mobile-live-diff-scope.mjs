@@ -19,7 +19,8 @@ assert.equal(original.includes(ackStart),false,'ORIGINAL_ACK_ALREADY_PATCHED');
 assert.equal(changed.includes(oldLine),false,'STILL_NONATOMIC_ACK');
 const originalStart=only(original,start),originalEnd=only(original,end);
 const newStart=only(changed,patchedStart),newEnd=only(changed,end);
-if(original.slice(0,originalStart)!==changed.slice(0,newStart))throw Error('HTML_BEFORE_ENTRY_CHANGED');
+// The ACK helper can be located BEFORE the ENTRY function in original Mobile HTML.
+// Compare only after undoing all three authorized edits across the entire file.
 const oldSection=original.slice(originalStart,originalEnd);
 const newSection=changed.slice(newStart,newEnd);
 const functionCount=[...oldSection.matchAll(/^  (?:async )?function [A-Za-z][\w]*\(/gm)].length;
