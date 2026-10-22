@@ -17,6 +17,7 @@ export async function recordFTDecision(owner,input){
 export function linkFTReplay(observation,decision,outcome){
  if(!observation||!decision||!outcome||decision.schema!=='FT_DECISION_V1_DRAFT'||outcome.schema!=='FT_OUTCOME_V2_DRAFT'||outcome.state!=='RESOLVED'||decision.observation_id!==observation.id||outcome.observation_id!==observation.id||decision.fixture_id!==observation.fixture_id||outcome.fixture_id!==observation.fixture_id)throw Error('REPLAY_IDENTITY_MISMATCH');
  if(!time(observation.decision_at)||!time(decision.decision_at)||!time(outcome.observed_at)||decision.input_at!==observation.decision_at||decision.decision_at<observation.decision_at||outcome.observed_at<decision.decision_at)throw Error('REPLAY_TIME_MISMATCH');
+ if(!['FT','AET','PEN'].includes(outcome.status))throw Error('REPLAY_NOT_FINAL_REGULATION');
  return structuredClone({observation,decision,outcome,market_settlement:null,forecast_validation:'NOT_COMPUTED'});
 }
 export async function recordFTOutcome(owner,observation,fixture,receivedAt,now=Date.now()){
