@@ -87,6 +87,11 @@ await test('atomic pair trial stores Observation and Decision together in one ro
  const pairs=[...rows.entries()].filter(([id])=>id.startsWith('PAIR:'));
  assert.equal(pairs.length,1);
  assert.equal(pairs[0][1].payload.id,pairs[0][1].decision.observation_id);
+ const manifest=r.storage.get('ft:replay:capture-plan:v1')?.history?.at(-1);
+ assert.equal(manifest?.attempts?.[0]?.fixture_id,42);
+ assert.equal(manifest?.attempts?.[0]?.capture_status,'PAIR_STAGED');
+ assert.equal(manifest?.attempts?.[0]?.decision_status,'PAIR_STORED');
+ assert.equal(manifest?.attempts?.[0]?.storage_confirmed,true);
  assert.equal([...rows.keys()].filter(k=>k.startsWith('OBS:')||k.startsWith('DEC:')).length,0);
 });
 await test('atomic pair trial defers on SQL cap but never stores half a pair',async()=>{
@@ -95,6 +100,9 @@ await test('atomic pair trial defers on SQL cap but never stores half a pair',as
  assert.equal(r.replay.status,'DEFERRED_CAPTURE_BUDGET');
  assert.equal(r.decision,undefined);
  assert.equal(sql-beforeSql,0);
+ const manifest=r.storage.get('ft:replay:capture-plan:v1')?.history?.at(-1);
+ assert.equal(manifest?.attempts?.[0]?.storage_confirmed,false);
+ assert.equal(manifest?.attempts?.[0]?.capture_status,'DEFERRED_CAPTURE_BUDGET');
  assert.equal(r.calls.length,5);
  assert.equal(rows.size,0);
 });
