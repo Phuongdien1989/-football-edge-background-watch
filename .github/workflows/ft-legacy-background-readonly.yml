@@ -1,0 +1,45 @@
+name: FT background odds presence — one-shot D1 read-only
+on:
+  push:
+    branches: [fix/ft-foundation-20261021]
+    paths:
+      - 'ft-audit-fix/legacy-ft-background-readonly.mjs'
+      - 'ft-audit-fix/legacy-ft-background-shape.mjs'
+      - '.github/workflows/ft-legacy-background-readonly.yml'
+permissions: {contents: read}
+concurrency:
+  group: ft-bg-odds-once
+  cancel-in-progress: false
+jobs:
+  inspect:
+    if: contains(github.event.head_commit.message, '[ft-bg-odds-once]') && github.run_attempt == 1
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    environment: football-edge-production
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Enforce closed bounded SQL
+        run: node ft-audit-fix/test-legacy-ft-background-shape.mjs
+      - name: Fresh D1 UTC usage read-only precheck
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          D1_READ_ONLY_AUDIT_ONCE: CONFIRM
+        run: node ft-audit-fix/d1-readonly-analytics.mjs
+      - name: Aggregate raw odds presence only from existing BACKGROUND snapshots
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          FT_BG_ODDS_READ_ONCE: CONFIRM
+        run: node ft-audit-fix/legacy-ft-background-readonly.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ft-background-odds-counts-no-raw-payload
+          path: |
+            ft-audit-output/ft-d1-readonly-usage.json
+            ft-audit-output/ft-background-odds-shape.json
+          retention-days: 30
