@@ -49,6 +49,9 @@ jobs:
       - run: node ft-audit-fix/test-replay-sql-budget.mjs
       - run: node ft-audit-fix/test-worker-recorder.mjs
       - run: node ft-pilot/test.mjs
+      - run: node ft-pilot/test-integration.mjs
+      - run: node --check ft-audit-output/ft-pilot-candidate/worker_notify_v130.js
+      - run: node --check ft-audit-output/ft-pilot-candidate/worker.js
       - run: node ft-audit-fix/test-decision-trace.mjs
       - run: node ft-audit-fix/test-outcome-pass.mjs
       - run: node ft-audit-fix/test-shared-api-budget.mjs
