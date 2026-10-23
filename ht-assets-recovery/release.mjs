@@ -24,7 +24,10 @@ try{
  if(action==='prepare'){
   assert.equal(await active(name),before,'MOBILE_VERSION_DRIFT');
   report.desktop_before=await active('football-edge-desktop-b2-test');await others();report.scanner_before=await health();
-  const meta=await cf(name+'/versions/'+before);assert.equal(meta.id,before);assert(Array.isArray(meta.resources?.bindings)&&meta.resources.bindings.length>0&&meta.resources.bindings.every(b=>b.type==='assets'),'ASSET_ONLY_BINDING_REQUIRED');
+  const meta=await cf(name+'/versions/'+before);assert.equal(meta.id,before);
+  report.mobile_binding_types=(meta.resources?.bindings||[]).map(b=>b.type);report.mobile_resource_keys=Object.keys(meta.resources||{});
+  // Pure static Workers may have zero named bindings. Reject every non-assets binding.
+  assert(Array.isArray(meta.resources?.bindings)&&meta.resources.bindings.every(b=>b.type==='assets'),'ASSET_ONLY_BINDING_REQUIRED');
   save(dir+'/backup-version.json',JSON.stringify(meta,null,2));
   const old=JSON.parse(readFileSync('previous-ht/ht-event-release/manifest.json'));
   assert.equal(old.source_commit,'319558534e1bac39dd9d212afd22ecf1c818bf22');
