@@ -4,7 +4,7 @@ import {spawnSync} from 'node:child_process';
 import {scheduleFTPilot} from './integration.mjs';
 import {patchExistingNotify,patchExistingEvidenceWorker} from './build-review-patch.mjs';
 let tests=0;async function test(name,fn){await fn();tests++;console.log('PASS '+name)}
-const orig=readFileSync('worker_notify_v130.js','utf8');
+const orig=readFileSync('worker_notify_v133_quota6500.js','utf8');
 const originalWorker=readFileSync('worker.js','utf8');
 const patched=patchExistingNotify(orig),patWorker=patchExistingEvidenceWorker(originalWorker);
 function owner({enabled=false,failDO=false,failDB=false}={}){
@@ -107,10 +107,29 @@ await test('OUTCOME cannot be captured for wrong fixture before D1',async()=>{
   'NOT_SCHEDULED_OUT_OF_SCOPE');
 });
 await test('the original source code files stay unmodified on disk',()=>{
- assert.equal(orig,readFileSync('worker_notify_v130.js','utf8'));
+ assert.equal(orig,readFileSync('worker_notify_v133_quota6500.js','utf8'));
  assert.equal(originalWorker,readFileSync('worker.js','utf8'));
  assert(!orig.includes("from './ft-pilot/integration.mjs'"));
  assert(!originalWorker.includes("from './ft-pilot/integration.mjs'"));
+});
+await test('candidate hooks into ACTIVE v133 inherited from current v138, NOT shadowed v130',()=>{
+ const v138=readFileSync('worker_notify_v138_peak_window.js','utf8');
+ const v137=readFileSync('worker_notify_v137_quota50000.js','utf8');
+ const v136=readFileSync('worker_notify_v136_hot_priority.js','utf8');
+ const v135=readFileSync('worker_notify_v135_full_pause.js','utf8');
+ const v134=readFileSync('worker_notify_v134_global6500.js','utf8');
+ const v133=readFileSync('worker_notify_v133_quota6500.js','utf8');
+ assert(v138.includes("from './worker_notify_v137_quota50000.js'"));
+ assert(v137.includes("from './worker_notify_v136_hot_priority.js'"));
+ assert(v136.includes("from './worker_notify_v135_full_pause.js'"));
+ assert(v135.includes("from './worker_notify_v134_global6500.js'"));
+ assert(v134.includes("from './worker_notify_v133_quota6500.js'"));
+ assert(v134.includes('await super.notifyTick()'));
+ assert(v133.includes('async notifyTick()'));
+ assert(!v138.includes('async notifyTick()'));
+ assert(!v137.includes('async notifyTick()'));
+ assert(!v136.includes('async notifyTick()'));
+ assert(!v135.includes('async notifyTick()'));
 });
 await test('candidate scanner imports only independent FT pilot code, not new HTTP',()=>{
  assert(patched.startsWith("import {scheduleFTPilot} from './ft-pilot/integration.mjs';"));
@@ -139,7 +158,7 @@ await test('new capture sidecar invoked after legacy send and before snapshot st
  const push=patched.indexOf('if(await this.send(d,packet))'),
    acceptedCapture=patched.lastIndexOf("scheduleFTPilot(this,{kind:'PAIR'"),
    degradedCapture=patched.indexOf("scheduleFTPilot(this,{kind:'PAIR'"),
-   persist=patched.indexOf('await this.putNotifyMatch(id,item)');
+   persist=patched.indexOf("await this.ctx.storage.put('notify:match:'+id,item)");
  assert(push>=0&&acceptedCapture>push&&persist>acceptedCapture);
  assert(degradedCapture<push&&degradedCapture>=0);
  assert(patched.includes("if(signals.goal)ftPilotCandidate=true"));
@@ -154,7 +173,7 @@ await test('outcome candidate hooks into pre-existing evidence fixture read',()=
  assert(patWorker.includes("FT_PILOT_ENABLED==='true'"));
 });
 await test('review-only patched source parses, no tracked Worker build produced',()=>{
- const a=spawnSync('node',['--check','ft-audit-output/ft-pilot-candidate/worker_notify_v130.js'],{encoding:'utf8'});
+ const a=spawnSync('node',['--check','ft-audit-output/ft-pilot-candidate/worker_notify_v133_quota6500.js'],{encoding:'utf8'});
  const b=spawnSync('node',['--check','ft-audit-output/ft-pilot-candidate/worker.js'],{encoding:'utf8'});
  assert.equal(a.status,0,a.stderr);assert.equal(b.status,0,b.stderr);
 });
