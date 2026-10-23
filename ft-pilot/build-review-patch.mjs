@@ -29,11 +29,26 @@ export function patchExistingNotify(src){
   'SOURCE_RECEIPT_FAILURE');
  s=change(s,"            const goalEstimates={};",
   "            const goalEstimates={};let ftPilotCandidate=false;",
-  'CROSSING_READONLY_CLASS');
- const line="if(check.send)signals.goal={value:candidate,threshold:dp.goalThreshold,source:goal?.source||'MODEL'};";
- s=change(s,line,
-  "if(check.send){ftPilotCandidate=true;signals.goal={value:candidate,threshold:dp.goalThreshold,source:goal?.source||'MODEL'};}",
-  'CROSSING_CAPTURE_ONLY');
+  'PUSH_ACCEPTED_READONLY_CLASS');
+ s=change(s,"if(await this.send(d,packet)){for(const kind of kinds)",
+  "if(await this.send(d,packet)){if(signals.goal)ftPilotCandidate=true;for(const kind of kinds)",
+  'AFTER_PUSH_ACCEPTANCE_FLAG');
+ // A 2H fixture with missing core stats must still be included in the
+ // non-recommended population; do not silently sample successful evaluations only.
+ const degraded="if(!stats.length){item.last={goalMode:null,h1Score:null,gap:null,at:Date.now(),sourceHealth:health,reason:'STATS_UNAVAILABLE'};status.scanned++;status.degraded++}";
+ const degradedWithHook=`if(!stats.length){
+            item.last={goalMode:null,h1Score:null,gap:null,at:Date.now(),sourceHealth:health,reason:'STATS_UNAVAILABLE'};status.scanned++;status.degraded++;
+            if(this.env.FT_PILOT_ENABLED==='true'&&f.fixture?.status?.short==='2H'){
+              try{scheduleFTPilot(this,{kind:'PAIR',scan:{
+                fixture:f,fixtureReceivedAt:ftPilotFixtureAt,capturedAt:Date.now(),
+                health,receipts:ftPilotReceipts,payloads:{stats,events,odds,half},
+                crossingRequested:false,
+                decision:{state:'NOT_EVALUATED',reason:'STATS_UNAVAILABLE',
+                  market_rows:null,devices:[]}
+              }});}catch{}
+            }
+          }`;
+ s=change(s,degraded,degradedWithHook,'DEGRADED_NO_STATS_COVERAGE');
  const anchor="            item.last={goalMode:ft.eval.scoreMode,h1Score:h1Eval?.score??null,h1Mode:h1Eval?.scoreMode??null,gap,at:stamp,sourceHealth:health};status.scanned++;";
  const hook=`            // FT PILOT sidecar is nonblocking and OFF by default. Existing
             // HT/HC/PUSH already evaluated and sent above; never await capture.
