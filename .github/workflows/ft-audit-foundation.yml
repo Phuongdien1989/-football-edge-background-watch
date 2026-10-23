@@ -2,7 +2,7 @@ name: FT foundation candidate and read-only inventory
 on:
   push:
     branches: [fix/ft-foundation-20261021]
-    paths: ['ft-audit-fix/**', 'mobile-outbox-candidate/production-preflight.mjs', 'mobile-outbox-candidate/production-release.mjs', '.github/workflows/ft-audit-foundation.yml']
+    paths: ['ft-audit-fix/**', 'ft-v2-mobile/**', 'mobile-outbox-candidate/production-preflight.mjs', 'mobile-outbox-candidate/production-release.mjs', '.github/workflows/ft-audit-foundation.yml']
 permissions: {contents: read, actions: read}
 jobs:
   candidate:
@@ -22,6 +22,7 @@ jobs:
       - run: node ft-audit-fix/build.mjs
       - run: node ft-audit-fix/build-recorder-trial.mjs
       - run: node ft-audit-fix/test-mobile-asset-isolation.mjs
+      - run: node ft-v2-mobile/test.mjs
       - run: node ft-audit-fix/test.mjs
       - run: node ft-audit-fix/test-events.mjs
       - run: node ft-audit-fix/test-evidence.mjs
