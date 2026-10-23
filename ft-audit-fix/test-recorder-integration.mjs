@@ -69,6 +69,26 @@ await test('FT trial disabled preserves HC and Goal Radar FT in second half',asy
  assert.deepEqual(b.row.alerts,a.row.alerts);
  assert.equal(b.replay.status,'DISABLED');
 });
+await test('FT replay recording ON still leaves HC outputs and device alerts unchanged',async()=>{
+ deny=false;
+ const second=f({home:1,away:0},'2H');
+ const stats=[1,2].map(id=>({team:{id},statistics:[
+  {type:'Red Cards',value:0},{type:'Total Shots',value:id===1?11:8},
+  {type:'Shots on Goal',value:4},{type:'Shots insidebox',value:5},
+  {type:'Corner Kicks',value:3}]}));
+ const options={devicePrefs:{h1:true,gap:true,goal:true}};
+ const a=await run(before,second,stats,[],options);
+ const b=await run(after,second,stats,[],{...options,env});
+ assert.equal(b.replay.status,'STORED');
+ assert.deepEqual(b.calls,a.calls,'Trial capture must not steal HT/HC provider calls');
+ assert.equal(b.writes,a.writes,'Trial capture must not trigger extra shared fixture writes');
+ assert.deepEqual(b.row.ui?.hc_snapshot?.metrics,a.row.ui?.hc_snapshot?.metrics);
+ assert.deepEqual(b.row.hcHistory.map(x=>x.metrics),a.row.hcHistory.map(x=>x.metrics));
+ assert.equal(b.row.last?.gap,a.row.last?.gap);
+ assert.deepEqual(b.row.ui?.goal_estimates,a.row.ui?.goal_estimates);
+ assert.deepEqual(b.row.alerts,a.row.alerts);
+ assert.equal(b.row.ui?.engines?.FT?.score,a.row.ui?.engines?.FT?.score);
+});
 await test('actual Worker records missing stats without extra provider requests',async()=>{const b=await run(after,fixture,[],[],{env});assert.equal(b.replay.status,'STORED');assert.equal(b.calls.length,5);assert.equal(rows.size,2);assert.equal(b.decision.status,'STORED');const p=[...rows.values()][0].payload;assert.equal(p.sources.statistics.status,'EMPTY');assert.equal(p.sources.odds.status,'EMPTY');assert.equal(p.sources.fixture.received_at<=p.decision_at,true);assert.equal(p.fixture.fixture.status.short,'2H');});
 await test('provider failure receipt is retained as error not empty',async()=>{const b=await run(after,fixture,[],[],{env,failEvents:true});assert.equal(b.replay.status,'STORED');const p=[...rows.values()].filter(x=>x.payload.schema==='FT_OBSERVATION_V1_DRAFT').at(-1).payload;assert.equal(p.sources.events.status,'ERROR');assert.equal(p.sources.events.data,null);assert(p.sources.events.received_at>0);});
 await test('pause survives a new Worker instance while normal scan continues',async()=>{deny=true;const beforeSql=sql,a=await run(after,fixture,[],[],{env}),b=await run(after,fixture,[],[],{env,storage:a.storage});assert.equal(a.replay.status,'BUDGET_DENIED');assert.equal(b.replay.status,'PAUSED');assert.equal(sql-beforeSql,1);assert.equal(a.calls.length,5);assert.equal(b.calls.length,5);});
