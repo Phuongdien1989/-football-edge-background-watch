@@ -26,6 +26,8 @@ jobs:
           path: previous-ht
       - name: Reproduce omitted HT bundle and check dependency closure and MIME guards
         run: node ht-assets-recovery/test-package.mjs
+      - name: Verify canonical redirects preserve bytes and block external or API redirects
+        run: node ht-assets-recovery/test-read.mjs
       - run: node --check ht-assets-recovery/release.mjs
       - run: npm install --no-save --no-package-lock wrangler@4 playwright@1.58.2
       - name: Use installed Chrome for scoped asset restoration QA
