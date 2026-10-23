@@ -1,4 +1,5 @@
 // Separate once-only production BACKGROUND FT odds presence audit.
+// Operator-approved bounded read-only source check on 2026-10-23.
 // Pure indexed SELECTs, zero payload export, D1 writes, API calls or deploys.
 import assert from 'node:assert/strict';
 import {readFileSync,mkdirSync,writeFileSync} from 'node:fs';
