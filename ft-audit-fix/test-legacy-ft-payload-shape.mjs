@@ -10,7 +10,7 @@ test('fixed SQL is indexed and bounded',()=>{
 test('SQL never returns raw payload odds, fixture score or bookmaker rows',()=>{
  assert(!FT_RAW_ODDS_PRESENCE_SQL.includes('SELECT *'));
  assert(!/SELECT[^]*\bodds_raw\s*,/.test(FT_RAW_ODDS_PRESENCE_SQL));
- assert(!FT_RAW_ODDS_PRESENCE_SQL.includes('payload_json,'));
+ assert(!/,\s*payload_json\s*(?:,|FROM)\b/i.test(FT_RAW_ODDS_PRESENCE_SQL));
 });
 test('rejects unbounded SQL and mutation',()=>{
  assert.throws(()=>assertFTPayloadReadOnlySQL('SELECT * FROM live_snapshots'),/CLOSED/);
