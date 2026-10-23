@@ -27,6 +27,8 @@ jobs:
         run: node ft-pilot/build-review-patch.mjs
       - name: Verify safe after-Push integration and failure isolation
         run: node ft-pilot/test-integration.mjs
+      - name: Compare real H1/FT/HC evaluator before and after FT Pilot at equal provider inputs
+        run: node ft-pilot/test-dual-replay.mjs
       - name: Parse both reviewed Worker candidates, never execute them
         run: |
           node --check ft-audit-output/ft-pilot-candidate/worker_notify_v130.js
@@ -39,5 +41,6 @@ jobs:
           path: |
             ft-pilot/
             ft-audit-output/ft-pilot-candidate/
+            ft-audit-output/ft-pilot-parity/dual-replay-report.json
           retention-days: 90
           if-no-files-found: error
