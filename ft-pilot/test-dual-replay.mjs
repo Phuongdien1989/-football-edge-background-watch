@@ -203,14 +203,29 @@ for(const scenario of cases)for(const mode of modes){
   state_equal:true});
 }
 }finally{Date.now=originalDateNow;}
+const casePushCounts=samples.filter(x=>x.mode==='OFF').map(x=>x.push_packets);
+const pushAttemptScenarios=casePushCounts.filter(n=>n>0).length;
+const baselineMs=samples.map(x=>x.before_ms);
+const pilotMs=samples.map(x=>x.after_ms);
+const percentile=(xs,p)=>xs.toSorted((a,b)=>a-b)[Math.max(0,Math.ceil(xs.length*p)-1)];
+assert(pushAttemptScenarios>=1,'NO_LEGACY_PUSH_EVENTS_EXERCISED');
+const latencySummary={
+ sample_count:samples.length,local_node_only:true,
+ baseline_p50_ms:percentile(baselineMs,.5),baseline_p95_ms:percentile(baselineMs,.95),
+ with_pilot_p50_ms:percentile(pilotMs,.5),with_pilot_p95_ms:percentile(pilotMs,.95),
+ max_extra_ms:Math.round(Math.max(...samples.map(x=>x.after_ms-x.before_ms))*100)/100,
+ push_attempt_scenarios:pushAttemptScenarios,
+ // GitHub CI runner timing is too noisy to serve as a production SLO.
+ production_worker_cpu_ms:null,production_p95_ms:null,production_d1_billed_rows:null
+};
 const result={checks,scenarios:cases.length,modes:modes.map(x=>x.name),
   using_real_createEngine:true,using_real_notifyTick:true,
   provider_calls_added:0,ht_hc_ft_stored_state_equal:true,push_packets_equal:true,
   actual_uiStatePacket_equal:true,existing_tabs_card_inputs_and_mock_top_equal:true,
   scanner_control_unchanged:true,simulation_not_production_cpu_acceptance:true,
-  paired_latency_ms:samples,production_deploy:false};
+  paired_latency_ms:samples,latency_summary:latencySummary,production_deploy:false};
 writeFileSync(root+'/dual-replay-report.json',JSON.stringify(result,null,2));
 console.log('FE_FT_PILOT_REAL_ENGINE_DUAL_REPLAY_PASS '+JSON.stringify({
  checks,scenarios:cases.length,modes:modes.map(x=>x.name),provider_calls_added:0,
- stored_state_push_mobile_tabs_equal:true,production_measured:false
+ stored_state_push_mobile_tabs_equal:true,latency_summary:latencySummary,production_measured:false
 }));
