@@ -1,0 +1,10 @@
+import assert from 'node:assert/strict';
+import {readPublicStatic} from './public-read.mjs';
+const origin='https://assets.test',urls=[];
+const response=await readPublicStatic(origin+'/ht-candidate/demo.html',async url=>{urls.push(url);return urls.length===1?new Response(null,{status:307,headers:{Location:'/ht-candidate/demo'}}):new Response('<!doctype html><title>exact bytes</title>',{headers:{'content-type':'text/html'}});});
+assert.equal(await response.text(),'<!doctype html><title>exact bytes</title>');assert.deepEqual(urls,[origin+'/ht-candidate/demo.html',origin+'/ht-candidate/demo']);
+await assert.rejects(()=>readPublicStatic(origin+'/x',async()=>new Response(null,{status:302,headers:{Location:'https://other.test/x'}})),/STATIC_REDIRECT_EXTERNAL/);
+await assert.rejects(()=>readPublicStatic(origin+'/x',async()=>new Response(null,{status:302,headers:{Location:'/api/notify/scan-now'}})),/STATIC_REDIRECT_API/);
+await assert.rejects(()=>readPublicStatic(origin+'/x',async()=>new Response(null,{status:301,headers:{Location:'/x'}})),/STATIC_REDIRECT_LIMIT/);
+assert.equal((await readPublicStatic(origin+'/missing',async()=>new Response(null,{status:404}))).status,404);
+console.log(JSON.stringify({status:'PASS',canonical_static_html:'FOLLOWED_WITH_EXACT_BODY',external_redirect:'BLOCKED',api_redirect:'BLOCKED',loop:'BOUNDED',missing_file:'NOT_MASKED'}));
