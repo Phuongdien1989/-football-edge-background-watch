@@ -16,3 +16,11 @@ User authorized Gate A on 23/10/2026 subject to permissions, resource and accoun
 5. Report exact resource IDs, CPU/DO/D1 billing metrics, rollback, and stop gate. Gate B/C still require independent authorizations.
 
 Gate A authorization does not mean account Free limits are available. All FT AI fair odds, EV, TOP and recommendations remain OFF.
+## Gate A independent static isolation guard — 23/10/2026
+GitHub workflow `.github/workflows/ft-gate-a-isolation-guard.yml` asserts no production DB/DO names or UUID in staging, no provider/Push credentials, no route/cron, FT recorder OFF, exact Workerd compatibility date, unresolved new D1 ID and missing migration prevents accidental deploy. Pass certifies review-template constraints only, NOT Cloudflare cloud isolation. Cloudflare plan-specific billable quota and actual remaining headroom still UNKNOWN.
+
+Verified official Cloudflare D1 Free limits: 5,000,000 rows read and 100,000 rows written daily UTC per account. On reaching quota queries fail until UTC reset; adaptive GraphQL analytics may lag. See https://developers.cloudflare.com/d1/platform/pricing/ and https://developers.cloudflare.com/d1/reference/faq/.
+
+Cloudflare roles: creating a NEW Worker requires Workers product Admin, while DO permissions follow its implementing Worker. Prior CI read-only GraphQL/D1 success does NOT prove Admin permission. See https://developers.cloudflare.com/workers/authorization/workers/.
+
+**Cloud provisioning remains HOLD** until fresh reliable quota/billing plan, Worker Admin capability and genuinely separate identifiers verified. User Gate A approval remains valid; Gate B/C not approved.
