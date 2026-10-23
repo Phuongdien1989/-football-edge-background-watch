@@ -64,6 +64,31 @@ await test('failure of DO tracking is caught without provider/push calls',async(
  assert.equal(scheduleFTPilot(x.o,input).status,'SCHEDULED_NON_BLOCKING');
  await x.flush();
 });
+await test('waitUntil rejects registration: no FT D1 or DO work may start',async()=>{
+ const x=owner({enabled:true});let db=0,doReads=0;
+ x.o.env.FT_PILOT_DB={prepare(){db++;throw Error('MUST_NOT_TOUCH_D1')}};
+ x.o.ctx.storage.get=async()=>{doReads++;throw Error('MUST_NOT_TOUCH_DO')};
+ x.o.ctx.waitUntil=()=>{throw Error('WORKER_CONTEXT_SHUTTING_DOWN')};
+ const result=scheduleFTPilot(x.o,input);
+ assert.equal(result.status,'FT_WAITUNTIL_UNAVAILABLE');
+ await Promise.resolve();await Promise.resolve();
+ assert.equal(db,0);assert.equal(doReads,0);
+});
+await test('durable 60-SQL/240-write token budget stops only FT after restart',async()=>{
+ const x=owner({enabled:true});
+ const key='ft:pilot:v1:TEST-PILOT-LOCK:sql-budget';
+ x.mem.set(key,{used:60,reserved_writes:240});
+ assert.equal(scheduleFTPilot(x.o,input).status,'SCHEDULED_NON_BLOCKING');
+ await x.flush();
+ const paused=x.mem.get('ft:pilot:v1:TEST-PILOT-LOCK:paused');
+ assert.equal(paused.reason,'FT_SQL_OR_WRITE_TOKEN_TOTAL_CAP');
+ // Simulate a restarted Durable Object reusing persistent storage.
+ const next=owner({enabled:true});
+ next.o.ctx.storage=x.o.ctx.storage;
+ assert.equal(scheduleFTPilot(next.o,input).status,'SCHEDULED_NON_BLOCKING');
+ await next.flush();
+ assert.deepEqual(x.mem.get(key),{used:60,reserved_writes:240});
+});
 await test('OUTCOME hook ignores unfinished result without scheduling',async()=>{
  const x=owner({enabled:true});
  assert.equal(scheduleFTPilot(x.o,{kind:'OUTCOME',fixture:{fixture:{id:45,status:{short:'2H'}}},receivedAt:600}).status,
