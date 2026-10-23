@@ -97,10 +97,13 @@ export function createFTPilotRecorder({
   const r=await db.prepare(sqlText).bind(...params)[method]();
   if(!r||!Array.isArray(r.results)&&method==='all')throw Error('FT_PILOT_SQL_BAD_RESULT');
   const read=r.meta?.rows_read,written=r.meta?.rows_written;
-  if(Number.isFinite(read)&&read>=0)usage.reported_rows_read+=read;
-  else usage.unverified_sql_metrics++;
-  if(Number.isFinite(written)&&written>=0)usage.reported_rows_written+=written;
-  else usage.unverified_sql_metrics++;
+  // Require actual D1 meta counters, including index amplification.
+  // If absent or excessive, fail closed rather than reporting optimistic cost.
+  if(!Number.isFinite(read)||read<0||read>1000||
+    !Number.isFinite(written)||written<0||written>16)
+    throw Error('FT_PILOT_BILLED_METRIC_UNKNOWN_OR_EXCESSIVE');
+  usage.reported_rows_read+=read;
+  usage.reported_rows_written+=written;
   return r;
  }
  async function stop(reason){
