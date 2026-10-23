@@ -12,6 +12,24 @@ concurrency:
   group: ft-phase3-${{ github.ref }}
   cancel-in-progress: true
 jobs:
+  v138_inherited_ab:
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Actual v138 through v130 inherited notifyTick A/B, local stubs only
+        run: node ft-pilot/test-v138-chain-replay.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ft-phase3-v138-inherited-ab-NO-DEPLOY
+          path: ft-audit-output/ft-pilot-v138-parity/
+          retention-days: 60
   static_v138_lineage:
     runs-on: ubuntu-latest
     timeout-minutes: 5
