@@ -58,10 +58,12 @@ export function scheduleFTPilot(owner,{kind,scan,fixture,receivedAt}={}){
    // lookups during ordinary 30s legacy scanner ticks and across DO restart.
    const terminalPair=result.status==='PAIR_STORED'||
     result.status==='SKIPPED_EXISTING_FIXTURE'||result.status.startsWith('SKIPPED_');
-   const terminalOutcome=['OUTCOME_STORED','OUTCOME_REVISION_LIMIT','OUTCOME_NO_SELECTED_PAIR'].includes(result.status);
-   // OUTCOME_STORED is not final: corrections may later arrive. Never mark its
-   // fixture as final until revision 2 or explicit stop-window.
-   if(terminalPair||terminalOutcome&&result.status!=='OUTCOME_STORED')
+   // No matching pair is PENDING, not a durable negative label. An existing
+   // fixture callback may race a still-in-flight waitUntil PAIR transaction.
+   // Outcomes must remain eligible for later *already-received* callbacks.
+   const terminalOutcome=result.status==='OUTCOME_REVISION_LIMIT';
+   // First stored outcome is not final: a provider correction might arrive.
+   if(terminalPair||terminalOutcome)
     await storage.put(doneKey,{status:result.status,at:Date.now()});
    if(result.status==='D1_ERROR_PAUSED'||result.status==='BILLING_UNVERIFIED_PAUSED'||
     result.status==='WRITE_AMPLIFICATION_PAUSED')
