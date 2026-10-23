@@ -17,14 +17,17 @@ assert(targetDate,'PRODUCTION_DATE_MISSING');
 if(process.env.FT_PILOT_REQUIRE_EXACT_COMPAT==='true')
  assert.equal(shadowDate,targetDate,'RUNTIME_COMPATIBILITY_DATE_MISMATCH');
 const miniflareVersion=JSON.parse(readFileSync('node_modules/miniflare/package.json','utf8')).version;
-const opts=on=>({
+const opts=on=>{const worker={
  modules:true,scriptPath:'ft-pilot/shadow-worker.mjs',
  // Miniflare v4 test binary currently supports <=2026-08-06 (not the\n // production Worker date 2026-09-11). This is a compatibility LIMIT.\n compatibilityDate:shadowDate,compatibilityFlags:['nodejs_compat'],
  durableObjects:{SHADOW_DO:{className:'FTPilotShadowDO',useSQLite:true}},
  d1Databases:{FT_PILOT_DB:'00000000-0000-4000-8000-000000000123'},
  bindings:{FT_PILOT_ENABLED:on?'true':'false',FT_PILOT_EPOCH:epoch,
   FT_PILOT_LOGIC_VERSION:logic}
-});
+};
+// Miniflare 5 requires workers[]; Miniflare 4 retains its validated API.
+return miniflareVersion.startsWith('5.')?{workers:[{name:'ft-pilot-shadow',...worker}]}:worker;
+};
 let assertions=0;const test=(condition,why)=>{assert(condition,why);assertions++};
 const mf=new Miniflare(opts(true));
 let db;
