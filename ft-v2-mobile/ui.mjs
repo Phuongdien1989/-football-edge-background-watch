@@ -27,7 +27,6 @@ function tags(row,demo){
  const stale=row.freshness==='STALE'?'<span class="ftv2-rank warn">DỮ LIỆU CŨ</span>':'';
  return rank+' '+(demo?'<span class="ftv2-rank demo">DEMO</span>':'<span class="ftv2-rank neutral">CHỜ MODEL</span>')+age+stale;
 }
- }
 function card(row,p){
  const demo=isDemo(p),quote=row.quote,rec=row.recommendation,shown=demo&&rec?.side;
  const pick=shown?`${label(rec.side)} ${lineText(rec.line)} @${fixed(rec.odds)}`:
