@@ -139,14 +139,14 @@ await check('offline CLI accepts valid local export and retains provenance limit
  mkdirSync('ft-audit-output/ft-v2-pair-export',{recursive:true});
  const file='ft-audit-output/ft-v2-pair-export/input.json';
  const report='ft-audit-output/ft-v2-pair-export/report.json';
- // This synthetic row is historical relative to actual wall-clock UTC time.
+ // The CLI uses the actual wall clock, so snapshots may be past or future.
  writeFileSync(file,JSON.stringify({pair_rows:rows}));
  execFileSync(process.execPath,['ft-v2-mobile/inspect-export.mjs',file,report]);
  const result=JSON.parse(readFileSync(report,'utf8'));
  assert.equal(result.audit.hash_verified,1);
  assert.equal(result.ingestion_source,'OPERATOR_SUPPLIED_LOCAL_FILE_NOT_CLOUDFLARE_AUTHENTICATED');
  assert.equal(result.source_attestation,'UNVERIFIED_REMOTE_EXPORT_ORIGIN');
- assert.equal(result.packet.rows.length,0);
+ assert(result.packet.rows.every(x=>x.recommendation.ev===null&&x.model.pmf===null));
  assert.equal(result.d1_writes,0);assert.equal(result.production_deploy,false);
 });
 await check('offline CLI rejects unknown input format without creating false report',async()=>{
