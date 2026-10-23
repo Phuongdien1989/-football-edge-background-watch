@@ -70,11 +70,13 @@ export function readExistingFTWatch(bridge,now=Date.now(),{maxAgeMs=600000}={}){
  let state;
  try{state=bridge.read();}catch{return empty(now,'FT_BRIDGE_READ_FAILED');}
  if(!state||!Array.isArray(state.watchState?.items))return empty(now,'FT_WATCH_ITEMS_UNAVAILABLE');
- const rows=[],seen=new Set();
+ const byFixture=new Map();
  for(const item of state.watchState.items.slice(0,150)){
   const x=readSingle(item,now,maxAgeMs);
-  if(x&&!seen.has(x.id)){seen.add(x.id);rows.push(x);}
+  if(x&&(!byFixture.has(x.id)||byFixture.get(x.id).decision_at<x.decision_at))
+   byFixture.set(x.id,x);
  }
+ const rows=[...byFixture.values()];
  rows.sort((a,b)=>(a.freshness==='CURRENT'?-1:1)-(b.freshness==='CURRENT'?-1:1)||
    b.decision_at-a.decision_at||a.id-b.id);
  return {schema:'FT_V2_MOBILE_READ_ONLY',mode:'LIVE',rows,
