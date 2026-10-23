@@ -10,7 +10,7 @@ const patched=patchExistingNotify(orig),patWorker=patchExistingEvidenceWorker(or
 function owner({enabled=false,failDO=false,failDB=false}={}){
  const tasks=[],mem=new Map(),logs=[];
  const db={prepare(){if(failDB)throw Error('D1_FAILURE');
-  return {bind(){return {all:async()=>({results:[],meta:{rows_read:0}}),
+  return {bind(){return {all:async()=>({results:[],meta:{rows_read:0,rows_written:0}}),
    run:async()=>({meta:{changes:0,rows_written:0}})}}};
  }};
  const o={env:{FT_PILOT_ENABLED:enabled?'true':'false',
