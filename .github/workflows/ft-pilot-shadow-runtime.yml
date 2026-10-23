@@ -1,0 +1,34 @@
+name: FT Pilot local Workerd D1 and DO shadow — NO production
+on:
+  push:
+    branches: [fix/ft-foundation-20261021]
+    paths:
+      - 'ft-pilot/**'
+      - '.github/workflows/ft-pilot-shadow-runtime.yml'
+permissions:
+  contents: read
+concurrency:
+  group: ft-pilot-workerd-shadow-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  local_runtime:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install local Workerd/Miniflare test library (no Cloudflare authentication)
+        run: npm install --no-save --no-package-lock miniflare@4
+      - name: Exercise isolated D1/DO shadow under Workerd; no network scanner
+        run: node ft-pilot/test-shadow-workerd.mjs
+      - name: Upload measured local runtime report (not provider billing)
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ft-pilot-local-workerd-shadow-NO-DEPLOY
+          path: ft-audit-output/ft-pilot-shadow/
+          retention-days: 60
