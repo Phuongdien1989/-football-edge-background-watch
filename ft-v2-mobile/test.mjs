@@ -63,7 +63,7 @@ test('live detail includes league and match with no fair pricing',()=>{
 });
 test('live chart makes lack of PMF explicit, preserves binary signal distinction',()=>{
  const s=renderFTScreen(live,{selectedId:42,tab:'chart'});
- assert(s.includes('Đang chờ xác suất tổng bàn FT'));assert(s.includes('không phải xác suất bàn thắng'));
+ assert(s.includes('Đang chờ xác suất tổng bàn FT'));assert(s.includes('không phải dự đoán xác suất'));
 });
 test('all five demo matches are distinct fixtures, clearly fictional',()=>{
  assert.equal(demoFTPacket.rows.length,5);assert.equal(new Set(demoFTPacket.rows.map(r=>r.id)).size,5);
@@ -115,6 +115,6 @@ test('all browser assets live within isolated FT namespace',()=>{
  const h=readFileSync('ft-v2-mobile/preview.html','utf8');
  assert(h.includes('./style.css'));assert(h.includes('./preview.mjs'));
  const m=readFileSync('ft-v2-mobile/preview.mjs','utf8');
- assert(m.includes('demoFTPacket'));assert(m.includes('mapFTLiveRows([])'));
+ assert(m.includes('demoFTPacket'));assert(m.includes('readExistingFTWatch(window.FEUIReadBridge)'));
 });
 console.log('FE_FT_V2_LIGHT_UI_PASS '+JSON.stringify({checks,demo_fixture_count:5,real_ev_calculated:false,live_recommendations:0,ht_hc_assets_changed:0,api_calls:0,d1_writes:0,production_deploy:false}));
