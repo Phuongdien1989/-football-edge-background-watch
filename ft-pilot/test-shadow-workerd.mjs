@@ -71,7 +71,10 @@ const report={engine:'LOCAL_MINIFLARE_WORKERD',production:false,
  actual_cloudflare_rows_written:null,actual_production_cpu_ms:null};
 try{
  db=await mf.getD1Database('FT_PILOT_DB');
- await db.exec(readFileSync('ft-pilot/schema-candidate.sql','utf8'));
+ // D1 exec() can reject comment-only lines even though SQLite accepts them.
+ const migration=readFileSync('ft-pilot/schema-candidate.sql','utf8')
+  .split('\n').filter(line=>!line.trimStart().startsWith('--')).join('\n');
+ await db.exec(migration);
  await db.prepare(`INSERT INTO ft_pilot_control_v1
  (epoch,enabled,capture_start_ms,capture_end_ms,outcome_end_ms,max_fixtures,
  max_pair_bytes,max_total_pair_bytes,max_revisions_per_fixture)
