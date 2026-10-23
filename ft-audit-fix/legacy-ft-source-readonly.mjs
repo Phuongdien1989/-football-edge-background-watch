@@ -1,4 +1,5 @@
 // ONE-SHOT LIVE read-only D1 source discovery. No table creation or source payload export.
+// Operator-authorized single read-only discovery checkpoint: 2026-10-23.
 // Only allowlisted, index-backed FT SELECTs after a fresh UTC D1 usage check.
 import assert from 'node:assert/strict';
 import {readFileSync,mkdirSync,writeFileSync} from 'node:fs';
