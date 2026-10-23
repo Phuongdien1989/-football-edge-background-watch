@@ -12,7 +12,7 @@ const epoch='LOCAL-MINIFLARE-FT-REVIEW',logic='e'.repeat(64);
 const now=Date.now(),start=now-3600000,end=now+4*3600000;
 const opts=on=>({
  modules:true,scriptPath:'ft-pilot/shadow-worker.mjs',
- compatibilityDate:'2026-09-11',compatibilityFlags:['nodejs_compat'],
+ // Miniflare v4 test binary currently supports <=2026-08-06 (not the\n // production Worker date 2026-09-11). This is a compatibility LIMIT.\n compatibilityDate:'2026-08-01',compatibilityFlags:['nodejs_compat'],
  durableObjects:{SHADOW_DO:{className:'FTPilotShadowDO',useSQLite:true}},
  d1Databases:{FT_PILOT_DB:'00000000-0000-4000-8000-000000000123'},
  bindings:{FT_PILOT_ENABLED:on?'true':'false',FT_PILOT_EPOCH:epoch,
