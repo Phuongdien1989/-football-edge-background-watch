@@ -114,6 +114,30 @@ try{
  const totals=await db.prepare('SELECT class, COUNT(*) AS n FROM ft_pilot_pairs_v1 GROUP BY class').all();
  test(totals.results.length===2,'BALANCED_BOTH_SOURCE_CLASSES');
  report.checks.push('FIVE_DISTINCT_FT_FIXTURES_AND_TWO_CLASSES_LIMITED');
+ // Miniflare restarts the local Workerd instance, preserving the same
+ // ephemeral D1/DO storage. Re-acquire invalidated D1 proxy after reload.
+ const reserveBefore=await (await mf.dispatchFetch('http://localhost/inspect')).json();
+ await mf.setOptions(opts(true));
+ db=await mf.getD1Database('FT_PILOT_DB');
+ const reserveAfter=await (await mf.dispatchFetch('http://localhost/inspect')).json();
+ test(reserveAfter.sql_reserved===reserveBefore.sql_reserved,'DURABLE_SQL_CAP_RESET_ON_RELOAD');
+ test(reserveAfter.write_tokens_reserved===reserveBefore.write_tokens_reserved,'DURABLE_WRITE_BUDGET_RESET_ON_RELOAD');
+ test((await dbCount('ft_pilot_pairs_v1'))===5,'PAIR_PERSISTENCE_LOST_ON_RELOAD');
+ await dispatch(scan(76001,false));
+ await new Promise(resolve=>setTimeout(resolve,75));
+ test((await dbCount('ft_pilot_pairs_v1'))===5,'RESTART_DUPLICATE_STORED');
+ report.checks.push('LOCAL_WORKERD_RELOAD_PRESERVES_D1_AND_DO_LIMITS');
+ const oldPair=await db.prepare('SELECT content_hash,observation_json FROM ft_pilot_pairs_v1 WHERE fixture_id=76001').first();
+ let updateRejected=false,deleteRejected=false;
+ try{await db.prepare("UPDATE ft_pilot_pairs_v1 SET content_hash=?1 WHERE fixture_id=76001").bind('f'.repeat(64)).run();}
+ catch{updateRejected=true;}
+ try{await db.prepare('DELETE FROM ft_pilot_pairs_v1 WHERE fixture_id=76001').run();}
+ catch{deleteRejected=true;}
+ test(updateRejected&&deleteRejected,'REAL_D1_TRIGGER_ALLOW_MUTATION');
+ const still=await db.prepare('SELECT content_hash,observation_json FROM ft_pilot_pairs_v1 WHERE fixture_id=76001').first();
+ test(oldPair.content_hash===still.content_hash&&oldPair.observation_json===still.observation_json,
+  'IMMUTABLE_PAIR_CONTENT_CHANGED');
+ report.checks.push('ACTUAL_D1_SQLITE_TRIGGERS_REJECT_UPDATE_DELETE');
  const t1=performance.now();
  await dispatch(result(76001,2,1));
  await eventually(async()=>(await dbCount('ft_pilot_outcomes_v1'))===1);
@@ -148,6 +172,23 @@ try{
  test(x.n===0,'OFF_CREATED_SCHEMA');
  report.checks.push('DEFAULT_OFF_NO_DB_SCHEMA_OR_PROVIDER');
 }finally{await off.dispose();}
+// Fault-test a separate fully isolated local Workerd instance whose D1 lacks
+// the pilot schema. An ON sidecar must pause itself; no scanner or Push exists.
+const failed=new Miniflare(opts(true));
+try{
+ const r=await failed.dispatchFetch('http://localhost/event',{
+  method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(scan(99001,false))
+ });
+ test(r.status===200,'SHADOW_D1_FAILURE_CHANGED_WORKER_RESPONSE');
+ test((await r.json()).scheduled.status==='SCHEDULED_NON_BLOCKING','SHADOW_D1_FAILURE_ABORTED_HANDLER');
+ let why;
+ await eventually(async()=>{
+  const st=await (await failed.dispatchFetch('http://localhost/inspect')).json();
+  why=st.pause;return typeof why==='string';
+ });
+ test(why==='D1_ERROR_PAUSED'||why.includes('D1'),'MISSING_FT_ONLY_PAUSE_ON_D1_FAILURE');
+ report.checks.push('REAL_WORKERD_D1_SCHEMA_ABSENT_FAIL_CLOSED_FT_ONLY');
+}finally{await failed.dispose();}
 report.assertions=assertions;
 writeFileSync(root+'/report.json',JSON.stringify(report,null,2));
 console.log('FE_FT_PILOT_WORKERD_SHADOW_PASS '+JSON.stringify({
