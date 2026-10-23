@@ -139,6 +139,9 @@ const modes=[{name:'OFF',flag:'false',d1Fault:false},
  {name:'ON_D1_FAULT',flag:'true',d1Fault:true},
  {name:'ON_BUDGET_EXHAUSTED',flag:'true',d1Fault:false,budget:true}];
 const samples=[];let checks=0;
+const originalDateNow=Date.now;
+Date.now=()=>FIXED;
+try{
 for(const scenario of cases)for(const mode of modes){
  const a=makeContext(scenario),b=makeContext(scenario);
  if(mode.budget){
@@ -155,8 +158,15 @@ for(const scenario of cases)for(const mode of modes){
  const left=projected(before,a.context),right=projected(after,b.context);
  try{assert.deepEqual(right,left,
   'LEGACY_BEFORE_AFTER_DRIFT '+scenario.name+' '+mode.name);}catch(err){
+  const firstDiff=(x,y,where='root')=>{
+   if(Object.is(x,y))return null;
+   if(typeof x!==typeof y||!x||!y||typeof x!=='object')return {at:where,before:x,after:y};
+   const keys=new Set([...Object.keys(x),...Object.keys(y)]);
+   for(const k of keys){const d=firstDiff(x[k],y[k],where+'.'+k);if(d)return d;}
+   return {at:where,reason:'OBJECT_ORDER'};
+  };
   console.error('FE_FT_PILOT_DUAL_REPLAY_DIFF '+JSON.stringify({
-   scenario:scenario.name,mode:mode.name,before:left,after:right}).slice(0,13000));
+   scenario:scenario.name,mode:mode.name,difference:firstDiff(left,right)}).slice(0,1800));
   throw err;
  }
  if(mode.flag==='false'){
@@ -171,6 +181,7 @@ for(const scenario of cases)for(const mode of modes){
   push_packets:before.sends.length,api_requests:before.requests.length,
   state_equal:true});
 }
+}finally{Date.now=originalDateNow;}
 const result={checks,scenarios:cases.length,modes:modes.map(x=>x.name),
   using_real_createEngine:true,using_real_notifyTick:true,
   provider_calls_added:0,ht_hc_ft_stored_state_equal:true,push_packets_equal:true,
