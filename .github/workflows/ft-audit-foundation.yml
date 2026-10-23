@@ -50,6 +50,7 @@ jobs:
       - run: node ft-audit-fix/test-worker-recorder.mjs
       - run: node ft-pilot/test.mjs
       - run: node ft-pilot/test-integration.mjs
+      - run: node ft-pilot/test-dual-replay.mjs
       - run: node --check ft-audit-output/ft-pilot-candidate/worker_notify_v130.js
       - run: node --check ft-audit-output/ft-pilot-candidate/worker.js
       - run: node ft-audit-fix/test-decision-trace.mjs
