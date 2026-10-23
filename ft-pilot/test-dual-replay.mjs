@@ -146,9 +146,7 @@ for(const scenario of cases)for(const mode of modes){
  }
  const env={NOTIFY_DAILY_BUDGET:'43000',FT_PILOT_ENABLED:mode.flag,
   FT_PILOT_EPOCH:'DUAL-REPLAY-EPOCH',FT_PILOT_LOGIC_VERSION:'a'.repeat(64),
-  FT_PILOT_DB:{prepare(){if(mode.d1Fault)throw Error('D1_BILLED_LIMIT');return {
-   bind(){return {all:async()=>({results:[],meta:{rows_read:0,rows_written:0}}),
-    run:async()=>({meta:{changes:0,rows_read:0,rows_written:0}})}};}}}};
+  FT_PILOT_DB:{prepare(){throw Error('LOCAL_D1_FAULT_INJECTED')}}};
  const before=new Before(a.context,{...env,FT_PILOT_ENABLED:'false'});
  const after=new After(b.context,env);
  const t0=performance.now();await before.notifyTick();const t1=performance.now();
