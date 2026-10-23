@@ -43,6 +43,7 @@ jobs:
       - run: node ft-audit-fix/test-replay-validation-report.mjs
       - run: node ft-audit-fix/test-prod-backend-d1-guard.mjs
       - run: node ft-audit-fix/test-d1-capacity-analysis.mjs
+      - run: node ft-audit-fix/test-legacy-ft-source-plan.mjs
       - run: node ft-audit-fix/test-replay-sql-budget.mjs
       - run: node ft-audit-fix/test-worker-recorder.mjs
       - run: node ft-audit-fix/test-decision-trace.mjs
