@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import {REQUIRED_MOBILE_ASSETS,assertFullMobileAssetInventory} from '../ft-audit-fix/mobile-asset-isolation.mjs';
 import {createHash} from 'node:crypto';
 import {readFileSync,writeFileSync,mkdirSync} from 'node:fs';
 import {dirname} from 'node:path';
@@ -8,7 +9,8 @@ const expectedVersion='3166663f-f039-48f5-92ae-888890bb9455';
 const pinnedSource='005a74b4768a00f92ac462592b3de63106b2a4db35732103f6095cfed9fdb46d';
 const pinnedCandidate='d5dd7761ea2296aab2762564457f92c778c1065f3112bba61e6cdd0a13535752';
 const directory='ft-audit-output/mobile-release';
-const files=['index.html','original/index.html','ft-overview-live/index.html','push-sw.js','manifest.webmanifest','favicon.svg','icons/icon-180.png','icons/icon-192.png','icons/icon-512.png','ft-overview/core.mjs','ft-overview/adapter.mjs','ft-overview/charts.mjs','ft-overview/demo.mjs','ft-overview/ui.mjs','ft-overview/style.css','ui-tabs/integrated.css','ui-tabs/integrated.mjs','ui-tabs/read-model.mjs'];
+const files=REQUIRED_MOBILE_ASSETS;
+assertFullMobileAssetInventory(files); // Fails closed if any of the 10 HT pricing files are omitted.
 const hash=data=>createHash('sha256').update(data).digest('hex');
 const cfBase='https://api.cloudflare.com/client/v4/accounts/'+encodeURIComponent(account)+'/workers/scripts/';
 function save(path,bytes){mkdirSync(dirname(path),{recursive:true});writeFileSync(path,bytes);}
@@ -55,6 +57,7 @@ try{
   save(directory+'/backup/'+f,bytes);save(directory+'/site/'+f,bytes);
   manifest.push({path:f,sha256:hash(bytes),bytes:bytes.length});
  }
+ assertFullMobileAssetInventory(manifest,{requireHashes:true});
  assert.equal(hash(readFileSync(directory+'/backup/index.html')),pinnedSource,'BACKUP_BASELINE_WRONG');
  save(directory+'/site/index.html',candidate);
  const unchanged=manifest.filter(f=>f.path!=='index.html');
