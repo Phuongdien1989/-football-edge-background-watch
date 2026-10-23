@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import {assertFullMobileAssetInventory} from '../ft-audit-fix/mobile-asset-isolation.mjs';
 import {readFileSync,writeFileSync} from 'node:fs';
 import {createHash} from 'node:crypto';
 import {spawnSync} from 'node:child_process';
@@ -6,6 +7,7 @@ const action=process.argv[2],dir='ft-audit-output/mobile-release';
 assert(['deploy','rollback'].includes(action),'INVALID_ACTION');
 assert.equal(process.env.FE_MOBILE_OUTBOX_RELEASE_APPROVED,'true','OWNER_APPROVAL_GATE_MISSING');
 const packageManifest=JSON.parse(readFileSync(dir+'/manifest.json','utf8'));
+assertFullMobileAssetInventory(packageManifest.files,{requireHashes:true}); // Hard stop before any external mutation.
 const name='shiny-silence-d892',old='3166663f-f039-48f5-92ae-888890bb9455';
 const hash=x=>createHash('sha256').update(x).digest('hex');
 const base='https://api.cloudflare.com/client/v4/accounts/'+encodeURIComponent(process.env.CLOUDFLARE_ACCOUNT_ID)+'/workers/scripts/'+name;
