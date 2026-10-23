@@ -1,0 +1,15 @@
+# REVIEW TEMPLATE — not a deployable production wrangler.toml
+# Keep the existing name, main=worker_notify_v138_peak_window.js, existing
+# FOOTBALL_DB, DO bindings, scanner settings, assets, secrets, migrations.
+# Add ONLY AFTER EXPLICIT APPROVAL to the deployed backend environment:
+[vars]
+FT_PILOT_ENABLED = "false"  # OFF even after review build
+FT_PILOT_EPOCH = "REPLACE_WITH_EXPLICIT_UNIQUE_PILOT_EPOCH"
+FT_PILOT_LOGIC_VERSION = "REPLACE_WITH_64_LOWERCASE_SHA256_OF_BASELINE_SCANNER"
+# Add the following SECOND BINDING to the SAME existing D1 database;
+# DO NOT create another D1 account/database or pretend it bypasses Free quota.
+[[d1_databases]]
+binding = "FT_PILOT_DB"
+database_name = "football-edge-db"
+database_id = "0d12a7cc-12a9-4c71-b55b-61dfd2dac4d4"
+# This is only a diff TEMPLATE. DO NOT deploy this incomplete overlay file.
