@@ -72,10 +72,63 @@ const {resolve,extname}=require('node:path');
   await page.screenshot({path:out+'/live-no-real-data-390.png',fullPage:true});
   results.push({width:390,mode:'LIVE_EMPTY',synthetic_items:0,EV_shown:false,status:'PASS'});
   await context.close();
+
+  // Local-only representative shape of EXISTING FEUIReadBridge.watchState:
+  // read the FT data without entering FT V2 paired-odds or fictitious EV.
+  const ctx=await browser.newContext({viewport:{width:390,height:844},serviceWorkers:'block'});
+  await ctx.addInitScript(()=>{
+    const at=Date.now()-13000;
+    const fixture={fixture:{id:76543,status:{short:'2H',elapsed:67}},
+      league:{name:'Local FT Bridge QA',country:'QA'},
+      teams:{home:{name:'Home Source'},away:{name:'Away Source'}}};
+    window.FEUIReadBridge={read:()=>({
+      watchState:{items:[{
+        id:76543,home:'Home Source',away:'Away Source',league:'Local FT Bridge QA',
+        h1History:[{score:'HT_UNCHANGED'}],hcHistory:[{score:'HC_UNCHANGED'}],
+        history:[
+          {captured_at:at-40000,minute:65,stats_presence:{sot:true},metrics:{total:{sot:7}}},
+          {captured_at:at,minute:67,stats_presence:{sot:true},metrics:{total:{sot:9}}}
+        ],
+        ui:{fixture,
+          snapshot:{captured_at:at,minute:67,status:'2H',goals:{home:1,away:1},
+            stats_presence:{sot:true},metrics:{total:{sot:9}},
+            market_rows:[{category:'over_under',values:[{value:'Over',handicap:2.5,odd:9.99}]}]},
+          engines:{FT:{score:81,scoreMode:'FULL'},H1:{score:45}}}
+      }]},
+      h1WatchState:{items:[{id:8888,home:'HT fixture'}]},
+      handicapWatchState:{pool:[{id:9999,home:'HC fixture'}]}
+    })};
+  });
+  const p=await ctx.newPage(),caught=[],outside=[];
+  p.on('pageerror',err=>caught.push(err.message));
+  await p.route('**/*',route=>{
+    if(new URL(route.request().url()).origin===base)return route.continue();
+    outside.push(route.request().url);return route.abort();
+  });
+  await p.goto(base+'/ft-v2-mobile/preview.html?mode=live',{waitUntil:'load'});
+  assert.equal(await p.locator('.ftv2-match-card').count(),1);
+  const all=await p.locator('.ftv2-app').innerText();
+  assert(all.includes('Local FT Bridge QA')&&all.includes('Home Source')&&all.includes('Away Source'));
+  assert(all.includes('CHỜ MODEL')&&!all.includes('EV DEMO')&&!all.includes('9.99'));
+  await p.screenshot({path:out+'/bridge-live-list-390.png',fullPage:true});
+  await p.locator('[data-ft-open="76543"]').click();
+  assert((await p.locator('.ftv2-valuation-hero').innerText()).includes('81/100'));
+  await p.screenshot({path:out+'/bridge-live-detail-390.png',fullPage:true});
+  await p.getByRole('button',{name:'Biểu đồ'}).click();
+  assert.equal(await p.locator('.ftv2-trend').count(),1);
+  assert.equal(await p.locator('.ftv2-bars').count(),0);
+  await p.screenshot({path:out+'/bridge-live-chart-390.png',fullPage:true});
+  await p.getByRole('button',{name:'Định giá'}).click();
+  assert((await p.locator('.ftv2-table').innerText()).includes('—'));
+  await p.screenshot({path:out+'/bridge-live-pricing-390.png',fullPage:true});
+  assert.deepEqual(caught,[]);assert.deepEqual(outside,[]);
+  results.push({width:390,mode:'EXISTING_FT_BRIDGE',cards:1,verified_market_prices:0,
+    pmf:false,EV_shown:false,synthetic_items:0,external_requests:0,js_errors:0,status:'PASS'});
+  await ctx.close();
  }finally{
   if(browser)await browser.close();
   await new Promise(resolve=>server.close(resolve));
  }
  writeFileSync(out+'/report.json',JSON.stringify({status:'PASS',results,production_deploy:false,scans:0,real_calibrated_pricing:false},null,2));
- console.log('FE_FT_V2_BROWSER_PREVIEW_PASS '+JSON.stringify({screenshots:17,resolutions:[320,375,390,1280],live_empty:true,production_deploy:false,api_calls:0}));
+ console.log('FE_FT_V2_BROWSER_PREVIEW_PASS '+JSON.stringify({screenshots:21,resolutions:[320,375,390,1280],live_empty:true,existing_ft_bridge:true,production_deploy:false,api_calls:0}));
 })().catch(e=>{console.error(e);process.exitCode=1;});
