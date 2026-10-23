@@ -30,7 +30,10 @@ test('paired market quote is kept with exact Over and Under',()=>{assert.equal(l
 test('no PMF/AI price invented from FT score 91 or binary goal estimate 99',()=>{assert.equal(live.rows[0].model.pmf,null);assert.equal(live.rows[0].model.fair_over,null);assert.equal(live.rows[0].recommendation.ev,null);assert.equal(live.rows[0].recommendation.rank,null)});
 test('market quote is explicitly non-executable',()=>assert.equal(live.rows[0].quote.executable,false));
 test('tampered raw odds loses market quote and is never displayed as verified',()=>{
- const f=structuredClone(pair);f.observation.sources.odds.data[0].odds[0].values[0].odd=2.9;
+ const f=structuredClone(pair);
+ // Do not alias normalized values to raw input: prove independent parity check.
+ f.decision.market_rows[0].values=structuredClone(f.decision.market_rows[0].values);
+ f.observation.sources.odds.data[0].odds[0].values[0].odd=2.9;
  const p=mapFTLiveRows([f],t+60000);assert.equal(p.rows[0].quote,null);assert.equal(p.rows[0].recommendation.state,'WAIT_MODEL');
 });
 test('unknown/future observation is not admitted',()=>assert.equal(mapFTLiveRows([{observation:{...observation,decision_at:t+9999999},decision}],t).rows.length,0));
