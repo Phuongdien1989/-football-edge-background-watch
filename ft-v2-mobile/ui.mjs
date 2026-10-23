@@ -24,8 +24,10 @@ function footer(){
 function tags(row,demo){
  const rank=demo&&Number.isInteger(row.recommendation?.rank)?'<span class="ftv2-rank">TOP '+row.recommendation.rank+'</span>':'<span class="ftv2-rank neutral">CHƯA XẾP HẠNG</span>';
  const age=row.quote?.received_at&&row.decision_at-row.quote.received_at>300000?' <span class="ftv2-rank warn">GIÁ CŨ</span>':'';
- return rank+' '+(demo?'<span class="ftv2-rank demo">DEMO</span>':'<span class="ftv2-rank neutral">CHỜ MODEL</span>')+age;
+ const stale=row.freshness==='STALE'?'<span class="ftv2-rank warn">DỮ LIỆU CŨ</span>':'';
+ return rank+' '+(demo?'<span class="ftv2-rank demo">DEMO</span>':'<span class="ftv2-rank neutral">CHỜ MODEL</span>')+age+stale;
 }
+ }
 function card(row,p){
  const demo=isDemo(p),quote=row.quote,rec=row.recommendation,shown=demo&&rec?.side;
  const pick=shown?`${label(rec.side)} ${lineText(rec.line)} @${fixed(rec.odds)}`:
@@ -57,7 +59,7 @@ function keyMetrics(row,demo){
  <div><small>Giá nhà cái</small><strong>${quote&&side?fixed(side==='OVER'?quote.over_odds:quote.under_odds):quote?fixed(quote.over_odds)+' / '+fixed(quote.under_odds):'—'}</strong></div>
  <div><small>Giá AI (fair)</small><strong>${demo?fixed(fair):'—'}</strong></div>
  <div><small>EV ${demo?'DEMO':'THỰC TẾ'}</small><strong class="${num(ev)>=0&&demo?'ftv2-green':''}">${demo?signed(ev):'—'}</strong></div>
- </div><p class="ftv2-valuation-note">${demo?'Tính toán từ xác suất giả lập để duyệt card. Không dùng để vào cược.':'Chỉ ghi nhận giá thị trường khi nguồn hợp lệ; chưa suy diễn xác suất từ điểm Goal Radar.'}</p></div>`;
+ </div><p class="ftv2-valuation-note">${demo?'Tính toán từ xác suất giả lập để duyệt card. Không dùng để vào cược.':'Chỉ ghi nhận giá thị trường khi nguồn hợp lệ; chưa suy diễn xác suất từ điểm Goal Radar.'}${!demo&&num(row.latest_ft_signal_score)!==null?' Điểm tín hiệu Goal Radar FT: '+fixed(row.latest_ft_signal_score,0)+'/100, không phải xác suất Tài/Xỉu.':''}</p></div>`;
 }
 function graph(rows,title){
  const max=Math.max(1,...rows.map(r=>r.probability));
@@ -79,10 +81,24 @@ function timeline(history){
  return `<svg class="ftv2-trend" viewBox="0 0 ${width} ${height}" role="img" aria-label="Diễn biến điểm tín hiệu Goal Radar FT, không phải xác suất bàn thắng"><path d="${path}"/></svg>
  <div class="ftv2-graph-range"><span>${minX}′</span><span>${maxX}′</span></div>`;
 }
+function statTrend(history){
+ const observed=(Array.isArray(history)?history:[]).filter(x=>num(x.minute)!==null&&
+ num(x.sot_total)!==null&&x.sot_total>=0).slice(-30);
+ if(observed.length<2)return '<div class="ftv2-empty small">Chưa có đủ chuỗi thống kê sút trúng đích để vẽ.</div>';
+ const minX=Math.min(...observed.map(x=>x.minute)),maxX=Math.max(...observed.map(x=>x.minute));
+ const minY=0,maxY=Math.max(1,...observed.map(x=>x.sot_total));
+ const path=observed.map((r,j)=>{
+  const x=16+(r.minute-minX)/Math.max(1,maxX-minX)*288;
+  const y=96-r.sot_total/maxY*80;
+  return (j?'L':'M')+x.toFixed(1)+' '+y.toFixed(1);
+ }).join(' ');
+ return '<svg class="ftv2-trend" viewBox="0 0 320 110" role="img" aria-label="Sút trúng đích lũy kế theo phút, không phải xác suất Tài Xỉu"><path d="'+path+'"/></svg>'+
+ '<div class="ftv2-graph-range"><span>'+minX+'′</span><span>'+maxX+'′ · '+maxY+' SOT</span></div>';
+}
 function chartTab(row,demo){
  const p=demo&&Array.isArray(row.model?.pmf)?row.model.pmf:null;
  return `${p?graph(p,'Phân phối tổng bàn FT (minh họa)'):'<section class="ftv2-panel"><h3>Phân phối tổng bàn FT</h3><div class="ftv2-empty small">Đang chờ xác suất tổng bàn FT được kiểm chứng. Không dùng điểm Goal Radar để dựng biểu đồ xác suất.</div></section>'}
- <section class="ftv2-panel"><h3>Diễn biến điểm tín hiệu FT</h3><p class="ftv2-subheading">Điểm tín hiệu FT không phải xác suất bàn thắng hay xác suất Tài/Xỉu.</p>${timeline(row.history)}</section>`;
+ <section class="ftv2-panel"><h3>${demo?'Diễn biến điểm tín hiệu FT':'Sút trúng đích theo thời gian'}</h3><p class="ftv2-subheading">${demo?'Điểm tín hiệu FT không phải xác suất bàn thắng hay xác suất Tài/Xỉu.':'Dữ liệu thống kê đã ghi nhận từ nguồn FT hiện hành, không phải dự đoán xác suất.'}</p>${demo?timeline(row.history):statTrend(row.history)}</section>`;
 }
 function pricingTab(row,demo){
  const quote=row.quote,pmf=demo?row.model?.pmf:null,lines=[2,2.25,2.5,2.75,3,3.25,3.5];
@@ -100,7 +116,7 @@ function pricingTab(row,demo){
 function historyTab(row,demo){
  const records=Array.isArray(row.history)?row.history:[];
  return `<section class="ftv2-panel"><h3>Lịch sử ghi nhận FT</h3><p class="ftv2-subheading">Chỉ hiển thị các snapshot đã nhận; không điền thêm thời điểm còn thiếu.</p>
- ${records.length?`<div class="ftv2-scroll"><table class="ftv2-table"><thead><tr><th>Phút</th><th>Nhận lúc</th><th>Điểm FT</th><th>Kết quả</th></tr></thead><tbody>${records.slice(-12).reverse().map(x=>`<tr><td>${esc(x.minute)}′</td><td>${timeLabel(x.at)}</td><td>${num(x.score)===null?'—':fixed(x.score,0)+'/100'}</td><td>Chưa quyết toán</td></tr>`).join('')}</tbody></table></div>`:'<div class="ftv2-empty small">Chưa có lịch sử snapshot hợp lệ.</div>'}</section>`;
+ ${records.length?`<div class="ftv2-scroll"><table class="ftv2-table"><thead><tr><th>Phút</th><th>Nhận lúc</th><th>Điểm FT</th><th>SOT</th><th>Kết quả</th></tr></thead><tbody>${records.slice(-12).reverse().map(x=>`<tr><td>${esc(x.minute)}′</td><td>${timeLabel(x.at)}</td><td>${num(x.score)===null?'—':fixed(x.score,0)+'/100'}</td><td>${num(x.sot_total)===null?'—':fixed(x.sot_total,0)}</td><td>Chưa quyết toán</td></tr>`).join('')}</tbody></table></div>`:'<div class="ftv2-empty small">Chưa có lịch sử snapshot hợp lệ.</div>'}</section>`;
 }
 function factors(row,demo){
  const factors=[['Tỷ số hiện tại',row.home_goals+'–'+row.away_goals],
@@ -127,10 +143,13 @@ export function renderFTScreen(input,{selectedId=null,tab='summary',filter='all'
  const main=row?detailView(row,p,tab):listView(p.rows,p,filter);
  return `<div class="ftv2-app" data-ft-mode="${p.mode}" data-ft-screen="${row?'detail':'list'}">${header(p,row?'detail':'list')}<main class="ftv2-main">${main}</main>${footer()}</div>`;
 }
-export function mountFTPreview(root,{packet,demo=false}={}){
+export function mountFTPreview(root,{packet,demo=false,readPacket=null}={}){
  if(!root||typeof root.innerHTML!=='string')throw Error('FT_ROOT_REQUIRED');
  const state={selectedId:null,tab:'summary',filter:'all'};
- const refresh=()=>root.innerHTML=renderFTScreen(packet,{...state,demo});
+ const refresh=()=>{
+  const current=typeof readPacket==='function'?readPacket():packet;
+  root.innerHTML=renderFTScreen(current,{...state,demo});
+ };
  function click(event){
   const element=event.target?.closest?.('[data-ft-open],[data-ft-back],[data-ft-subtab],[data-ft-filter]');
   if(!element||!root.contains(element))return;
