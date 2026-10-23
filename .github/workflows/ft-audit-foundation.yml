@@ -24,6 +24,7 @@ jobs:
       - run: node ft-audit-fix/test-mobile-asset-isolation.mjs
       - run: node ft-v2-mobile/test.mjs
       - run: node ft-v2-mobile/test-legacy-bridge.mjs
+      - run: node ft-v2-mobile/test-pair-export-bridge.mjs
       - run: node ft-audit-fix/test.mjs
       - run: node ft-audit-fix/test-events.mjs
       - run: node ft-audit-fix/test-evidence.mjs
