@@ -89,7 +89,7 @@ await test('the original source code files stay unmodified on disk',()=>{
 });
 await test('candidate scanner imports only independent FT pilot code, not new HTTP',()=>{
  assert(patched.startsWith("import {scheduleFTPilot} from './ft-pilot/integration.mjs';"));
- assert.equal(patched.split('scheduleFTPilot(this,').length,2);
+ assert.equal(patched.split('scheduleFTPilot(this,').length,3);
  assert(patched.includes("FT_PILOT_ENABLED==='true'&&s.status==='2H'"));
  assert(patched.includes('market_rows:compact,devices:[]'));
 });
@@ -112,9 +112,13 @@ await test('candidate does not change HT/HC algorithmic operations or card/PUSH 
 });
 await test('new capture sidecar invoked after legacy send and before snapshot storage',()=>{
  const push=patched.indexOf('if(await this.send(d,packet))'),
-   capture=patched.indexOf("scheduleFTPilot(this,{kind:'PAIR'"),
+   acceptedCapture=patched.lastIndexOf("scheduleFTPilot(this,{kind:'PAIR'"),
+   degradedCapture=patched.indexOf("scheduleFTPilot(this,{kind:'PAIR'"),
    persist=patched.indexOf('await this.putNotifyMatch(id,item)');
- assert(push>=0&&capture>push&&persist>capture);
+ assert(push>=0&&acceptedCapture>push&&persist>acceptedCapture);
+ assert(degradedCapture<push&&degradedCapture>=0);
+ assert(patched.includes("if(signals.goal)ftPilotCandidate=true"));
+ assert(patched.includes("decision:{state:'NOT_EVALUATED',reason:'STATS_UNAVAILABLE'"));
 });
 await test('outcome candidate hooks into pre-existing evidence fixture read',()=>{
  const read=patWorker.indexOf("this.api('/fixtures',{id:j.fixture_id},true)"),
