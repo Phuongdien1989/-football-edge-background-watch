@@ -30,6 +30,28 @@ jobs:
           name: ft-phase3-v138-inherited-ab-NO-DEPLOY
           path: ft-audit-output/ft-pilot-v138-parity/
           retention-days: 60
+  concurrent_d1_do_stress:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install exact-date local Workerd, no credentials
+        run: npm install --no-save --no-package-lock miniflare@4.20260730.0 workerd@1.20261015.1
+      - name: 30 concurrent pair attempts, 9 outcome callbacks and restart
+        run: |
+          export MINIFLARE_WORKERD_PATH="$PWD/node_modules/workerd/bin/workerd"
+          node ft-pilot/test-phase3-stress-workerd.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ft-phase3-concurrent-d1-do-NO-DEPLOY
+          path: ft-audit-output/ft-pilot-stress/
+          retention-days: 60
   static_v138_lineage:
     runs-on: ubuntu-latest
     timeout-minutes: 5
