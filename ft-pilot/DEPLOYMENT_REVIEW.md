@@ -1,3 +1,13 @@
+# CẬP NHẬT NGHIỆM THU PHASE 2 (23/10/2026)
+
+- Đã có kiểm thử Workerd/Miniflare D1+Durable Object thực ở máy CI: **36 kiểm tra PASS**, bao gồm restart, giới hạn 5 trận, khóa sửa/xóa và tự dừng FT khi thiếu schema.
+- Xem [báo cáo Phase 2](PHASE2_WORKERD_SHADOW_REVIEW.md) và workflow `ft-pilot-shadow-runtime.yml`.
+- Kết quả trước/sau với chính hàm `notifyTick`, bộ chấm điểm H1/FT/HC và adapter Mobile vẫn 21/21 PASS. Kiểm thử này chỉ xác minh trạng thái từ cùng input trong Node, không phải benchmark production.
+- **Chưa có xác nhận tương đương bản production:** Miniflare v4 sử dụng compatibility date 2026-08-01 (bản production 2026-09-11); backend DO dưới tải thật, billed D1, CPU/p95, TOP thực và tỷ lệ Outcome thực đều CHƯA ĐO.
+- PR vẫn Draft; không sửa schema production, không deploy, không bật scanner.
+
+---
+
 # FOOTBALL EDGE — FT DATA CAPTURE PILOT | GÓI TRÌNH DUYỆT
 Checkpoint 23/10/2026. PR #16 `fix/ft-foundation-20261021` DRAFT. **CHƯA ĐƯỢC PHÉP DEPLOY, CHƯA MIGRATE PRODUCTION, CHƯA BẬT SCANNER/RECORDER.**
 
