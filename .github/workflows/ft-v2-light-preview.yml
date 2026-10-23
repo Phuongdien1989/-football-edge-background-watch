@@ -1,0 +1,43 @@
+name: FT AI V2 light mobile preview — local browser only
+on:
+  push:
+    branches: [fix/ft-foundation-20261021]
+    paths:
+      - 'ft-v2-mobile/**'
+      - '.github/workflows/ft-v2-light-preview.yml'
+permissions:
+  contents: read
+concurrency:
+  group: fe-ft-v2-preview-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  ft_preview:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: FT UI isolated model/data/asset tests (no network)
+        run: |
+          node ft-audit-fix/test-mobile-asset-isolation.mjs
+          node ft-v2-mobile/test.mjs
+      - name: Prepare Chrome browser QA
+        run: |
+          google-chrome --version
+          npm install --no-save --no-package-lock playwright@1.58.2
+      - name: Localhost-only FT screens and responsive screenshots
+        run: node ft-v2-mobile/test-browser.cjs
+      - name: Upload HTML preview and QA screenshots (not production)
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ft-v2-light-mobile-preview-only
+          path: |
+            ft-v2-mobile/
+            ft-audit-fix/ft-total-settlement.mjs
+            ft-audit-fix/ft-pricing-evidence-bridge.mjs
+            ft-audit-fix/replay-integrity.mjs
+            ft-audit-output/ft-v2-mobile-preview/
+          retention-days: 90
