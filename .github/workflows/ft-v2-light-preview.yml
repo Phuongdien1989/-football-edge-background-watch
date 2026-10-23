@@ -24,6 +24,7 @@ jobs:
           node ft-audit-fix/test-mobile-asset-isolation.mjs
           node ft-v2-mobile/test.mjs
           node ft-v2-mobile/test-legacy-bridge.mjs
+          node ft-v2-mobile/test-pair-export-bridge.mjs
       - name: Prepare Chrome browser QA
         run: |
           google-chrome --version
