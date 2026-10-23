@@ -8,6 +8,8 @@ import {pathToFileURL} from 'node:url';
 import {resolve} from 'node:path';
 import {performance} from 'node:perf_hooks';
 import {patchExistingNotify} from './build-review-patch.mjs';
+import {uiStatePacket} from '../notify-ui-state.mjs';
+import {fromBridges} from '../ui-tabs-preview/read-model.mjs';
 const root='ft-audit-output/ft-pilot-parity';mkdirSync(root,{recursive:true});
 const FIXED=Date.UTC(2026,9,23,7,30,0);
 const clock=`export const clockNow=()=>${FIXED};`;
@@ -118,14 +120,33 @@ function makeContext(scenario){
   data,storage,waitUntil(p){tasks.push(p);}};
  return {context,tasks};
 }
-const projected=(w,ctx)=>({
-  match:[...ctx.data.entries()].filter(([k])=>k.startsWith('notify:match:'))
-   .map(([k,v])=>[k,v]),
+const projected=(w,ctx)=>{
+ const match=[...ctx.data.entries()].filter(([k])=>k.startsWith('notify:match:'))
+   .map(([k,v])=>[k,v]);
+ const items=match.map(([,v])=>v);
+ const mobile=uiStatePacket(items,{device:'device-1',now:FIXED});
+ // Explicit mock rank is exactly the same incoming ranked TOP reference.
+ // This tests UI adapter non-regression, NOT the independent TOP ranker.
+ const ranked=items.map((item,i)=>({
+   id:item.id,ft:{...item,latest:item.ui?.snapshot},
+   h1:{...item,latest:item.ui?.h1_snapshot||item.ui?.snapshot},
+   hc:{...item,latest:item.ui?.hc_snapshot||item.ui?.snapshot},
+   __rank:{top:i+1,primary:{engine:'FT'}},__addon:{rankWhy:'Existing TOP preserved'}
+ }));
+ const legacy={read:()=>({watchState:{items},h1WatchState:{items},
+  handicapWatchState:{pool:items}})};
+ const tabs=fromBridges({legacy,master:{masterRows:()=>ranked},
+  overviewRows:()=>[]},FIXED);
+ return {
+  match,
+  mobile,
+  tabs,
   scannerStatus:ctx.data.get('notify:status')||null,
   notifyBudget:ctx.data.get('notify:budget')||null,
   requests:w.requests,
   sends:w.sends
-});
+ };
+};
 const cases=[
  {name:'1H HT+HC valuation and alert state',fixture:fx(11001,'1H',32,0,0),prior:{home:0,away:0}},
  {name:'2H FT+HC price history and eligible Push',fixture:fx(11002,'2H',70,1,1),prior:{home:1,away:1}},
@@ -185,10 +206,11 @@ for(const scenario of cases)for(const mode of modes){
 const result={checks,scenarios:cases.length,modes:modes.map(x=>x.name),
   using_real_createEngine:true,using_real_notifyTick:true,
   provider_calls_added:0,ht_hc_ft_stored_state_equal:true,push_packets_equal:true,
+  actual_uiStatePacket_equal:true,existing_tabs_card_inputs_and_mock_top_equal:true,
   scanner_control_unchanged:true,simulation_not_production_cpu_acceptance:true,
   paired_latency_ms:samples,production_deploy:false};
 writeFileSync(root+'/dual-replay-report.json',JSON.stringify(result,null,2));
 console.log('FE_FT_PILOT_REAL_ENGINE_DUAL_REPLAY_PASS '+JSON.stringify({
  checks,scenarios:cases.length,modes:modes.map(x=>x.name),provider_calls_added:0,
- stored_state_and_push_equal:true,production_measured:false
+ stored_state_push_mobile_tabs_equal:true,production_measured:false
 }));
