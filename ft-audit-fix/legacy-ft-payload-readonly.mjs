@@ -1,4 +1,5 @@
 // Explicit ONE-TIME read-only D1 JSON shape probe, never fetches raw values.
+// Second, separate, explicitly scoped read-only shape checkpoint on 2026-10-23.
 // Query is a closed, index-backed 24-row SELECT. No schema, API or scanner edits.
 import assert from 'node:assert/strict';
 import {readFileSync,mkdirSync,writeFileSync} from 'node:fs';
