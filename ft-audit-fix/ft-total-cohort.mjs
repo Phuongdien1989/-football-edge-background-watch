@@ -6,6 +6,13 @@ import {verifyFTPairRow} from './pair-outcome-replay.mjs';
 import {inspectFTOutcome} from './replay-integrity.mjs';
 const integer=v=>Number.isSafeInteger(v)&&v>=0;
 const validTime=v=>Number.isSafeInteger(v)&&v>0;
+const statCount=v=>{
+ if(integer(v))return v;
+ if(typeof v==='string'&&/^[0-9]+$/.test(v.trim())){
+  const num=Number(v);return integer(num)?num:null;
+ }
+ return null;
+};
 function statsSotTotal(o){
  const s=o?.sources?.statistics;
  if(s?.status!=='OK'||!Array.isArray(s.data)||s.data.length!==2)return null;
@@ -13,8 +20,7 @@ function statsSotTotal(o){
   const a=team?.statistics;
   if(!Array.isArray(a))return null;
   const shot=a.find(x=>['shots on goal','shots on target'].includes(String(x?.type||'').toLowerCase()));
-  if(!shot||!integer(shot.value))return null;
-  return shot.value;
+  return shot?statCount(shot.value):null;
  });
  return n.every(integer)?n[0]+n[1]:null;
 }
