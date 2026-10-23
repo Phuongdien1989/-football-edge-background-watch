@@ -81,16 +81,6 @@ await test('one truly atomic PAIR row saved, with raw bookmaker odds and immutab
  assert.equal(row.class,'RECOMMENDATION_CANDIDATE');
  assert(row.pair_bytes>0&&row.pair_bytes<=20000);
 });
-await test('stratum cap reserves room for both recommendation and nonrecommended fixture classes',async()=>{
- const secondEpoch='PILOT-CLASS-BALANCE-CHECK';
- runSQL('INSERT INTO ft_pilot_control_v1(epoch,enabled,capture_start_ms,capture_end_ms,outcome_end_ms,max_fixtures,max_pair_bytes,max_total_pair_bytes,max_revisions_per_fixture) VALUES (?,?,?,?,?,?,?,?,?)',
-  [secondEpoch,1,now-3600000,now+3600000,now+72*3600000,5,20000,100000,2],'run');
- const e={...env,FT_PILOT_EPOCH:secondEpoch};
- for(const id of [801,802,803])assert.equal((await rec(e).capture(scan(id,false))).status,'PAIR_STORED');
- assert.equal((await rec(e).capture(scan(804,false))).status,'SKIPPED_BALANCED_CLASS_CAP');
- for(const id of [805,806])assert.equal((await rec(e).capture(scan(id,true))).status,'PAIR_STORED');
- assert.equal(runSQL('SELECT COUNT(*) n FROM ft_pilot_pairs_v1 WHERE epoch=?',[secondEpoch]).results[0].n,5);
-});
 await test('same fixture after restart never overwrites original pair or consumes slot',async()=>{
  const before=runSQL('SELECT observation_json,content_hash FROM ft_pilot_pairs_v1 WHERE fixture_id=1').results[0];
  assert.equal((await rec().capture(scan(1,false,{capturedAt:now-10000}))).status,'SKIPPED_EXISTING_FIXTURE');
@@ -197,6 +187,16 @@ await test('closed 4h capture, 72h outcome, 5 fixture cap and zero provider call
  assert.equal(o.contract.max_per_class,3);
  assert.equal(o.contract.provider_calls,0);assert.equal(o.contract.scheduled_polls,0);
 });
-console.log('FE_FT_PILOT_LOCAL_SQLITE_PASS '+JSON.stringify({tests,unique_fixtures:count('ft_pilot_pairs_v1'),
+await test('stratum cap reserves room for both recommendation and nonrecommended fixture classes',async()=>{
+ const secondEpoch='PILOT-CLASS-BALANCE-CHECK';
+ runSQL('INSERT INTO ft_pilot_control_v1(epoch,enabled,capture_start_ms,capture_end_ms,outcome_end_ms,max_fixtures,max_pair_bytes,max_total_pair_bytes,max_revisions_per_fixture) VALUES (?,?,?,?,?,?,?,?,?)',
+  [secondEpoch,1,now-3600000,now+3600000,now+72*3600000,5,20000,100000,2],'run');
+ const e={...env,FT_PILOT_EPOCH:secondEpoch};
+ for(const id of [801,802,803])assert.equal((await rec(e).capture(scan(id,false))).status,'PAIR_STORED');
+ assert.equal((await rec(e).capture(scan(804,false))).status,'SKIPPED_BALANCED_CLASS_CAP');
+ for(const id of [805,806])assert.equal((await rec(e).capture(scan(id,true))).status,'PAIR_STORED');
+ assert.equal(runSQL('SELECT COUNT(*) n FROM ft_pilot_pairs_v1 WHERE epoch=?',[secondEpoch]).results[0].n,5);
+});
+console.log('FE_FT_PILOT_LOCAL_SQLITE_PASS '+JSON.stringify({tests,unique_fixtures:runSQL('SELECT COUNT(*) n FROM ft_pilot_pairs_v1 WHERE epoch=?',[epoch]).results[0].n,
  outcome_revisions:count('ft_pilot_outcomes_v1'),offline_sqlite:true,cloudflare_billed_writes_verified:false,
  provider_calls:0,deploy:false,scanner_actions:0,ht_hc_production_tested:false}));
