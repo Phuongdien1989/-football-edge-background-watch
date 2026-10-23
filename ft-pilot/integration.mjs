@@ -21,7 +21,9 @@ export function scheduleFTPilot(owner,{kind,scan,fixture,receivedAt}={}){
  const storage=owner.ctx.storage;
  // waitUntil registered synchronously; the caller does not await it and its
  // existing scan/Push results cannot be turned into an FT recorder exception.
- const task=(async()=>{
+ let waitUntilAttached=false;
+ const task=Promise.resolve().then(async()=>{
+  if(!waitUntilAttached)return {status:'FT_WAITUNTIL_NOT_ATTACHED'};
   const prefix=KEY(epoch),pauseKey=prefix+'paused',doneKey=prefix+'seen:'+id+':'+kind;
   try{
    if(await storage.get(pauseKey))return {status:'FT_PILOT_PAUSED'};
@@ -70,7 +72,7 @@ export function scheduleFTPilot(owner,{kind,scan,fixture,receivedAt}={}){
    try{console.log('FE_FT_PILOT_AUDIT '+JSON.stringify({id,kind,status:'FT_SIDE_CAR_ERROR'}));}catch{}
    return {status:'FT_SIDE_CAR_ERROR'};
   }
- })();
- try{owner.ctx.waitUntil(task.catch(()=>{}));return {status:'SCHEDULED_NON_BLOCKING'};}
- catch{task.catch(()=>{});return {status:'FT_WAITUNTIL_UNAVAILABLE'};}
+ });
+ try{owner.ctx.waitUntil(task.catch(()=>{}));waitUntilAttached=true;return {status:'SCHEDULED_NON_BLOCKING'};}
+ catch{return {status:'FT_WAITUNTIL_UNAVAILABLE'};}
 }
