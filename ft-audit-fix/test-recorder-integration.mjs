@@ -88,6 +88,9 @@ await test('FT replay recording ON still leaves HC outputs and device alerts unc
  assert.deepEqual(b.row.ui?.goal_estimates,a.row.ui?.goal_estimates);
  assert.deepEqual(b.row.alerts,a.row.alerts);
  assert.equal(b.row.ui?.engines?.FT?.score,a.row.ui?.engines?.FT?.score);
+ // This test uses the shared in-memory fake D1; isolate its records from
+ // following legacy assertions that intentionally start with an empty fake DB.
+ rows.clear();
 });
 await test('actual Worker records missing stats without extra provider requests',async()=>{const b=await run(after,fixture,[],[],{env});assert.equal(b.replay.status,'STORED');assert.equal(b.calls.length,5);assert.equal(rows.size,2);assert.equal(b.decision.status,'STORED');const p=[...rows.values()][0].payload;assert.equal(p.sources.statistics.status,'EMPTY');assert.equal(p.sources.odds.status,'EMPTY');assert.equal(p.sources.fixture.received_at<=p.decision_at,true);assert.equal(p.fixture.fixture.status.short,'2H');});
 await test('provider failure receipt is retained as error not empty',async()=>{const b=await run(after,fixture,[],[],{env,failEvents:true});assert.equal(b.replay.status,'STORED');const p=[...rows.values()].filter(x=>x.payload.schema==='FT_OBSERVATION_V1_DRAFT').at(-1).payload;assert.equal(p.sources.events.status,'ERROR');assert.equal(p.sources.events.data,null);assert(p.sources.events.received_at>0);});
