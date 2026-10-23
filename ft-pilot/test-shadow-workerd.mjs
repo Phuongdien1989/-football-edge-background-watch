@@ -10,9 +10,16 @@ const root='ft-audit-output/ft-pilot-shadow';
 mkdirSync(root,{recursive:true});
 const epoch='LOCAL-MINIFLARE-FT-REVIEW',logic='e'.repeat(64);
 const now=Date.now(),start=now-3600000,end=now+4*3600000;
+// Exact-date test is opt-in. Original v4 local shadow stays at 2026-08-01.
+const shadowDate=process.env.FT_PILOT_SHADOW_COMPAT_DATE||'2026-08-01';
+const targetDate=/^compatibility_date\s*=\s*"([0-9-]+)"/m.exec(readFileSync('wrangler.toml','utf8'))?.[1];
+assert(targetDate,'PRODUCTION_DATE_MISSING');
+if(process.env.FT_PILOT_REQUIRE_EXACT_COMPAT==='true')
+ assert.equal(shadowDate,targetDate,'RUNTIME_COMPATIBILITY_DATE_MISMATCH');
+const miniflareVersion=JSON.parse(readFileSync('node_modules/miniflare/package.json','utf8')).version;
 const opts=on=>({
  modules:true,scriptPath:'ft-pilot/shadow-worker.mjs',
- // Miniflare v4 test binary currently supports <=2026-08-06 (not the\n // production Worker date 2026-09-11). This is a compatibility LIMIT.\n compatibilityDate:'2026-08-01',compatibilityFlags:['nodejs_compat'],
+ // Miniflare v4 test binary currently supports <=2026-08-06 (not the\n // production Worker date 2026-09-11). This is a compatibility LIMIT.\n compatibilityDate:shadowDate,compatibilityFlags:['nodejs_compat'],
  durableObjects:{SHADOW_DO:{className:'FTPilotShadowDO',useSQLite:true}},
  d1Databases:{FT_PILOT_DB:'00000000-0000-4000-8000-000000000123'},
  bindings:{FT_PILOT_ENABLED:on?'true':'false',FT_PILOT_EPOCH:epoch,
@@ -67,6 +74,8 @@ async function eventually(fn,limitMs=2500){
 }
 const report={engine:'LOCAL_MINIFLARE_WORKERD',production:false,
  deployed:false,remote_fetches:0,additional_provider_requests:0,
+ target_compatibility_date:targetDate,test_compatibility_date:shadowDate,
+ exact_date_tested:targetDate===shadowDate,miniflare_version:miniflareVersion,
  migration_production:false,scanner_started:false,checks:[],
  actual_cloudflare_rows_written:null,actual_production_cpu_ms:null};
 try{
@@ -193,6 +202,7 @@ report.assertions=assertions;
 writeFileSync(root+'/report.json',JSON.stringify(report,null,2));
 console.log('FE_FT_PILOT_WORKERD_SHADOW_PASS '+JSON.stringify({
  assertions,steps:report.checks,local:report.sample_counts,
+ compatibility_date:shadowDate,exact_date_tested:targetDate===shadowDate,
  product_cpu_measured:false,actual_cloudflare_billed_measured:false,
  prod_schema_changes:0,prod_deploys:0,scanner_calls:0
 }));

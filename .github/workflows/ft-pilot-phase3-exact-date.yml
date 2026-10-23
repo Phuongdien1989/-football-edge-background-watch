@@ -1,0 +1,52 @@
+name: FT Pilot Phase 3 exact-date candidate — NO deploy
+on:
+  push:
+    branches: [fix/ft-foundation-20261021]
+    paths:
+      - 'ft-pilot/**'
+      - '.github/workflows/ft-pilot-phase3-exact-date.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: ft-phase3-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  static_v138_lineage:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node ft-pilot/test-phase3-source-guard.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: phase3-static-v138-NO-DEPLOY
+          path: ft-audit-output/ft-pilot-phase3/
+  exact_date_local_shadow:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Pinned beta Miniflare 5 local Workerd, no Cloudflare credentials
+        run: npm install --no-save --no-package-lock miniflare@5.20261012.1-beta
+      - name: Reuse existing 36-assertion D1/DO shadow at exact 2026-09-11
+        env:
+          FT_PILOT_SHADOW_COMPAT_DATE: '2026-09-11'
+          FT_PILOT_REQUIRE_EXACT_COMPAT: 'true'
+        run: node ft-pilot/test-shadow-workerd.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: phase3-exact-date-workerd-NO-DEPLOY
+          path: ft-audit-output/ft-pilot-shadow/
