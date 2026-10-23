@@ -100,6 +100,8 @@ await test('real evidence result callback is the only permitted outcome hook',as
  assert.equal(scheduleFTPilot(x.o,{kind:'OUTCOME',fixture:{fixture:{id:45,status:{short:'FT'}},
   score:{fulltime:{home:2,away:1}}},receivedAt:600}).status,'SCHEDULED_NON_BLOCKING');
  await x.flush();
+ assert.equal(x.mem.has('ft:pilot:v1:TEST-PILOT-LOCK:seen:45:OUTCOME'),false,
+  'PENDING_OUTCOME_MUST_NOT_BE_MARKED_PERMANENTLY_DONE');
 });
 await test('OUTCOME cannot be captured for wrong fixture before D1',async()=>{
  const x=owner({enabled:true});
