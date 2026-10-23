@@ -61,11 +61,11 @@ one("const env={NOTIFY_DAILY_BUDGET:'43000',FT_PILOT_ENABLED:mode.flag,",
 // Explicit actual HT research valuation adapter/ranker and v136 Push latency ledger.
 // This is NOT the global production Master TOP ranker and cannot validate its runtime.
 one("import {fromBridges} from '../../ui-tabs-preview/read-model.mjs';",
-"import {fromBridges} from '../../ui-tabs-preview/read-model.mjs';\\nimport {snapshotForHT} from '../../ht-early-candidate/valuation-adapter.mjs';\\nimport {assessHT,rankHT} from '../../ht-early-candidate/valuation.mjs';");
+"import {fromBridges} from '../../ui-tabs-preview/read-model.mjs';\nimport {snapshotForHT} from '../../ht-early-candidate/valuation-adapter.mjs';\nimport {assessHT,rankHT} from '../../ht-early-candidate/valuation.mjs';");
 one("const items=match.map(([,v])=>v);",
-"const items=match.map(([,v])=>v);\\n const htAssessed=items.map(it=>assessHT(snapshotForHT({...it,latest:it.ui?.h1_snapshot||it.ui?.snapshot||it.latest||{}},{model:null}),FIXED));\\n const htResearchRank=rankHT(htAssessed);");
+"const items=match.map(([,v])=>v);\n const htAssessed=items.map(it=>assessHT(snapshotForHT({...it,latest:it.ui?.h1_snapshot||it.ui?.snapshot||it.latest||{}},{model:null}),FIXED));\n const htResearchRank=rankHT(htAssessed);");
 one("  notifyBudget:ctx.data.get('notify:budget')||null,",
-"  notifyBudget:ctx.data.get('notify:budget')||null,\\n  pushLatency:ctx.data.get('notify:latency-last')||null,\\n  pushLatencyHistory:ctx.data.get('notify:latency-history')||null,\\n  htAssessed,htResearchRank,");
+"  notifyBudget:ctx.data.get('notify:budget')||null,\n  pushLatency:ctx.data.get('notify:latency-last')||null,\n  pushLatencyHistory:ctx.data.get('notify:latency-history')||null,\n  htAssessed,htResearchRank,");
 one("const result={checks,scenarios:cases.length,modes:modes.map(x=>x.name),",
 "const result={checks,actual_full_inherited_v138_chain:true,full_real_io:false,real_top_ranker_tested:false,real_push_transport_tested:false,scenarios:cases.length,modes:modes.map(x=>x.name),");
 one("console.log('FE_FT_PILOT_REAL_ENGINE_DUAL_REPLAY_PASS '+JSON.stringify({",
