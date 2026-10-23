@@ -1,5 +1,5 @@
 // Strictly read-only account-level D1 analytics. GraphQL query + GET only.
-// Recheck at 21:12 ICT prior to deciding whether Free tier allows scan (read-only).
+// Handoff continuation: measure current UTC-day usage on 2026-10-23, read-only.
 // Execute once only; no D1 write attempts permitted after the observed 7500 quota failure.
 // No D1 /query calls, SQL, Worker deployments, scanner control, plan changes or mutations.
 import assert from 'node:assert/strict';
