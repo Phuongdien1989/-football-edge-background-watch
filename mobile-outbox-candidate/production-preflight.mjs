@@ -1,3 +1,4 @@
+import {preservedMobileAssets,assertAssetClosure,assertStaticContent} from './preserved-mobile-assets.mjs';
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
 import {readFileSync,writeFileSync,mkdirSync} from 'node:fs';
@@ -8,7 +9,7 @@ const expectedVersion='3166663f-f039-48f5-92ae-888890bb9455';
 const pinnedSource='005a74b4768a00f92ac462592b3de63106b2a4db35732103f6095cfed9fdb46d';
 const pinnedCandidate='d5dd7761ea2296aab2762564457f92c778c1065f3112bba61e6cdd0a13535752';
 const directory='ft-audit-output/mobile-release';
-const files=['index.html','original/index.html','ft-overview-live/index.html','push-sw.js','manifest.webmanifest','favicon.svg','icons/icon-180.png','icons/icon-192.png','icons/icon-512.png','ft-overview/core.mjs','ft-overview/adapter.mjs','ft-overview/charts.mjs','ft-overview/demo.mjs','ft-overview/ui.mjs','ft-overview/style.css','ui-tabs/integrated.css','ui-tabs/integrated.mjs','ui-tabs/read-model.mjs'];
+const files=preservedMobileAssets;
 const hash=data=>createHash('sha256').update(data).digest('hex');
 const cfBase='https://api.cloudflare.com/client/v4/accounts/'+encodeURIComponent(account)+'/workers/scripts/';
 function save(path,bytes){mkdirSync(dirname(path),{recursive:true});writeFileSync(path,bytes);}
@@ -32,7 +33,7 @@ async function publicFile(path){
   try{
    const r=await fetch(url,{headers:{'Cache-Control':'no-cache'},signal:AbortSignal.timeout(22000),redirect:'error'});
    assert.equal(r.status,200,'PUBLIC_ASSET_HTTP_'+path+'_'+r.status);
-   return new Uint8Array(await r.arrayBuffer());
+   const bytes=new Uint8Array(await r.arrayBuffer());assertStaticContent(path,r.headers.get('content-type')||'',bytes);return bytes;
   }catch(e){last=e;if(attempt<2)await new Promise(resolve=>setTimeout(resolve,1600));}
  }
  throw Error('PUBLIC_ASSET_READ_FAILED_'+path+'_'+String(last?.message||last).slice(0,90));
@@ -57,6 +58,7 @@ try{
  }
  assert.equal(hash(readFileSync(directory+'/backup/index.html')),pinnedSource,'BACKUP_BASELINE_WRONG');
  save(directory+'/site/index.html',candidate);
+ assertAssetClosure(directory+'/site');
  const unchanged=manifest.filter(f=>f.path!=='index.html');
  for(const f of unchanged)assert.equal(hash(readFileSync(directory+'/site/'+f.path)),f.sha256,'ASSET_COPY_BAD_'+f.path);
  assert.equal(await active(),expectedVersion,'VERSION_CHANGED_DURING_PREP');
@@ -67,3 +69,4 @@ try{
  save(directory+'/wrangler.json',JSON.stringify({name,compatibility_date:'2026-10-01',keep_vars:true,assets:{directory:'./site'}},null,2));
  console.log('FE_MOBILE_OUTBOX_PREFLIGHT_PASS '+JSON.stringify({status:release.status,version:before,asset_count:files.length,source:pinnedSource,candidate:pinnedCandidate,release_commit:process.env.GITHUB_SHA}));
 }catch(e){report.error=String(e.message).slice(0,240);save(directory+'/preflight-error.json',JSON.stringify(report,null,2));console.error(report.error);process.exitCode=1;}
+

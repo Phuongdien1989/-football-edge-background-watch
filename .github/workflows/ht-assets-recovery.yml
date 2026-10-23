@@ -1,0 +1,72 @@
+name: Restore missing HT pricing assets only
+on:
+  push:
+    branches: [fix/restore-ht-pricing-assets-20261023]
+    paths: ['ht-assets-recovery/**', 'mobile-outbox-candidate/preserved-mobile-assets.mjs', 'mobile-outbox-candidate/production-preflight.mjs', '.github/workflows/ht-assets-recovery.yml']
+permissions: {contents: read, actions: read}
+concurrency:
+  group: fe-football-edge-mobile-production
+  cancel-in-progress: false
+jobs:
+  restore:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: football-edge-production
+    env: {WRANGLER_SEND_METRICS: 'false'}
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - uses: actions/download-artifact@v4
+        with:
+          name: football-edge-ht-event-release
+          run-id: 39550924531
+          github-token: ${{ github.token }}
+          path: previous-ht
+      - name: Reproduce omitted HT bundle and check dependency closure and MIME guards
+        run: node ht-assets-recovery/test-package.mjs
+      - run: node --check ht-assets-recovery/release.mjs
+      - run: npm install --no-save --no-package-lock wrangler@4 playwright@1.58.2
+      - run: npx playwright install --with-deps webkit
+      - name: Confirm 404s, pin current Mobile and preserve exact 18 existing assets
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node ht-assets-recovery/release.mjs prepare
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pre-ht-assets-recovery-backup
+          path: |
+            ht-assets-release/backup/
+            ht-assets-release/backup-version.json
+            ht-assets-release/manifest.json
+          retention-days: 90
+      - name: Candidate WebKit HT card, price, five-minute session and league at four widths
+        run: node ht-assets-recovery/test-browser.cjs --candidate
+      - run: npx wrangler deploy --dry-run --config ht-assets-release/wrangler.json
+      - name: Restore ten missing HT assets, keep all existing bytes
+        id: publish
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node ht-assets-recovery/release.mjs deploy
+      - name: Published HTTPS WebKit HT pricing and session smoke
+        run: node ht-assets-recovery/test-browser.cjs
+      - name: Verify all 28 public asset hashes, backend, Desktop and stored scan control
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node ht-assets-recovery/release.mjs verify
+      - name: Restore exact preceding Mobile if acceptance fails
+        if: failure() && steps.publish.outcome == 'success'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node ht-assets-recovery/release.mjs rollback
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ht-pricing-assets-recovery-evidence
+          path: ht-assets-release/
+          retention-days: 90
