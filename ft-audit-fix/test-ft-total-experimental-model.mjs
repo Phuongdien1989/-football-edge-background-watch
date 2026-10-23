@@ -6,6 +6,10 @@ import {buildFTDecision} from './decision-trace.mjs';
 import {prepareFTPair} from './ft-pair-collector.mjs';
 import {createFTTotalCohort} from './ft-total-cohort.mjs';
 import {trainFTTotalExperimental,predictFTTotalExperimental} from './ft-total-experimental-model.mjs';
+import {prepareRecord} from './replay-ledger.mjs';
+import {verifyFTOutcomeExport} from './ft-total-outcome-export.mjs';
+import {mkdirSync,writeFileSync,readFileSync} from 'node:fs';
+import {execFileSync} from 'node:child_process';
 let tests=0;
 const test=async(name,fn)=>{await fn();tests++;console.log('PASS '+name)};
 const day=86400000,base=Date.UTC(2025,0,1,12);
@@ -153,6 +157,42 @@ await test('training is deterministic on identical frozen verified rows',async()
 await test('model cannot price from future or invalid match state',()=>{
  const bad={...cohort.rows[35],shots_on_target_total:-1};
  assert.equal(predictFTTotalExperimental(report.model,bad).status,'NOT_ELIGIBLE');
+});
+await test('API statistics numeric string SOT values are accepted only when complete',async()=>{
+ const x=await make(110);
+ const o=structuredClone(x.o);
+ o.id='110:string-stats';
+ o.sources.statistics.data[0].statistics[0].value='4';
+ o.sources.statistics.data[1].statistics[0].value='3';
+ const d=buildFTDecision({observation:o,decision_at:o.decision_at+1000,state:'NOT_EVALUATED',
+ reason:'NOT_EVALUATED',source_hash:'f'.repeat(64)});
+ const p=await prepareFTPair(o,d,20000);
+ const y=await createFTTotalCohort([p],[{...x.out,observation_id:o.id}]);
+ assert.equal(y.rows.length,1);assert.equal(y.rows[0].shots_on_target_total,7);
+});
+await test('raw exported immutable outcome records require matching canonical content hash',async()=>{
+ const ledger=[];
+ for(const x of cohortRows)ledger.push(await prepareRecord('OUTCOME',x.out,20000));
+ const v=await verifyFTOutcomeExport(ledger);
+ assert.equal(v.status,'ALL_OUTCOME_ROWS_HASH_VERIFIED');assert.equal(v.verified_rows,40);
+ const changed=[...ledger];changed[0]={...changed[0],payload_json:JSON.stringify({...cohortRows[0].out,score:{home:999,away:0}})};
+ const bad=await verifyFTOutcomeExport(changed);
+ assert.equal(bad.status,'SOME_OUTCOME_ROWS_QUARANTINED');
+ assert.equal(bad.verified_rows,39);
+ assert.equal(bad.issues.length,1);
+});
+await test('offline JSON input report remains uncalibrated and blocked with all hashes valid',async()=>{
+ const ledger=await Promise.all(cohortRows.map(x=>prepareRecord('OUTCOME',x.out,20000)));
+ mkdirSync('ft-audit-output',{recursive:true});
+ const inp='ft-audit-output/ft-3l-synthetic-input.json',out='ft-audit-output/ft-3l-synthetic-report.json';
+ writeFileSync(inp,JSON.stringify({pair_rows:cohortRows.map(x=>x.p),outcome_ledger_rows:ledger}));
+ execFileSync(process.execPath,['ft-audit-fix/ft-total-offline-replay.mjs',inp,out],{encoding:'utf8'});
+ const r=JSON.parse(readFileSync(out,'utf8'));
+ assert.equal(r.status,'OFFLINE_DIAGNOSTIC_ONLY');
+ assert.equal(r.counts.train,30);assert.equal(r.counts.holdout,10);
+ assert.equal(r.input.verified_outcome_rows,40);
+ assert.equal(r.releaseGate,'BLOCKED');
+ assert.equal(r.calibration_verified,false);assert.equal(r.source_attestation,'UNVERIFIED_EXTERNAL_EXPORT_ORIGIN');
 });
 console.log('FT_TOTAL_3L_EXPERIMENTAL_OFFLINE_PASS '+JSON.stringify({tests,
  synthetic_cases:40,actual_production_data:0,actual_forecast_accuracy_certified:false,
