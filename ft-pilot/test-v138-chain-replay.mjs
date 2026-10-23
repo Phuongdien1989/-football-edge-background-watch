@@ -53,6 +53,9 @@ const newBlock=[
 one(oldBlock,newBlock);
 one("const tasks=[],storage={\n  get:async key=>clone(data.get(key)),",
 "const tasks=[],storage={\n  list:async({prefix=''}={})=>new Map([...data.entries()].filter(([k])=>k.startsWith(prefix)).map(([k,v])=>[k,clone(v)])),\n  get:async key=>clone(data.get(key)),");
+// v136 stores Push latency as a multi-key storage.put(object).
+one("put:async(key,value)=>{data.set(key,clone(value));},",
+"put:async(key,value)=>{if(key&&typeof key==='object'&&!Array.isArray(key)){for(const [k,v] of Object.entries(key))data.set(k,clone(v));}else data.set(key,clone(value));},");
 one("const env={NOTIFY_DAILY_BUDGET:'43000',FT_PILOT_ENABLED:mode.flag,",
 "const env={NOTIFY_DAILY_BUDGET:'43000',LIVE_STATE_D1_ENABLED:'false',MANUAL_SCAN_MODE_ENABLED:'false',PEAK_SCAN_ENABLED:'false',FT_PILOT_ENABLED:mode.flag,");
 one("const result={checks,scenarios:cases.length,modes:modes.map(x=>x.name),",
