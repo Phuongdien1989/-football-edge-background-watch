@@ -6,7 +6,7 @@ on:
 permissions: {contents: read, actions: read}
 concurrency:
   group: fe-football-edge-mobile-production
-  cancel-in-progress: false
+  cancel-in-progress: true
 jobs:
   restore:
     runs-on: ubuntu-latest
@@ -28,7 +28,8 @@ jobs:
         run: node ht-assets-recovery/test-package.mjs
       - run: node --check ht-assets-recovery/release.mjs
       - run: npm install --no-save --no-package-lock wrangler@4 playwright@1.58.2
-      - run: npx playwright install --with-deps webkit
+      - name: Use installed Chrome for scoped asset restoration QA
+        run: google-chrome --version
       - name: Confirm 404s, pin current Mobile and preserve exact 18 existing assets
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -42,7 +43,7 @@ jobs:
             ht-assets-release/backup-version.json
             ht-assets-release/manifest.json
           retention-days: 90
-      - name: Candidate WebKit HT card, price, five-minute session and league at four widths
+      - name: Candidate Chrome HT card, price, five-minute session and league at four widths
         run: node ht-assets-recovery/test-browser.cjs --candidate
       - run: npx wrangler deploy --dry-run --config ht-assets-release/wrangler.json
       - name: Restore ten missing HT assets, keep all existing bytes
@@ -51,7 +52,7 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: node ht-assets-recovery/release.mjs deploy
-      - name: Published HTTPS WebKit HT pricing and session smoke
+      - name: Published HTTPS Chrome HT pricing and session smoke
         run: node ht-assets-recovery/test-browser.cjs
       - name: Verify all 28 public asset hashes, backend, Desktop and stored scan control
         env:
