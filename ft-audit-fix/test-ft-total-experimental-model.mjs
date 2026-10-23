@@ -78,6 +78,15 @@ await test('model cannot predict retrospectively with later trained outcomes',()
  assert.equal(predictFTTotalExperimental(report.model,cohort.rows[0]).status,'NOT_ELIGIBLE');
  assert.equal(predictFTTotalExperimental(report.model,{...cohort.rows[32],decision_at:report.model.trained_until}).status,'NOT_ELIGIBLE');
 });
+await test('missing or malformed training cutoff cannot bypass chronological prediction guard',()=>{
+ const row=cohort.rows[32];
+ const missing={...report.model};delete missing.trained_until;
+ for(const model of [missing,...[null,NaN,Infinity,0,-1,1.5,'invalid',String(report.model.trained_until),Number.MAX_SAFE_INTEGER+1].map(trained_until=>({...report.model,trained_until}))]){
+  const prediction=predictFTTotalExperimental(model,row);
+  assert.equal(prediction.status,'NOT_ELIGIBLE');assert.equal(prediction.distribution,null);
+ }
+ assert.equal(predictFTTotalExperimental(report.model,{...row,decision_at:report.model.trained_until+1}).status,'OFFLINE_UNCALIBRATED_PMF');
+});
 await test('fixture repeated snapshots are deduplicated for independent cohort',async()=>{
  const duplicate=await make(3);
  const x=await createFTTotalCohort([...cohortRows.map(z=>z.p),duplicate.p],

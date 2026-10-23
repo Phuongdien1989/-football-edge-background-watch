@@ -1,5 +1,5 @@
 // Limited independent read-only probes.
-// One-shot verification of both deployed rollback artifacts on 2026-10-22.
+// One-shot continuation verification of both deployed rollback artifacts on 2026-10-23.
 // Bounded post-Mobile-release GET-only verification. No scan or D1 operations. No D1 SQL or mutable Cloudflare endpoints.
 // Fail-closed on unknown; each endpoint reported independently. This is the last read attempt for this checkpoint.
 import {mkdirSync,writeFileSync} from 'node:fs';
@@ -35,3 +35,4 @@ try{
  out.status=[out.backend,out.mobile,out.health,out.rollback,out.mobile_rollback].every(x=>x.status==='OK')&&out.rollback.exists===true&&out.mobile_rollback.exists===true?'PASS':'PARTIAL_UNKNOWN';
 }catch(e){out.status='FAIL';out.errors.push(e.message);}
 finally{save();console.log('FE_READONLY_LIVE_LAST '+JSON.stringify(out));}
+

@@ -113,6 +113,7 @@ export async function trainFTTotalExperimental(cohort,{holdoutFraction=.25,minTr
 }
 export function predictFTTotalExperimental(model,row){
  if(model?.schema!=='FT_TOTAL_POISSON_EXPERIMENTAL_3L'||
+ !clock(model.trained_until)||
  model?.state!=='NOT_CALIBRATED_FOR_BETTING'||!Array.isArray(model.coeffs)||model.coeffs.length!==K||
  model.coeffs.some(x=>!Number.isFinite(x))||!validatePrediction(row)||
  row.decision_at<=model.trained_until)return {status:'NOT_ELIGIBLE',distribution:null,reason:'INVALID_MODEL_INPUT_OR_TEMPORAL_LEAKAGE'};
