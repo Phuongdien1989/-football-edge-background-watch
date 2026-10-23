@@ -3,6 +3,7 @@
 // path inside waitUntil. No new fetch, timers, retries or scanner controls.
 import {createFTPilotRecorder} from './recorder.mjs';
 const SCAN_BUDGET=60; // max FT-sidecar D1 requests per entire pilot epoch
+const WRITE_TOKEN_BUDGET=240; // 15 candidate inserts * 16 billed rows each; includes index amplification tolerance
 const KEY=e=>'ft:pilot:v1:'+e+':';
 const passive=Object.freeze({status:'DISABLED',d1_queries:0,provider_calls:0});
 export function scheduleFTPilot(owner,{kind,scan,fixture,receivedAt}={}){
@@ -26,19 +27,23 @@ export function scheduleFTPilot(owner,{kind,scan,fixture,receivedAt}={}){
    if(await storage.get(pauseKey))return {status:'FT_PILOT_PAUSED'};
    if(await storage.get(doneKey))return {status:'ALREADY_AUDITED_THIS_EPOCH'};
    const reserve=await storage.transaction(async tx=>{
-    const key=prefix+'sql-budget',x=await tx.get(key)||{used:0};
-    if(!Number.isSafeInteger(x.used)||x.used<0||x.used+3>SCAN_BUDGET)return {allowed:false,used:x.used};
-    await tx.put(key,{used:x.used+3}); // no refund on error/restart
-    return {allowed:true,used:x.used+3};
+    const key=prefix+'sql-budget',x=await tx.get(key)||{used:0,reserved_writes:0};
+    if(!Number.isSafeInteger(x.used)||x.used<0||
+      !Number.isSafeInteger(x.reserved_writes)||x.reserved_writes<0||
+      x.used+3>SCAN_BUDGET||x.reserved_writes+16>WRITE_TOKEN_BUDGET)
+      return {allowed:false,used:x.used,reserved_writes:x.reserved_writes};
+    await tx.put(key,{used:x.used+3,reserved_writes:x.reserved_writes+16}); // no refunds
+    return {allowed:true,used:x.used+3,reserved_writes:x.reserved_writes+16};
    });
    if(!reserve.allowed){
-    await storage.put(pauseKey,{reason:'FT_SQL_TOTAL_CAP',at:Date.now()});
+    await storage.put(pauseKey,{reason:'FT_SQL_OR_WRITE_TOKEN_TOTAL_CAP',at:Date.now()});
     return {status:'FT_PILOT_SQL_CAP'};
    }
    const log=result=>{
     // bounded status only; never publish real source odds or API credentials.
     const minimal={id,status:result.status,kind,class:result.class??null,
-      billed_rows_written:result.billed_rows_written??null,sql_requests:result.sql_requests};
+      billed_rows_written:result.billed_rows_written??null,billed_rows_read:result.reported_rows_read??null,
+      sql_requests:result.sql_requests,sql_metrics_unverified:result.sql_metrics_unverified??true};
     try{console.log('FE_FT_PILOT_AUDIT '+JSON.stringify(minimal));}catch{}
    };
    const recorder=createFTPilotRecorder({
