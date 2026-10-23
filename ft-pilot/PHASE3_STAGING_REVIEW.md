@@ -34,3 +34,19 @@ Candidate remains 5 unique fixtures (recommended and not), one immutable pair ea
 - HT 28-asset restoration PR #17 was OPEN/DRAFT when checked on 23/10/2026. Static guard 20/20 PASS cannot certify the currently deployed Mobile release.
 - **UNKNOWN:** full v138 BackgroundWatcher A/B, real TOP algorithm and HT fair-value display, production CPU p95/p99 and Push latency, account D1 Free billing/index amplification, DO under load and actual Outcome callback coverage. No staging cloud resources were created.
 - **NOT AUTHORIZED:** Gate A staging cloud, Gate B production schema/binding OFF, Gate C live five-fixture capture. FT V2 fair odds/EV/FINAL still OFF.
+
+
+## Phase 3 — Bước 1 & 2: v138 A/B and concurrent local Workerd (23/10/2026)
+
+Source commit before this documentation update: `15d6e0b37a5aab3349e66076f06b631e6229dea4`.
+
+**CI evidence:** [Phase 3 runtime #39933064080](https://github.com/Phuongdien1989/-football-edge-background-watch/actions/runs/39933064080) — **SUCCESS, all four jobs**.
+
+- **Inherited v138 A/B:** Actual v138→v137→v136→v135→v132→v131→v130 classes, with review-only v130 FT capture hook. **21/21 equal comparisons** over seven fixed scenarios and three modes (OFF, D1 error, FT budget exhausted); real H1/FT/HC evaluator, v136 Push latency state, HT research valuation adapter/rankHT, uiStatePacket, fromBridges. Three scenarios attempted Push using a mocked transport, **0 added observed provider requests**. The v128 parent, upstream provider and Push transport are stubbed. Scanner/manual control and inherited D1 live offload are disabled in this local replay; NOT a full production operational test.
+- **Exact-date isolated FT local shadow:** Miniflare 4.20260730.0 and Workerd 1.20261015.1 with date `2026-09-11`; 36 local Workerd D1/DO assertions PASS.
+- **Concurrency:** 30 parallel distinct PAIR callbacks → five rows stored; classes **3 RECOMMENDATION_CANDIDATE + 2 NOT_RECOMMENDED**, local FT pause at `FT_SQL_OR_WRITE_TOKEN_TOTAL_CAP`. DO reserve at pause: **45 FT SQL + 240 write tokens**. Pause, counters and rows persisted through Workerd reload; later fixture blocked. Nine parallel Outcome callbacks with different local synthetic final scores → two Outcome versions max; immutable pair count 1.
+- **Static guard:** v138 inherited source/production config unchanged, FT flag default OFF.
+
+**Unproven:** independently deployed Master TOP ranker, HT valuation display rendering, actual APNs/FCM delivery, full v138 real API+DO concurrency, production Worker CPU p95/p99, Cloudflare billed D1 rows with indexes and account-wide Free usage, real Outcome coverage. Workerd test counters and 240-token reserve are NOT Cloudflare billing limits. No remote credentials, scanner, provider HTTP, production write or cloud deployment were used.
+
+**Next release gate:** prepare separate Worker/D1/DO identifiers, bounded account-wide quota budget, no provider/Push credentials, no public routes or cron, and stop criteria. Explicit authorization **Gate A** must precede staging cloud resource creation. Gate B production schema+binding (flag OFF) and Gate C live 5-fixture pilot require later independent approvals. FT V2 PMF/fair odds/EV/recommendations remain disabled.
