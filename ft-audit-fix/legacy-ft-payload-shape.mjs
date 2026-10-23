@@ -10,7 +10,7 @@ export const FT_RAW_ODDS_PRESENCE_SQL=`SELECT fixture_id,captured_at,source,snap
  FROM live_snapshots INDEXED BY idx_live_snapshots_engine_time
  WHERE engine='FT' ORDER BY captured_at DESC LIMIT 24`;
 export function assertFTPayloadReadOnlySQL(sql){
- if(sql!==FT_RAW_ODDS_PRESENCE_SQL||!/^SELECT\b/i.test(sql)||/;|\b(?:UPDATE|DELETE|INSERT|DROP|CREATE|ALTER)\b/i.test(sql))
+ if(sql!==FT_RAW_ODDS_PRESENCE_SQL||!/^SELECT\b/i.test(sql)||sql.includes(';'))
  throw Error('FT_PAYLOAD_NOT_CLOSED_READONLY_SQL');
  return true;
 }
