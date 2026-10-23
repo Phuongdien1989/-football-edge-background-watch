@@ -6,7 +6,7 @@ on:
 permissions: {contents: read, actions: read}
 concurrency:
   group: fe-football-edge-mobile-production
-  cancel-in-progress: true
+  cancel-in-progress: false
 jobs:
   restore:
     runs-on: ubuntu-latest
