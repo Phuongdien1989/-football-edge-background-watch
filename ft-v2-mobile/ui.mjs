@@ -82,7 +82,7 @@ function timeline(history){
 function chartTab(row,demo){
  const p=demo&&Array.isArray(row.model?.pmf)?row.model.pmf:null;
  return `${p?graph(p,'Phân phối tổng bàn FT (minh họa)'):'<section class="ftv2-panel"><h3>Phân phối tổng bàn FT</h3><div class="ftv2-empty small">Đang chờ xác suất tổng bàn FT được kiểm chứng. Không dùng điểm Goal Radar để dựng biểu đồ xác suất.</div></section>'}
- <section class="ftv2-panel"><h3>Diễn biến điểm tín hiệu FT</h3><p class="ftv2-subheading">Chỉ thể hiện xu hướng tín hiệu, không thay thế xác suất Tài/Xỉu</p>${timeline(row.history)}</section>`;
+ <section class="ftv2-panel"><h3>Diễn biến điểm tín hiệu FT</h3><p class="ftv2-subheading">Điểm tín hiệu FT không phải xác suất bàn thắng hay xác suất Tài/Xỉu.</p>${timeline(row.history)}</section>`;
 }
 function pricingTab(row,demo){
  const quote=row.quote,pmf=demo?row.model?.pmf:null,lines=[2,2.25,2.5,2.75,3,3.25,3.5];
