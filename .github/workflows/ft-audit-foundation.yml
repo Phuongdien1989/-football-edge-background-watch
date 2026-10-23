@@ -45,6 +45,7 @@ jobs:
       - run: node ft-audit-fix/test-d1-capacity-analysis.mjs
       - run: node ft-audit-fix/test-legacy-ft-source-plan.mjs
       - run: node ft-audit-fix/test-legacy-ft-payload-shape.mjs
+      - run: node ft-audit-fix/test-legacy-ft-background-shape.mjs
       - run: node ft-audit-fix/test-replay-sql-budget.mjs
       - run: node ft-audit-fix/test-worker-recorder.mjs
       - run: node ft-audit-fix/test-decision-trace.mjs
