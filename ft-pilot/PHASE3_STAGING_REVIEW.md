@@ -2,13 +2,13 @@
 Checkpoint 23/10/2026 · Draft PR #16 · review-only; NO deploy.
 
 ## Prior PASS retained
-- Baseline \`ed9251946b9f9bcf8569a5258585964780dc3eca\`: review CI 39926762374, foundation 39926762361, Workerd CI 39926762363 all SUCCESS.
+- Baseline `ed9251946b9f9bcf8569a5258585964780dc3eca`: review CI 39926762374, foundation 39926762361, Workerd CI 39926762363 all SUCCESS.
 - Node inherited v130 notifyTick and actual H1/FT/HC evaluator dual replay 21/21; isolated Miniflare v4 D1/DO 36 assertions at compatibility_date 2026-08-01; 28 Mobile assets with 10 HT guarded 20/20.
 - Real TOP ranker, full v138 operational BackgroundWatcher, HT price valuation and Push delivery NOT yet A/B tested; no production CPU or billed D1 measurements.
 
 ## New candidate tests (not a production-safe claim)
-- \`.github/workflows/ft-pilot-phase3-exact-date.yml\` installs pinned prerelease \`miniflare@5.20261012.1-beta\` on a clean GitHub runner and executes unchanged semantic 36-assertion Workerd D1/DO test using compatibility_date \`2026-09-11\`. Runtime version and exact date go into artifact. This explicitly resolves the prior date mismatch **only if the new job passes**; a beta runtime cannot guarantee real Cloudflare behavior.
-- \`test-phase3-source-guard.mjs\` statically verifies the v138→v137→v136→v135→v132→v131→v130 source lineage, default OFF/unchanged config and unchanged original notifier. This is not full v138 dynamic replay.
+- `.github/workflows/ft-pilot-phase3-exact-date.yml` now runs stable `miniflare@4.20260730.0` with explicitly overridden `workerd@1.20261015.1` executable at compatibility date `2026-09-11`. GitHub Actions **39930806060 SUCCESS**: local D1/DO **36/36 assertions PASS** and source-inventory PASS. This clears the local FT shadow date mismatch, not full production parity. Earlier Miniflare 5 beta trials failed at its breaking configuration API and were not counted as runtime acceptance.
+- `test-phase3-source-guard.mjs` statically verifies the v138→v137→v136→v135→v132→v131→v130 source lineage, default OFF/unchanged config and unchanged original notifier. This is not full v138 dynamic replay.
 - Original v4 job remains intact and runs on its previously supported date; NEVER report its result as equivalence to 2026-09-11.
 - No additional provider request, polling/retry, schedule, Cloudflare credential, schema migration, production deployment or scanner action.
 
@@ -26,3 +26,11 @@ Checkpoint 23/10/2026 · Draft PR #16 · review-only; NO deploy.
 - **C** enable 5-fixture capture with source reuse, new explicit approval — NOT AUTHORIZED.
 
 Candidate remains 5 unique fixtures (recommended and not), one immutable pair each, max two revisions per fixture, 60 reserved FT SQL, 240 reserved write tokens (NOT a billing ceiling). Outcome may remain PENDING. FT V2 real fair odds, PMF calibration, EV and final recommendations remain OFF.
+
+## Phase 3 verified runtime and remaining blockers — 23/10/2026
+
+- Exact-date local Workerd CI: https://github.com/Phuongdien1989/-football-edge-background-watch/actions/runs/39930806060 — SUCCESS at source commit `c00871ca40964708acdaa8ba1b08168cac7dbceb` (two jobs SUCCESS).
+- 36 local assertions: five distinct pair cap, two sample classes, D1/DO persistence/restart, immutability triggers, two Outcome versions, OFF and D1 fail-closed. **No remote production measurements**.
+- HT 28-asset restoration PR #17 was OPEN/DRAFT when checked on 23/10/2026. Static guard 20/20 PASS cannot certify the currently deployed Mobile release.
+- **UNKNOWN:** full v138 BackgroundWatcher A/B, real TOP algorithm and HT fair-value display, production CPU p95/p99 and Push latency, account D1 Free billing/index amplification, DO under load and actual Outcome callback coverage. No staging cloud resources were created.
+- **NOT AUTHORIZED:** Gate A staging cloud, Gate B production schema/binding OFF, Gate C live five-fixture capture. FT V2 fair odds/EV/FINAL still OFF.
