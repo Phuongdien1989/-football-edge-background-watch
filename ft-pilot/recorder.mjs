@@ -83,6 +83,7 @@ export function createFTPilotRecorder({
  durablePause=null,maxSqlPerInvocation=CAP
 }={}){
  let sql=0,halt=false;
+ const usage={reported_rows_read:0,reported_rows_written:0,unverified_sql_metrics:0};
  if(!Number.isSafeInteger(maxSqlPerInvocation)||maxSqlPerInvocation<1||maxSqlPerInvocation>CAP)
   throw Error('INVALID_FT_PILOT_SQL_CAP');
  const enabled=env?.FT_PILOT_ENABLED==='true';
@@ -95,6 +96,11 @@ export function createFTPilotRecorder({
   sql++;
   const r=await db.prepare(sqlText).bind(...params)[method]();
   if(!r||!Array.isArray(r.results)&&method==='all')throw Error('FT_PILOT_SQL_BAD_RESULT');
+  const read=r.meta?.rows_read,written=r.meta?.rows_written;
+  if(Number.isFinite(read)&&read>=0)usage.reported_rows_read+=read;
+  else usage.unverified_sql_metrics++;
+  if(Number.isFinite(written)&&written>=0)usage.reported_rows_written+=written;
+  else usage.unverified_sql_metrics++;
   return r;
  }
  async function stop(reason){
@@ -102,7 +108,10 @@ export function createFTPilotRecorder({
   try{if(typeof durablePause==='function')await durablePause({epoch,reason:String(reason).slice(0,70)});}catch{}
  }
  const report=(fixture_id,status,extra={})=>{
-  const result={fixture_id,status,...extra,sql_requests:sql};
+  const result={fixture_id,status,...extra,sql_requests:sql,
+   reported_rows_read:usage.reported_rows_read,
+   reported_rows_written:usage.reported_rows_written,
+   sql_metrics_unverified:usage.unverified_sql_metrics>0};
   try{audit(result);}catch{}return result;
  };
  async function capture(scan){
@@ -171,7 +180,8 @@ export function createFTPilotRecorder({
     {revisions_before:previous.length,billed_rows_written:billed,elapsed_ms:nowHighRes()-started});
   }catch(e){await stop(String(e?.message||'OUTCOME_D1_ERROR'));return report(id,'D1_ERROR_PAUSED',{elapsed_ms:nowHighRes()-started});}
  }
- return {capture,outcome,sqlUsed:()=>sql,paused:()=>halt,enabled:()=>validConfig,
+ return {capture,outcome,sqlUsed:()=>sql,reportedUsage:()=>({...usage}),
+  paused:()=>halt,enabled:()=>validConfig,
   contract:{max_sql_per_invocation:maxSqlPerInvocation,max_distinct_fixtures:5,
    max_per_class:3,max_pair_bytes:PAIR_MAX,default_off:true,
    provider_calls:0,scheduled_polls:0,model_pricing:false}};
