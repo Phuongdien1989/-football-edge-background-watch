@@ -38,13 +38,17 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Pinned beta Miniflare 5 local Workerd, no Cloudflare credentials
-        run: npm install --no-save --no-package-lock miniflare@5.20261012.1-beta
-      - name: Reuse existing 36-assertion D1/DO shadow at exact 2026-09-11
+      - name: Pin stable Miniflare 4 and recent Workerd binary (local only)
+        run: npm install --no-save --no-package-lock miniflare@4.20260730.0 workerd@1.20261015.1
+      - name: Run 36 local D1/DO assertions on exact 2026-09-11 with external Workerd
         env:
           FT_PILOT_SHADOW_COMPAT_DATE: '2026-09-11'
           FT_PILOT_REQUIRE_EXACT_COMPAT: 'true'
-        run: node ft-pilot/test-shadow-workerd.mjs
+        run: |
+          test -x node_modules/workerd/bin/workerd
+          export MINIFLARE_WORKERD_PATH="$PWD/node_modules/workerd/bin/workerd"
+          node -p '"Miniflare="+require("./node_modules/miniflare/package.json").version+" Workerd="+require("./node_modules/workerd/package.json").version'
+          node ft-pilot/test-shadow-workerd.mjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:
