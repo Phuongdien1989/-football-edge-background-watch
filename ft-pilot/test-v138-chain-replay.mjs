@@ -10,6 +10,10 @@ const one=(a,b)=>{
  assert.equal(replay.split(a).length,2,'V138_HARNESS_ANCHOR_DRIFT '+a.slice(0,90));
  replay=replay.replace(a,b);
 };
+// The composed harness runs two levels below the repository root.
+replay=replay.replace("from './build-review-patch.mjs'","from '../../ft-pilot/build-review-patch.mjs'")
+ .replace("from '../notify-ui-state.mjs'","from '../../notify-ui-state.mjs'")
+ .replace("from '../ui-tabs-preview/read-model.mjs'","from '../../ui-tabs-preview/read-model.mjs'");
 const folder='ft-audit-output/ft-pilot-v138-parity';
 mkdirSync(folder,{recursive:true});
 one("const root='ft-audit-output/ft-pilot-parity';mkdirSync(root,{recursive:true});",
