@@ -4,6 +4,8 @@ import {buildFTDecision} from '../ft-audit-fix/decision-trace.mjs';
 import {prepareFTPair} from '../ft-audit-fix/ft-pair-collector.mjs';
 import {inspectFTPairExport} from './pair-export-bridge.mjs';
 import {renderFTScreen} from './ui.mjs';
+import {mkdirSync,writeFileSync,readFileSync} from 'node:fs';
+import {execFileSync} from 'node:child_process';
 const now=Date.UTC(2026,9,23,8);
 let tests=0;
 const check=async(name,fn)=>{await fn();tests++;console.log('PASS '+name)};
@@ -131,6 +133,28 @@ await check('no pair export returns explicit empty not fake demo',async()=>{
 });
 await check('bad reader configuration fails before processing any rows',async()=>{
  await assert.rejects(()=>inspectFTPairExport([],{now,maxQuoteAgeMs:700000}),/INVALID_FT_EXPORT_READ_CONFIG/);
+});
+await check('offline CLI accepts valid local export and retains provenance limitations',async()=>{
+ const rows=[await makePair(7711)];
+ mkdirSync('ft-audit-output/ft-v2-pair-export',{recursive:true});
+ const file='ft-audit-output/ft-v2-pair-export/input.json';
+ const report='ft-audit-output/ft-v2-pair-export/report.json';
+ // This synthetic row is historical relative to actual wall-clock UTC time.
+ writeFileSync(file,JSON.stringify({pair_rows:rows}));
+ execFileSync(process.execPath,['ft-v2-mobile/inspect-export.mjs',file,report]);
+ const result=JSON.parse(readFileSync(report,'utf8'));
+ assert.equal(result.audit.hash_verified,1);
+ assert.equal(result.ingestion_source,'OPERATOR_SUPPLIED_LOCAL_FILE_NOT_CLOUDFLARE_AUTHENTICATED');
+ assert.equal(result.source_attestation,'UNVERIFIED_REMOTE_EXPORT_ORIGIN');
+ assert.equal(result.packet.rows.length,0);
+ assert.equal(result.d1_writes,0);assert.equal(result.production_deploy,false);
+});
+await check('offline CLI rejects unknown input format without creating false report',async()=>{
+ const bad='ft-audit-output/ft-v2-pair-export/bad.json';
+ writeFileSync(bad,JSON.stringify({watchState:{items:[]}}));
+ assert.throws(()=>execFileSync(process.execPath,
+  ['ft-v2-mobile/inspect-export.mjs',bad,'ft-audit-output/ft-v2-pair-export/invalid-report.json'],
+  {stdio:'pipe'}));
 });
 console.log('FE_FT_V2_PAIR_EXPORT_PASS '+JSON.stringify({tests,real_provider_data_used:false,hash_verified_test_cases:true,
  calibrated_probability:false,trade_recommendations:0,provider_calls:0,d1_queries:0,d1_writes:0,production_deploy:false}));
