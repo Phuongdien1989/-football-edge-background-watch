@@ -71,10 +71,17 @@ const report={engine:'LOCAL_MINIFLARE_WORKERD',production:false,
  actual_cloudflare_rows_written:null,actual_production_cpu_ms:null};
 try{
  db=await mf.getD1Database('FT_PILOT_DB');
- // D1 exec() can reject comment-only lines even though SQLite accepts them.
+ // D1 exec() treats each newline as a separate query. Submit the known,
+ // review-only CREATE TABLE/TRIGGER statements intact through prepare().run().
+ // The production schema is never touched.
  const migration=readFileSync('ft-pilot/schema-candidate.sql','utf8')
   .split('\n').filter(line=>!line.trimStart().startsWith('--')).join('\n');
- await db.exec(migration);
+ const statements=[
+  ...migration.matchAll(/CREATE TABLE IF NOT EXISTS[\s\S]*?\)\s*(?:WITHOUT ROWID)?;/g),
+  ...migration.matchAll(/CREATE TRIGGER IF NOT EXISTS[\s\S]*?END;/g)
+ ].sort((a,b)=>a.index-b.index).map(m=>m[0].replace(/\s+/g,' ').trim());
+ test(statements.length===7,'EXPECTED_THREE_TABLES_FOUR_IMMUTABILITY_TRIGGERS');
+ for(const statement of statements)await db.prepare(statement).run();
  await db.prepare(`INSERT INTO ft_pilot_control_v1
  (epoch,enabled,capture_start_ms,capture_end_ms,outcome_end_ms,max_fixtures,
  max_pair_bytes,max_total_pair_bytes,max_revisions_per_fixture)
