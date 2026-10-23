@@ -14,11 +14,11 @@ const {createEngine}=await import('data:text/javascript;base64,'+Buffer.from(rea
 function load(path){let source=readFileSync(path,'utf8').replace(/^import .*;\s*$/gm,'').replace('export class BackgroundWatcher','class BackgroundWatcher').replace('export default base;','return BackgroundWatcher;');
  return new Function('DeepLinkWatcher','base','createHTCollection','readHTContext','createHTHistoryCache','assessHTItem','createEngine','crossing','observeFT','observeFTStats','observeFTRedEvents','observeFTCatalog','recordFTScan','recordFTDecision','runFTOutcomePass','runPendingFT','reserveScanAttempt','beginFTReplaySqlInvocation','ftReplaySqlRemaining','planFTCaptureBatch',source)(class{}, {},()=>({eligible:()=>false}),async()=>({}),()=>({beginCycle(){}}),()=>null,createEngine,()=>({state:{},send:false}),observeFT,observeFTStats,observeFTRedEvents,observeFTCatalog,recordFTScan,recordFTDecision,runFTOutcomePass,runPendingFT,reserveScanAttempt,beginFTReplaySqlInvocation,ftReplaySqlRemaining,planFTCaptureBatch);}
 const before=load(out+'/candidate/worker_notify_v130.js'),after=load(out+'/recorder-trial/worker_notify_v130.js');
-const f=(goals,phase='2H')=>({fixture:{id:42,status:{short:phase,elapsed:75}},goals,teams:{home:{id:1,name:'A'},away:{id:2,name:'B'}}});
+const f=(goals,phase='2H')=>({fixture:{id:42,status:{short:phase,elapsed:phase==='1H'?35:75}},goals,teams:{home:{id:1,name:'A'},away:{id:2,name:'B'}}});
 async function run(C,fixture,stats=[],events=[],options={}){
  const w=new C(),now=Date.now(),rows=new Map(),storage=options.storage||new Map(),calls=[];let writes=0,bytes=0,storageReads=0,storagePuts=0,transactionTail=Promise.resolve();
  const old={id:42,lastAt:now-1000,history:[{captured_at:now-1000}],hcHistory:[{hc:1}],h1History:[{h1:1}],oddsHistory:[],alerts:{},red:0,ui:{fixture:f({home:1,away:0}),captured_at:now-1000,snapshot:{fresh_at:now-1000},engines:{FT:{score:85},H1:{score:72}},goal_estimates:{d:{prob:80}}}};
- rows.set(42,structuredClone(old));w.env=options.env||{};w.ctx={storage:{get:async k=>{storageReads++;return storage.get(k);},put:async(k,v)=>{storagePuts++;return storage.set(k,v);},transaction:fn=>{const task=transactionTail.then(()=>fn(w.ctx.storage));transactionTail=task.catch(()=>{});return task;}}};w.scanControl=async()=>({enabled:true});w.devices=async()=>[{id:'d',prefs:{enabled:true,goal:true,h1:false,gap:false}}];w.listNotifyMatches=async()=>[...rows.values()].map(x=>structuredClone(x));w.putNotifyMatch=async(id,x)=>{writes++;bytes+=Buffer.byteLength(JSON.stringify(x));rows.set(id,structuredClone(x));};w.deleteNotifyMatch=async id=>rows.delete(id);w.api=async(path,params)=>{calls.push(path);if(path==='/fixtures'&&params?.id&&options.finalFixture)return [options.finalFixture];if(options.failEvents&&path==='/fixtures/events')throw Error('PROVIDER_TEST_ERROR');return path==='/fixtures'?(fixture?[fixture]:[]):path==='/fixtures/statistics'?stats:path==='/fixtures/events'?events:[]};w.send=async()=>{throw Error('UNEXPECTED_PUSH')};await w.notifyTick();return {storageOps:{reads:storageReads,puts:storagePuts},worker:w,row:rows.get(42),old,calls,writes,bytes,replay:w.ftReplayLast,decision:w.ftReplayDecisionLast,discovery:w.ftReplayDiscoveryLast,storage};
+ rows.set(42,structuredClone(old));w.env=options.env||{};w.ctx={storage:{get:async k=>{storageReads++;return storage.get(k);},put:async(k,v)=>{storagePuts++;return storage.set(k,v);},transaction:fn=>{const task=transactionTail.then(()=>fn(w.ctx.storage));transactionTail=task.catch(()=>{});return task;}}};w.scanControl=async()=>({enabled:true});w.devices=async()=>[{id:'d',prefs:{enabled:true,goal:true,h1:false,gap:false,...(options.devicePrefs||{})}}];w.listNotifyMatches=async()=>[...rows.values()].map(x=>structuredClone(x));w.putNotifyMatch=async(id,x)=>{writes++;bytes+=Buffer.byteLength(JSON.stringify(x));rows.set(id,structuredClone(x));};w.deleteNotifyMatch=async id=>rows.delete(id);w.api=async(path,params)=>{calls.push(path);if(path==='/fixtures'&&params?.id&&options.finalFixture)return [options.finalFixture];if(options.failEvents&&path==='/fixtures/events')throw Error('PROVIDER_TEST_ERROR');return path==='/fixtures'?(fixture?[fixture]:[]):path==='/fixtures/statistics'?stats:path==='/fixtures/events'?events:[]};w.send=async()=>{throw Error('UNEXPECTED_PUSH')};await w.notifyTick();return {storageOps:{reads:storageReads,puts:storagePuts},worker:w,row:rows.get(42),old,calls,writes,bytes,replay:w.ftReplayLast,decision:w.ftReplayDecisionLast,discovery:w.ftReplayDiscoveryLast,storage};
 }
 
 const fixture=f({home:1,away:0}),rows=new Map();let sql=0,reservations=0,deny=false;
@@ -26,6 +26,49 @@ const db={prepare(q){return {bind(...a){return {async all(){sql++;assert([PAGE_S
 const env={FT_REPLAY_TRIAL_ENABLED:'true',FT_REPLAY_TRIAL_EPOCH:'integration-1',FT_REPLAY_TRIAL_MAX_RECORD_BYTES:'20000',FT_REPLAY_DB:db};
 let baselineCost;let checks=0;async function test(name,fn){await fn();checks++;console.log('PASS '+name);}
 await test('disabled trial Worker preserves scan API and logical writes',async()=>{const a=await run(before,fixture),b=await run(after,fixture);assert.deepEqual(a.calls,b.calls);assert.equal(a.writes,b.writes);assert.equal(b.replay.status,'DISABLED');assert.equal(sql,0);baselineCost={api_calls:a.calls.length,storage_ops:a.storageOps,logical_match_puts:a.writes};});
+// Explicit HT/HC non-regression: compare user-facing evaluations/alerts and
+// normal scan API/write footprint when the FT replay sidecar remains OFF.
+await test('FT trial disabled preserves HT/H1 and HC snapshots in live first half',async()=>{
+ const first=f({home:1,away:0},'1H');
+ const stats=[1,2].map(id=>({team:{id},statistics:[
+  {type:'Red Cards',value:0},{type:'Total Shots',value:id===1?11:8},
+  {type:'Shots on Goal',value:4},{type:'Shots insidebox',value:5},
+  {type:'Corner Kicks',value:3},{type:'Ball Possession',value:id===1?'55%':'45%'}]}));
+ const opts={devicePrefs:{h1:true,gap:true,goal:true}};
+ const a=await run(before,first,stats,[],opts),b=await run(after,first,stats,[],opts);
+ assert.deepEqual(b.calls,a.calls,'FT sidecar must not add provider calls');
+ assert.equal(b.writes,a.writes,'FT sidecar OFF must not add match writes');
+ assert.equal(b.storageOps.puts,a.storageOps.puts,'FT sidecar OFF must not add DO writes');
+ assert.equal(b.row.ui?.engines?.H1?.score,a.row.ui?.engines?.H1?.score);
+ assert.equal(b.row.ui?.engines?.H1?.scoreMode,a.row.ui?.engines?.H1?.scoreMode);
+ assert.deepEqual(b.row.ui?.h1_snapshot?.metrics,a.row.ui?.h1_snapshot?.metrics);
+ assert.deepEqual(b.row.ui?.hc_snapshot?.metrics,a.row.ui?.hc_snapshot?.metrics);
+ assert.deepEqual(b.row.h1History.map(x=>x.metrics),a.row.h1History.map(x=>x.metrics));
+ assert.deepEqual(b.row.hcHistory.map(x=>x.metrics),a.row.hcHistory.map(x=>x.metrics));
+ assert.deepEqual(b.row.alerts,a.row.alerts);
+ assert.equal(b.row.last?.gap,a.row.last?.gap);
+ assert.equal(b.replay.status,'DISABLED');
+});
+await test('FT trial disabled preserves HC and Goal Radar FT in second half',async()=>{
+ const second=f({home:1,away:1},'2H');
+ const stats=[1,2].map(id=>({team:{id},statistics:[
+  {type:'Red Cards',value:0},{type:'Total Shots',value:10},
+  {type:'Shots on Goal',value:4},{type:'Shots insidebox',value:6},
+  {type:'Corner Kicks',value:3},{type:'Ball Possession',value:'50%'}]}));
+ const opts={devicePrefs:{h1:true,gap:true,goal:true}};
+ const a=await run(before,second,stats,[],opts),b=await run(after,second,stats,[],opts);
+ assert.deepEqual(b.calls,a.calls);
+ assert.equal(b.writes,a.writes);
+ assert.equal(b.storageOps.puts,a.storageOps.puts);
+ assert.deepEqual(b.row.ui?.hc_snapshot?.metrics,a.row.ui?.hc_snapshot?.metrics);
+ assert.deepEqual(b.row.hcHistory.map(x=>x.metrics),a.row.hcHistory.map(x=>x.metrics));
+ assert.equal(b.row.last?.gap,a.row.last?.gap);
+ assert.equal(b.row.ui?.engines?.FT?.score,a.row.ui?.engines?.FT?.score);
+ assert.equal(b.row.ui?.engines?.FT?.scoreMode,a.row.ui?.engines?.FT?.scoreMode);
+ assert.deepEqual(b.row.ui?.goal_estimates,a.row.ui?.goal_estimates);
+ assert.deepEqual(b.row.alerts,a.row.alerts);
+ assert.equal(b.replay.status,'DISABLED');
+});
 await test('actual Worker records missing stats without extra provider requests',async()=>{const b=await run(after,fixture,[],[],{env});assert.equal(b.replay.status,'STORED');assert.equal(b.calls.length,5);assert.equal(rows.size,2);assert.equal(b.decision.status,'STORED');const p=[...rows.values()][0].payload;assert.equal(p.sources.statistics.status,'EMPTY');assert.equal(p.sources.odds.status,'EMPTY');assert.equal(p.sources.fixture.received_at<=p.decision_at,true);assert.equal(p.fixture.fixture.status.short,'2H');});
 await test('provider failure receipt is retained as error not empty',async()=>{const b=await run(after,fixture,[],[],{env,failEvents:true});assert.equal(b.replay.status,'STORED');const p=[...rows.values()].filter(x=>x.payload.schema==='FT_OBSERVATION_V1_DRAFT').at(-1).payload;assert.equal(p.sources.events.status,'ERROR');assert.equal(p.sources.events.data,null);assert(p.sources.events.received_at>0);});
 await test('pause survives a new Worker instance while normal scan continues',async()=>{deny=true;const beforeSql=sql,a=await run(after,fixture,[],[],{env}),b=await run(after,fixture,[],[],{env,storage:a.storage});assert.equal(a.replay.status,'BUDGET_DENIED');assert.equal(b.replay.status,'PAUSED');assert.equal(sql-beforeSql,1);assert.equal(a.calls.length,5);assert.equal(b.calls.length,5);});
