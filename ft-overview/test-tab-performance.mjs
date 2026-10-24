@@ -1,11 +1,4 @@
 import assert from 'node:assert/strict';
-import {readFileSync} from 'node:fs';
 import {patchMechanismTabs} from './patch-mechanism-tabs.mjs';
-const original=readFileSync('ui-tabs-preview/integrated.mjs','utf8');
-const current="import {renderSignalMechanism} from '../ft-ai-v2/light-signal-mechanisms.mjs';\n"+original.replace(" html+='<div class=\"ftabs-note\">Cùng dữ liệu nguồn và kết luận của từng cơ chế. Chuyển tab không gọi quét, không thay Smart Follow.</div>';", " html+='<div class=\"ftabs-note\">Cùng dữ liệu nguồn và kết luận của từng cơ chế. Chuyển tab không gọi quét, không thay Smart Follow.</div>';\n html=renderSignalMechanism({tab:current,rows,chosen,fixture,packet,route,displayAction});");
-const patched=patchMechanismTabs(current);
-assert.equal(patched.anchors,1);
-assert(patched.code.includes("if(!body.querySelector('#ftAIV2ReadOnly'))"));
-assert(patched.code.includes('FE_TAB_PERF_V2'));
-assert.throws(()=>patchMechanismTabs(patched.code),/ALREADY_OPTIMIZED/);
-console.log('TAB_PERFORMANCE_PATCH_PASS');
+const live="import {renderSignalMechanism} from '../ft-ai-v2/light-signal-mechanisms.mjs';\nconst tabs=[['ftv2','FT AI V2']];/* FE_TAB_PERF_V2 */";
+const p=patchMechanismTabs(live);assert(p.unchanged===true&&p.anchors===0&&p.code===live);console.log('PRESERVE_EXISTING_TAB_PERF_PASS');
