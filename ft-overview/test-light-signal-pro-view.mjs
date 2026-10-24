@@ -1,0 +1,17 @@
+import assert from 'node:assert/strict';
+import {lightSignalFTV2View} from './light-signal-pro-view.mjs';
+const empty=lightSignalFTV2View();
+assert(empty.includes('Light')===false);
+assert(empty.includes('Chưa có trận đủ điều kiện'));
+assert(!empty.includes('78%'));
+const sample={id:77,rank:1,snapshot:{home:'A & B',away:'C < D',league:'League',minute:65,goals:{home:1,away:0},market:{line:2.5}},quote:{ev:.025}};
+const decision={action:'TRIAL_OVER',title:'CÂN NHẮC TÀI THỬ NGHIỆM',odds:1.95,winProbability:.55,fairOdds:1.82,estimatedEV:.025,breakEven:1/1.95,reason:['Model có EV dương'],warnings:['Chưa hiệu chỉnh'],sensitivity:{lowEV:-.02,highEV:.07}};
+const html=lightSignalFTV2View({rows:[sample],selected:77,review:decision,live:{evidence:{status:'NO_WINDOW'},reason:'Chưa có cửa sổ'}});
+assert(html.includes('A &amp; B'));
+assert(html.includes('C &lt; D'));
+assert(html.includes('2.5%'));
+assert(html.includes('55.0%'));
+assert(html.includes('ft-v2-select="77"'));
+assert(html.includes('CÂN NHẮC TÀI'));
+assert(!html.includes('78%'));
+console.log('LIGHT_SIGNAL_PRO_VIEW_PASS');
