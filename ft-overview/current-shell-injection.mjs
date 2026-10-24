@@ -8,9 +8,11 @@ export function injectFTV2IntoCurrentShell(html){
  const a=html.indexOf(start),b=html.indexOf(end,a);
  if(a<0||b<0||html.indexOf(start,a+1)!==-1)throw Error('DETACHED_V2_CARD_ANCHOR_MISMATCH');
  const oldBlock=html.slice(a,b+'</details>'.length);
- const next=html.replace(oldBlock,'');
+ const link='<link rel="stylesheet" href="/ft-ai-v2/light-signal-pro.css">';
+ if(html.includes(link))throw Error('LIGHT_SIGNAL_CSS_ALREADY_INSTALLED');
+ const next=html.replace(oldBlock,'').replace('</head>',link+'\n</head>');
  if(next.replace('', '')!==next||next.includes('id="ftAIV2Card"'))throw Error('DETACHED_CARD_NOT_REMOVED');
  if(!next.includes('/ft-ai-v2/integrated.mjs'))throw Error('FT_V2_MODULE_SCRIPT_MISSING');
  return {html:next,originalBytes:Buffer.byteLength(html),removedBytes:Buffer.byteLength(oldBlock),
- changedElements:['remove_detached_ftAIV2Card','preserve_module_script']};
+ changedElements:['remove_detached_ftAIV2Card','preserve_module_script','add_light_signal_css']};
 }
