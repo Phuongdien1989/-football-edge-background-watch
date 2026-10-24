@@ -18,7 +18,7 @@ const result={schema:'FT_V2_SAME_APP_RELEASE_V1',source_commit:process.env.GITHU
 const out='ft-overview/current-main-app-package',site=out+'/site';
 async function cf(path,options={}){const r=await fetch(api+path,{...options,headers:{Authorization:'Bearer '+token,...options.headers},signal:AbortSignal.timeout(30000)});const j=await r.json();assert(r.ok&&j.success,'CF_ERROR_'+path+'_'+r.status);return j.result;}
 async function active(n){const d=await cf(n+'/deployments'),v=d.deployments?.[0]?.versions;assert(v?.length===1&&v[0].percentage===100,'SPLIT_DEPLOYMENT_'+n);return v[0].version_id;}
-async function get(path){const route=path.endsWith('/index.html')?'/'+path.slice(1,-10):'/'+path;const r=await fetch(base+route,{headers:{'Cache-Control':'no-cache'},redirect:'error',signal:AbortSignal.timeout(25000)});assert.equal(r.status,200,'MISSING_LIVE_ASSET_'+path+'_'+r.status);const bytes=Buffer.from(await r.arrayBuffer());assert(bytes.length>0&&bytes.length<4000000,'INVALID_LIVE_ASSET_'+path);return bytes;}
+async function get(path){const route=path==='/'?'/':path.endsWith('/index.html')?'/'+path.slice(1,-10):path;const r=await fetch(base+route,{headers:{'Cache-Control':'no-cache'},redirect:'error',signal:AbortSignal.timeout(25000)});assert.equal(r.status,200,'MISSING_LIVE_ASSET_'+path+'_'+r.status);const bytes=Buffer.from(await r.arrayBuffer());assert(bytes.length>0&&bytes.length<4000000,'INVALID_LIVE_ASSET_'+path);return bytes;}
 function save(path,bytes){mkdirSync(dirname(path),{recursive:true});writeFileSync(path,bytes);}
 async function rollback(){
  await cf(name+'/deployments',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({strategy:'percentage',versions:[{version_id:pin,percentage:100}]})});
