@@ -1,51 +1,20 @@
-name: FT V2 Light Signal Pro Mobile Release
+name: FT V2 Light Signal Pro release preparation — NO deploy
 on:
   push:
-    branches:
-      - fix/ft-foundation-20261021
+    branches: [fix/ft-foundation-20261021]
     paths:
-      - ft-overview/release-current-main-app.mjs
-      - ft-overview/current-shell-injection.mjs
-      - ft-overview/ft-ai-v2-integrated.mjs
-      - ft-overview/light-signal-pro-view.mjs
-      - ft-overview/light-signal-pro.css
-      - .github/workflows/ft-v2-same-app-release.yml
-permissions:
-  contents: read
+      - 'ft-overview/**'
+      - '.github/workflows/ft-v2-same-app-release.yml'
+permissions: {contents: read}
 jobs:
-  preflight:
+  prepare:
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
+        with: {persist-credentials: false}
       - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-      - run: node ft-overview/test-same-app-integration.mjs
+        with: {node-version: '22'}
       - run: node ft-overview/test-light-signal-pro-view.mjs
-      - run: node --check ft-overview/ft-ai-v2-integrated.mjs
-      - run: node ft-overview/test-experimental-decision.mjs
-      - run: node ft-overview/test-live-probability.mjs
-  publish:
-    needs: preflight
-    if: ${{ startsWith(github.event.head_commit.message, 'release(ft-v2): owner-reviewed light signal pro production') }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    environment: football-edge-production
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-      - name: Deploy same Mobile preserving original assets
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          FT_V2_SAME_APP_RELEASE: APPROVED_20261024
-          FT_V2_COMPLETE_MANIFEST_VERIFIED: RECOVERY_28_VERIFIED_20261023
-        run: node ft-overview/release-current-main-app.mjs
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: ft-v2-light-signal-pro-release
-          path: ft-overview/current-main-app-package/result.json
+      - run: node ft-overview/test-same-app-integration.mjs
+      - run: node --check ft-overview/release-current-main-app.mjs
