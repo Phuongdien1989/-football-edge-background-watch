@@ -65,13 +65,13 @@ async function run(){
  result.tabs_patch_anchors=tabsPatch.changedAnchors;
  assert.equal(tabsPatch.changedAnchors,4,'INCOMPLETE_TAB_PATCH');
  save(site+'/index.html',injection.html);
- const modules=['core.mjs','adapter.mjs','experimental-decision.mjs','live-probability.mjs'];
+ const modules=['core.mjs','adapter.mjs','experimental-decision.mjs','live-probability.mjs','light-signal-pro-view.mjs','light-signal-pro.css'];
  for(const file of modules)save(site+'/ft-ai-v2/'+file,readFileSync('ft-overview/'+file));
  save(site+'/ft-ai-v2/integrated.mjs',readFileSync('ft-overview/ft-ai-v2-integrated.mjs'));
  result.preserved_count=Object.keys(retained).length;
  result.ht_preserved=REQUIRED_MOBILE_ASSETS.filter(x=>x.startsWith('ht-candidate/')).length===10;
  result.mobile_root_changed_only_by_ft_v2=true;
- result.changed_static_assets=['index.html','ui-tabs/integrated.mjs','ft-ai-v2/integrated.mjs'];
+ result.changed_static_assets=['index.html','ui-tabs/integrated.mjs','ft-ai-v2/integrated.mjs','ft-ai-v2/light-signal-pro-view.mjs','ft-ai-v2/light-signal-pro.css'];
  const config={name,compatibility_date:'2026-10-01',keep_vars:true,assets:{directory:'./site'}};
  save(out+'/wrangler.json',JSON.stringify(config));
  const command=['--yes','wrangler@4','deploy','--config',out+'/wrangler.json'];
@@ -94,6 +94,8 @@ async function run(){
  assert(await verifyPublished('/',sha(Buffer.from(injection.html))),'LIVE_HTML_MISMATCH_AFTER_RETRIES');
  assert(await verifyPublished('/ft-ai-v2/integrated.mjs',sha(readFileSync('ft-overview/ft-ai-v2-integrated.mjs'))),'V2_ASSET_NOT_SERVED_AFTER_RETRIES');
  assert(await verifyPublished('/ui-tabs/integrated.mjs',sha(Buffer.from(tabsPatch.code))),'NEW_TABS_NOT_SERVED_AFTER_RETRIES');
+ assert(await verifyPublished('/ft-ai-v2/light-signal-pro.css',sha(readFileSync('ft-overview/light-signal-pro.css'))),'LIGHT_SIGNAL_CSS_NOT_SERVED');
+ assert(await verifyPublished('/ft-ai-v2/light-signal-pro-view.mjs',sha(readFileSync('ft-overview/light-signal-pro-view.mjs'))),'LIGHT_SIGNAL_VIEW_NOT_SERVED');
  for(const file of Object.keys(retained).filter(x=>!['index.html','ui-tabs/integrated.mjs'].includes(x)))assert.equal(sha(await get('/'+file)),retained[file],'PROTECTED_ASSET_CHANGED_'+file);
  assert.equal(await active(others[0]),before.backend,'BACKEND_CHANGED');
  assert.equal(await active(others[1]),before.desktop,'DESKTOP_CHANGED');
