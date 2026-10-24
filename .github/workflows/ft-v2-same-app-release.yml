@@ -18,6 +18,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - run: node ft-overview/test-tab-performance.mjs
       - run: node ft-overview/test-light-signal-mechanisms.mjs
       - run: node ft-overview/test-light-signal-pro-view.mjs
       - run: node ft-overview/test-same-app-integration.mjs
