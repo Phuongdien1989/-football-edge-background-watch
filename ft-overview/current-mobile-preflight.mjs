@@ -31,6 +31,7 @@ try{
  ft_v2_review:root.content.includes('FT V2 · QUYẾT ĐỊNH')||root.content.includes('FT V2'),
  detached_v2_card:root.content.includes('id="ftAIV2Card"'),
  ft_v2_module:root.content.includes('/ft-ai-v2/integrated.mjs'),
+ light_signal_pro:root.content.includes('/ft-ai-v2/light-signal-pro.css'),
  tab_workspace:root.content.includes('feTabsWorkspace')};
  const paths=['/ft-overview/core.mjs','/ft-overview/ui.mjs','/ft-overview/adapter.mjs',
  '/ui-tabs/integrated.mjs','/ht-candidate/valuation.mjs','/push-sw.js','/manifest.webmanifest'];
