@@ -9,6 +9,14 @@ const {chromium}=require('playwright');
   await page.waitForSelector('[data-ftabs-tab="ftv2"]',{timeout:20000});
   await page.waitForSelector('#ftAIV2ReadOnly',{state:'visible',timeout:20000});
   assert.equal(await page.locator('#ftAIV2Card').count(),0,'DETACHED_CARD_STILL_PRESENT');
+  // The same FT V2 root must survive repeat source-refresh and tab events without remount.
+  const sameRoot=await page.evaluate(()=>{
+    const root=document.getElementById('ftAIV2ReadOnly');
+    for(let i=0;i<20;i++){window.dispatchEvent(new Event('fe-notify-sync-updated'));window.dispatchEvent(new Event('fe-ft-v2-tab-open'));}
+    return document.getElementById('ftAIV2ReadOnly')===root&&root.dataset.ftV2Mounted==='true';
+  });
+  assert(sameRoot,'FTV2_REINITIALIZED_ON_REFRESH');
+
   assert.equal(await page.locator('.fe-lsp-header').count(),1,'LIGHT_SIGNAL_PRO_NOT_RENDERED');
   assert.equal(await page.locator('.fe-lsp-panel').count(),2,'LIGHT_SIGNAL_PRO_PANELS_MISSING');
   assert.equal(await page.locator('link[href="/ft-ai-v2/light-signal-pro.css"]').count(),1,'LIGHT_SIGNAL_STYLESHEET_MISSING');
