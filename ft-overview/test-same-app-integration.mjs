@@ -9,7 +9,7 @@ assert(patched.code.includes("['ftv2','FT AI V2']"));
 assert(patched.code.includes("fe-ft-v2-tab-open"));
 assert.throws(()=>patchCurrentTabs(patched.code),/ANCHOR_NOT_UNIQUE/);
 const old='<details class="card fo-native" id="ftAIV2Card" style="margin:14px 0;padding:14px;border:1px solid #cbdff4;border-radius:18px"><summary style="font-size:14px;font-weight:700">FT AI V2 · EXPERIMENTAL — mở phân tích</summary><div id="ftAIV2ReadOnly" style="padding:12px 0;color:#234761">Đang chờ dữ liệu trận đấu hiện hành…</div></details>';
-const input='<html><body>'+'A'.repeat(21000)+' ftOverviewCard ui-tabs/integrated ht-candidate/'+old+'\n<script type="module" src="/ft-ai-v2/integrated.mjs"></script></body></html>';
+const input='<html><head></head><body>'+'A'.repeat(21000)+' ftOverviewCard ui-tabs/integrated ht-candidate/'+old+'\n<script type="module" src="/ft-ai-v2/integrated.mjs"></script></body></html>';
 const v=injectFTV2IntoCurrentShell(input);
 assert(!v.html.includes('id="ftAIV2Card"'));
 assert(v.html.includes('/ft-ai-v2/integrated.mjs'));
