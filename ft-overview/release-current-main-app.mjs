@@ -20,6 +20,17 @@ async function cf(path,options={}){const r=await fetch(api+path,{...options,head
 async function active(n){const d=await cf(n+'/deployments'),v=d.deployments?.[0]?.versions;assert(v?.length===1&&v[0].percentage===100,'SPLIT_DEPLOYMENT_'+n);return v[0].version_id;}
 async function get(path){const route=path==='/'?'/':path.endsWith('/index.html')?'/'+path.slice(1,-10):path;let last;for(let k=0;k<3;k++){try{const r=await fetch(base+route,{headers:{'Cache-Control':'no-cache'},redirect:'follow',signal:AbortSignal.timeout(25000)});assert.equal(r.status,200,'MISSING_LIVE_ASSET_'+path+'_'+r.status);const bytes=Buffer.from(await r.arrayBuffer());assert(bytes.length>0&&bytes.length<4000000,'INVALID_LIVE_ASSET_'+path);return bytes;}catch(e){last=e;if(k<2)await new Promise(resolve=>setTimeout(resolve,700*(k+1)));}}throw Error('ASSET_FETCH_EXHAUSTED_'+path+'_'+String(last.message).slice(0,90));}
 function save(path,bytes){mkdirSync(dirname(path),{recursive:true});writeFileSync(path,bytes);}
+async function verifyPublished(path,expected,{tries=14,delay=2500}={}){
+ for(let attempt=0;attempt<tries;attempt++){
+  try{
+   const url=base+path+(path.includes('?')?'&':'?')+'fe_ft_v2_release_verify='+Date.now()+'_'+attempt;
+   const r=await fetch(url,{headers:{'Cache-Control':'no-cache, no-store'},cache:'no-store',signal:AbortSignal.timeout(15000)});
+   if(r.ok&&sha(Buffer.from(await r.arrayBuffer()))===expected)return true;
+  }catch{}
+  if(attempt<tries-1)await new Promise(resolve=>setTimeout(resolve,delay));
+ }
+ return false;
+}
 async function rollback(){
  await cf(name+'/deployments',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({strategy:'percentage',versions:[{version_id:pin,percentage:100}]})});
  assert.equal(await active(name),pin,'ROLLBACK_NOT_ACTIVE');
@@ -74,8 +85,8 @@ async function run(){
  assert.equal(deployed.status,0,'WRANGLER_DEPLOY_FAILED');
  result.version=await active(name);
  assert.notEqual(result.version,pin,'VERSION_NOT_CHANGED');
- assert.equal(sha(await get('/')),sha(Buffer.from(injection.html)),'LIVE_HTML_MISMATCH');
- assert.equal(sha(await get('/ft-ai-v2/integrated.mjs')),sha(readFileSync('ft-overview/ft-ai-v2-integrated.mjs')),'V2_ASSET_NOT_SERVED');
+ assert(await verifyPublished('/',sha(Buffer.from(injection.html))),'LIVE_HTML_MISMATCH_AFTER_RETRIES');
+ assert(await verifyPublished('/ft-ai-v2/integrated.mjs',sha(readFileSync('ft-overview/ft-ai-v2-integrated.mjs'))),'V2_ASSET_NOT_SERVED_AFTER_RETRIES');
  for(const file of Object.keys(retained))assert.equal(sha(await get('/'+file)),retained[file],'PROTECTED_ASSET_CHANGED_'+file);
  assert.equal(await active(others[0]),before.backend,'BACKEND_CHANGED');
  assert.equal(await active(others[1]),before.desktop,'DESKTOP_CHANGED');
