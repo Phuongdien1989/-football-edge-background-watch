@@ -10,7 +10,7 @@ import {injectFTV2IntoCurrentShell} from './current-shell-injection.mjs';
 import {patchMechanismTabs} from './patch-mechanism-tabs.mjs';
 const name='shiny-silence-d892',base='https://'+name+'.ngophuonghuy.workers.dev';
 const token=process.env.CLOUDFLARE_API_TOKEN,account=process.env.CLOUDFLARE_ACCOUNT_ID;
-const pin='f355f367-d6bd-466c-bac3-d2569eb14a12';
+const pin='874b9f33-6df9-4858-903e-c0db8e6bb89d';
 const pinHtml='24e012d6c3ca3c21b32982a5b37f0adb9827c16d7354c3d5657d63f546e2b0ae';
 const sha=x=>createHash('sha256').update(x).digest('hex');
 const api='https://api.cloudflare.com/client/v4/accounts/'+encodeURIComponent(account)+'/workers/scripts/';
@@ -73,7 +73,7 @@ async function run(){
  result.preserved_count=Object.keys(retained).length;
  result.ht_preserved=REQUIRED_MOBILE_ASSETS.filter(x=>x.startsWith('ht-candidate/')).length===10;
  result.mobile_root_changed_only_by_ft_v2=true;
- result.changed_static_assets=['ui-tabs/integrated.mjs','ft-ai-v2/light-signal-mechanisms.mjs'];
+ result.changed_static_assets=['ft-ai-v2/light-signal-mechanisms.mjs','ft-ai-v2/light-signal-pro.css'];
  const config={name,compatibility_date:'2026-10-01',keep_vars:true,assets:{directory:'./site'}};
  save(out+'/wrangler.json',JSON.stringify(config));
  const command=['--yes','wrangler@4','deploy','--config',out+'/wrangler.json'];
