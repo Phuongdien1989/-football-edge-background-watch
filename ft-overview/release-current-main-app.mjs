@@ -87,7 +87,7 @@ async function run(){
  assert.notEqual(result.version,pin,'VERSION_NOT_CHANGED');
  assert(await verifyPublished('/',sha(Buffer.from(injection.html))),'LIVE_HTML_MISMATCH_AFTER_RETRIES');
  assert(await verifyPublished('/ft-ai-v2/integrated.mjs',sha(readFileSync('ft-overview/ft-ai-v2-integrated.mjs'))),'V2_ASSET_NOT_SERVED_AFTER_RETRIES');
- for(const file of Object.keys(retained))assert.equal(sha(await get('/'+file)),retained[file],'PROTECTED_ASSET_CHANGED_'+file);
+ for(const file of Object.keys(retained).filter(x=>x!=='index.html'))assert.equal(sha(await get('/'+file)),retained[file],'PROTECTED_ASSET_CHANGED_'+file);
  assert.equal(await active(others[0]),before.backend,'BACKEND_CHANGED');
  assert.equal(await active(others[1]),before.desktop,'DESKTOP_CHANGED');
  result.status='DEPLOYED_ACCEPTANCE_PASS';result.production_deployed=true;
