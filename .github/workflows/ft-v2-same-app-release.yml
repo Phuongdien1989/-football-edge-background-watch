@@ -1,4 +1,4 @@
-name: FT V2 Light Signal Pro guarded Mobile release
+name: Football Edge Light Signal Pro all tabs guarded release
 on:
   push:
     branches: [fix/ft-foundation-20261021]
@@ -18,12 +18,13 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - run: node ft-overview/test-light-signal-mechanisms.mjs
       - run: node ft-overview/test-light-signal-pro-view.mjs
       - run: node ft-overview/test-same-app-integration.mjs
       - run: node ft-overview/test-experimental-decision.mjs
       - run: node ft-overview/test-live-probability.mjs
       - run: node --check ft-overview/release-current-main-app.mjs
-      - name: Release exact pinned Mobile preserving 28 assets and rollback
+      - name: Publish exact pinned Mobile with full asset manifest and rollback
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -33,5 +34,5 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: ft-v2-light-signal-pro-guarded-release
+          name: football-edge-lsp-all-tabs-release
           path: ft-overview/current-main-app-package/result.json
