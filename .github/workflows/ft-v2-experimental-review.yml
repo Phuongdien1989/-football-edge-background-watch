@@ -17,6 +17,7 @@ jobs:
         with: {node-version: '22'}
       - run: node ft-overview/test-experimental-decision.mjs
       - run: node ft-overview/test-pilot-e2e.mjs
+      - run: node ft-overview/test-validation-dashboard.mjs
       - run: node ft-overview/test-cohort-report.mjs
       - run: node ft-overview/test-pilot-evidence-join.mjs
       - run: node ft-overview/test-calibration-audit.mjs
