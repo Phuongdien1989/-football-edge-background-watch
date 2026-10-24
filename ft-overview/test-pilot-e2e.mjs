@@ -1,0 +1,15 @@
+import assert from 'node:assert/strict';
+import {auditPilotEvidence} from './pilot-evidence-join.mjs';
+const at=Date.UTC(2026,9,24,10);
+const obs={id:'obs-101',fixture_id:101,decision_at:at,fixture:{fixture:{id:101},goals:{home:1,away:0}},sources:{fixture:{received_at:at-1000}}};
+const pairs=[{fixture_id:101,observation_json:JSON.stringify(obs),decision_json:JSON.stringify({observation_id:'obs-101',fixture_id:101,decision_at:at})}];
+const outcomes=[{schema:'FT_OUTCOME_V2_DRAFT',state:'RESOLVED',observation_id:'obs-101',fixture_id:101,observed_at:at+3600000,status:'FT',score:{home:2,away:0}}];
+const forecast={fixture_id:101,observation_id:'obs-101',decision_at:at,model_generated_at:at,source_received_at:at-1000,remaining_goals_pmf:[.46,.54],observed_stats:[{received_at:at-2000}],line:1.5,market_odds:2.1,settlement_basis:'FULL_MATCH_REGULATION',minute:65,live_signal:'CHANCES_ADDED'};
+const x=auditPilotEvidence({pairs,outcomes,forecasts:[forecast]});
+assert.equal(x.matched,1);assert.equal(x.calibration.sample,1);assert.equal(x.calibration.status,'INSUFFICIENT_OBSERVED_OUTCOMES');
+assert.ok(Math.abs(x.calibration.brier-.46**2)<1e-12);
+const missing=auditPilotEvidence({pairs,outcomes,forecasts:[]});assert.equal(missing.matched,0);
+assert.equal(missing.excluded[0].reason,'MISSING_ASOF_FORECAST');
+const future=auditPilotEvidence({pairs,outcomes,forecasts:[{...forecast,model_generated_at:at+1}]});assert.equal(future.matched,0);
+assert.equal(future.excluded[0].reason,'UNVERIFIED_ASOF_PROVENANCE');
+console.log('FT_V2_E2E_PASS; synthetic evidence only');
