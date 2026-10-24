@@ -5,7 +5,9 @@ const mean=(a,k)=>a.length?a.reduce((s,x)=>s+x[k],0)/a.length:null;
 export function makeFTV2CohortReport(input,{minSamples=30}={}){
  const joined=joinPilotEvidence(input),calibration=auditFTCalibration(joined.rows,{minSamples});
  const details=[];
- for(const row of joined.rows){
+ const rejectedCalibrationIndexes=new Set(calibration.excluded.map(x=>x.index));
+ for(const [index,row] of joined.rows.entries()){
+  if(rejectedCalibrationIndexes.has(index))continue;
   const model=(input.forecasts||[]).find(x=>x.fixture_id===row.fixture_id);
   if(!model)continue;
   const additional=Math.max(0,Math.floor(row.line)+1-row.score.home-row.score.away);
@@ -22,5 +24,5 @@ export function makeFTV2CohortReport(input,{minSamples=30}={}){
  group('EV',['NEGATIVE','0-2%','2-5%','5%+'],x=>x.ev<0?'NEGATIVE':x.ev<.02?'0-2%':x.ev<.05?'2-5%':'5%+');
  group('MINUTE',['BEFORE_65','65-74','75+','UNKNOWN'],x=>!Number.isFinite(x.minute)?'UNKNOWN':x.minute<65?'BEFORE_65':x.minute<75?'65-74':'75+');
  group('LIVE',['CHANCES_ADDED','NO_CONFIRMED_CHANCES','MISSING_STATS','NO_WINDOW','UNKNOWN'],x=>['CHANCES_ADDED','NO_CONFIRMED_CHANCES','MISSING_STATS','NO_WINDOW'].includes(x.live)?x.live:'UNKNOWN');
- return {schema:'FT_V2_COHORT_V1',status:calibration.status,sample:calibration.sample,groups,excluded:joined.excluded,calibration,performance_claim_permitted:false};
+ return {schema:'FT_V2_COHORT_V1',status:calibration.status,sample:calibration.sample,groups,excluded:[...joined.excluded,...calibration.excluded],calibration,performance_claim_permitted:false};
 }
