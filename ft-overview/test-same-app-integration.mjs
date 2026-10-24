@@ -5,7 +5,7 @@ const current='<html><head></head><body>'+('A'.repeat(21000))+' ftOverviewCard u
 const v=injectFTV2IntoCurrentShell(current);
 assert(v.html.includes('light-signal-pro.css'));
 assert.equal(v.html.replace('<link rel="stylesheet" href="/ft-ai-v2/light-signal-pro.css">\n',''),current);
-assert.throws(()=>injectFTV2IntoCurrentShell(v.html),/ALREADY_INSTALLED/);
+assert.equal(injectFTV2IntoCurrentShell(v.html).html,v.html);
 assert.throws(()=>injectFTV2IntoCurrentShell(current.replace('ftOverviewCard','missing')),/REQUIRED_CURRENT_FEATURE_MISSING/);
 const entry=readFileSync('ft-overview/ft-ai-v2-integrated.mjs','utf8');
 for(const mod of ['core.mjs','adapter.mjs','experimental-decision.mjs','live-probability.mjs','light-signal-pro-view.mjs'])
