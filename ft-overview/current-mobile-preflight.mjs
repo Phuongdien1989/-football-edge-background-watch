@@ -33,6 +33,7 @@ try{
  ft_v2_module:root.content.includes('/ft-ai-v2/integrated.mjs'),
  light_signal_pro:root.content.includes('/ft-ai-v2/light-signal-pro.css'),
  light_signal_mechanisms:root.content.includes('/ft-ai-v2/light-signal-mechanisms.mjs'),
+ tab_perf_v2:root.content.includes('FE_TAB_PERF_V2'),
  tab_workspace:root.content.includes('feTabsWorkspace')};
  const paths=['/ft-overview/core.mjs','/ft-overview/ui.mjs','/ft-overview/adapter.mjs',
  '/ui-tabs/integrated.mjs','/ht-candidate/valuation.mjs','/push-sw.js','/manifest.webmanifest'];
