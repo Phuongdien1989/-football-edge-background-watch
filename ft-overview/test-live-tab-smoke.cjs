@@ -24,17 +24,19 @@ const {chromium}=require('playwright');
   await page.locator('[data-ftabs-tab="ht"]').click();
   await page.waitForSelector('[data-ftabs-tab="ht"][aria-selected="true"]',{timeout:8000});
   await page.locator('[data-ftabs-tab="ht"]').click();
-  await page.waitForSelector('.fe-lsp-original [data-ftabs-tools]',{state:'visible',timeout:8000});
-  await page.locator('.fe-lsp-original [data-ftabs-tools]').click();
-  assert.equal(await page.locator('body[data-fe-tabs-tools="true"]').count(),1,'ORIGINAL_HT_TOOL_NOT_OPEN');
   await page.waitForSelector('#h1WatchCard',{state:'visible',timeout:8000});
   await page.locator('[data-ftabs-tab="ftv2"]').click();
   await page.waitForSelector('#ftAIV2ReadOnly',{state:'visible',timeout:8000});
   for(const tab of ['overview','ht','ft','hc','valuation']){
     await page.locator('[data-ftabs-tab="'+tab+'"]').click();
     await page.waitForSelector('[data-ftabs-tab="'+tab+'"][aria-selected="true"]',{timeout:8000});
-    await page.waitForSelector('.fe-lsp-mechanism',{state:'visible',timeout:8000});
-    assert.equal(await page.locator('.fe-lsp-mechanism .fe-lsp-panel').count(),2,'SHARED_PANELS_MISSING_'+tab);
+    if(tab==='ht'){
+      await page.waitForSelector('#h1WatchCard',{state:'visible',timeout:8000});
+      assert.equal(await page.locator('.fe-lsp-mechanism:visible').count(),0,'HT_OLD_CARD_NOT_PRIMARY');
+    }else{
+      await page.waitForSelector('.fe-lsp-mechanism',{state:'visible',timeout:8000});
+      assert.equal(await page.locator('.fe-lsp-mechanism .fe-lsp-panel').count(),2,'SHARED_PANELS_MISSING_'+tab);
+    }
   }
   await page.locator('[data-ftabs-tab="ftv2"]').click();
   await page.waitForSelector('#ftAIV2ReadOnly',{state:'visible',timeout:8000});
