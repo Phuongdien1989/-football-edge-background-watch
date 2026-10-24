@@ -13,7 +13,8 @@ const input='<html><body>'+'A'.repeat(21000)+' ftOverviewCard ui-tabs/integrated
 const v=injectFTV2IntoCurrentShell(input);
 assert(!v.html.includes('id="ftAIV2Card"'));
 assert(v.html.includes('/ft-ai-v2/integrated.mjs'));
-assert.equal(v.html.replace(old,''),input.replace(old,''));
+assert.equal(v.html.replace(old,'').replace('<link rel="stylesheet" href="/ft-ai-v2/light-signal-pro.css">\n',''),input.replace(old,''));
+assert(v.html.includes('light-signal-pro.css'));
 assert.throws(()=>injectFTV2IntoCurrentShell(v.html),/DETACHED_V2_CARD_ANCHOR_MISMATCH/);
 const entry=readFileSync('ft-overview/ft-ai-v2-integrated.mjs','utf8');
 for(const mod of ['core.mjs','adapter.mjs','experimental-decision.mjs','live-probability.mjs'])
