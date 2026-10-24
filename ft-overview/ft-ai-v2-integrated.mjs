@@ -5,8 +5,10 @@ import {readLegacy} from './adapter.mjs';
 import {reviewFTDecision} from './experimental-decision.mjs';
 import {liveProbability} from './live-probability.mjs';
 // The host tab owns navigation; this module only renders into its assigned panel.
-const root=document.getElementById('ftAIV2ReadOnly');
-if(root){
+function attachFTV2Tab(){
+ const root=document.getElementById('ftAIV2ReadOnly');
+ if(!root||root.dataset.ftV2Mounted==='true')return;
+ root.dataset.ftV2Mounted='true';
  const store=createStore({trialRecommendations:true});
  const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
  const percent=x=>typeof x==='number'&&Number.isFinite(x)?(x*100).toFixed(1)+'%':'—';
@@ -43,5 +45,10 @@ if(root){
  root.addEventListener('click',event=>{const t=event.target.closest('[data-ft-v2-select]');if(t){selected=Number(t.dataset.ftV2Select);render();}});
  window.addEventListener('fe-notify-sync-updated',render);
  document.addEventListener('visibilitychange',render);
- render();setInterval(render,4000);
+ render();
+ // Refresh while this tab is open; keep legacy scanner scheduling untouched.
+ const refresh=()=>{if(!root.isConnected){clearInterval(timer);return;}render();};
+ const timer=setInterval(refresh,4000);
 }
+window.addEventListener('fe-ft-v2-tab-open',attachFTV2Tab);
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',attachFTV2Tab,{once:true});else attachFTV2Tab();
