@@ -15,7 +15,7 @@ const sha=x=>createHash('sha256').update(x).digest('hex');
 const api='https://api.cloudflare.com/client/v4/accounts/'+encodeURIComponent(account)+'/workers/scripts/';
 const result={schema:'FT_V2_SAME_APP_RELEASE_V1',source_commit:process.env.GITHUB_SHA,
  status:'NOT_STARTED',production_deployed:false,backend_changed:false,scanner_toggled:false,d1_queries:0,provider_calls:0,rollback_version:pin};
-const out='ft-overview/current-main-app-package',site=out+'/site';
+const out='ft-overview/current-main-app-package',site=out+'/site';let attempted=false;
 async function cf(path,options={}){const r=await fetch(api+path,{...options,headers:{Authorization:'Bearer '+token,...options.headers},signal:AbortSignal.timeout(30000)});const j=await r.json();assert(r.ok&&j.success,'CF_ERROR_'+path+'_'+r.status);return j.result;}
 async function active(n){const d=await cf(n+'/deployments'),v=d.deployments?.[0]?.versions;assert(v?.length===1&&v[0].percentage===100,'SPLIT_DEPLOYMENT_'+n);return v[0].version_id;}
 async function get(path){const route=path==='/'?'/':path.endsWith('/index.html')?'/'+path.slice(1,-10):path;let last;for(let k=0;k<3;k++){try{const r=await fetch(base+route,{headers:{'Cache-Control':'no-cache'},redirect:'follow',signal:AbortSignal.timeout(25000)});assert.equal(r.status,200,'MISSING_LIVE_ASSET_'+path+'_'+r.status);const bytes=Buffer.from(await r.arrayBuffer());assert(bytes.length>0&&bytes.length<4000000,'INVALID_LIVE_ASSET_'+path);return bytes;}catch(e){last=e;if(k<2)await new Promise(resolve=>setTimeout(resolve,700*(k+1)));}}throw Error('ASSET_FETCH_EXHAUSTED_'+path+'_'+String(last.message).slice(0,90));}
@@ -66,11 +66,11 @@ async function run(){
  result.status='READY_FOR_UPLOAD';
  // Fail closed on incomplete asset knowledge: require a signed, exhaustive asset manifest from
  // the deployed Workers version before upload. Public-URL discovery alone is not exhaustive.
- if(process.env.FT_V2_COMPLETE_MANIFEST_VERIFIED!=='true'){
+ if(result.preserved_count!==28||process.env.FT_V2_COMPLETE_MANIFEST_VERIFIED!=='RECOVERY_28_VERIFIED_20261023'){
   result.status='BLOCKED_INCOMPLETE_ASSET_MANIFEST';
   return;
  }
- const deployed=spawnSync('npx',command,{stdio:'inherit',timeout:180000});
+ attempted=true;const deployed=spawnSync('npx',command,{stdio:'inherit',timeout:180000});
  assert.equal(deployed.status,0,'WRANGLER_DEPLOY_FAILED');
  result.version=await active(name);
  assert.notEqual(result.version,pin,'VERSION_NOT_CHANGED');
@@ -82,5 +82,5 @@ async function run(){
  result.status='DEPLOYED_ACCEPTANCE_PASS';result.production_deployed=true;
 }
 try{await run();}catch(e){result.status='FAILED';result.error=String(e.message||e).slice(0,190);process.exitCode=1;
- if(result.version){try{await rollback();result.rolled_back=true;result.production_deployed=false;}catch(err){result.rollback_error=String(err.message).slice(0,120);}}
+ if(attempted){try{const now=await active(name);assert(now===pin||now===result.version||now!==result.before?.mobile&&result.before?.mobile===pin,'UNRELATED_MOBILE_VERSION');await rollback();result.rolled_back=true;result.production_deployed=false;}catch(err){result.rollback_error=String(err.message).slice(0,120);}}
 }finally{mkdirSync(out,{recursive:true});writeFileSync(out+'/result.json',JSON.stringify(result,null,2));console.log('FT_V2_SAME_APP_RELEASE '+JSON.stringify(result));}
