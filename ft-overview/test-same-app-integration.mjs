@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import {readFileSync,existsSync} from 'node:fs';
 import {injectFTV2IntoCurrentShell} from './current-shell-injection.mjs';
 import {patchCurrentTabs} from './patch-current-tabs.mjs';
-const original=readFileSync('ui-tabs-preview/integrated.mjs','utf8');
+const original=`const tabs=[['overview','Overview'],['valuation','FT Overview']],names; const cards={valuation:'ftOverviewCard'}; const selectedSignal=(x,tab)=>tab==='overview'?null:null;\nfunction render(){\n if(!enabled||!root)return;\n try{packet=read();}`;
 const patched=patchCurrentTabs(original);
 assert.equal(patched.changedAnchors,4);
 assert(patched.code.includes("['ftv2','FT AI V2']"));
