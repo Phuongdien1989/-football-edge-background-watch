@@ -35,6 +35,7 @@ export function renderSignalMechanism({tab,rows=[],chosen=null,fixture=null,pack
  h+='<div class="fe-lsp-sections"><details class="fe-lsp-detail" open><summary>Lý do phân tích</summary><p>'+esc(focus.reason||'Nguồn chưa cung cấp lý do')+'</p></details><details class="fe-lsp-detail"><summary>Dữ liệu và độ mới</summary><p>Ghi nhận: '+esc(clock(o.at))+' · '+esc(focus.freshness)+'</p></details><details class="fe-lsp-detail"><summary>Công cụ gốc</summary><p>Phần số liệu, biểu đồ và chức năng đang có được bảo toàn trong công cụ gốc.</p></details></div>';
  h+='<a class="ftabs-back" href="'+esc(route(tab))+'">← Về danh sách</a>';
  }
+ if(['ht','ft','hc','valuation','overview'].includes(tab))h+='<div class="fe-lsp-original"><button type="button" data-ftabs-tools aria-label="Mở công cụ và khuyến nghị gốc">Xem khuyến nghị / định giá gốc ↗</button><small>Hiện thông tin Tài/Xỉu và giá kèo từ công cụ gốc khi có dữ liệu. Giao diện này không tính lại kèo.</small></div>';
  h+='</section></div><small class="fe-lsp-note">Giao diện Light Signal Pro chỉ trình bày kết luận có sẵn. Không thay đổi engine, scanner, TOP hoặc Push.</small></div>';
  return h;
 }
