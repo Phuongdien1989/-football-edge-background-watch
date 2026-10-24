@@ -1,0 +1,15 @@
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+import {restoreHTView} from './patch.mjs';
+import {patchMechanismTabs} from '../ft-overview/patch-mechanism-tabs.mjs';
+const root=process.argv[2]||'ht-mechanism-release/backup';
+const tabs=readFileSync(root+'/ui-tabs/integrated.mjs','utf8'),css=readFileSync(root+'/ft-ai-v2/light-signal-pro.css','utf8'),v=restoreHTView(tabs,css);
+assert(tabs.includes('html=renderSignalMechanism({tab:current'));
+assert(css.includes('.ftabs-content{display:none!important}'));
+assert(v.tabs.includes("if(current!=='ht')html=renderSignalMechanism"));
+assert(!v.css.includes('.ftabs-content{display:none!important}'));
+for(const marker of ["['ftv2','FT AI V2']",'FE_TAB_PERF_V2',"if(!body.querySelector('#ftAIV2ReadOnly'))",'data-ftabs-fixture','class="ftabs-detail"'])assert(v.tabs.includes(marker));
+assert.throws(()=>restoreHTView(v.tabs,v.css),/DRIFT/);
+assert.equal(patchMechanismTabs(tabs).code,v.tabs,'FUTURE_BUILD_ROUTE_MUST_MATCH');
+assert.equal(readFileSync('ft-overview/light-signal-pro.css','utf8'),v.css,'FUTURE_BUILD_CSS_MUST_MATCH');
+console.log(JSON.stringify({status:'PASS',reproduced:'HT detail replaced and hidden',restored:'legacy HT list/detail mount contract',ft_v2_performance_path:'PRESERVED',other_tabs_renderer:'PRESERVED',model_changed:false}));

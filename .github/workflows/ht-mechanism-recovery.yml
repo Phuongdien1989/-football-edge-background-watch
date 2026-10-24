@@ -1,0 +1,75 @@
+name: Restore original HT pricing route without changing engines
+on:
+  push:
+    branches: [fix/ht-mechanism-recovery-20261024]
+    paths: ['ht-mechanism-recovery/**', '.github/workflows/ht-mechanism-recovery.yml']
+permissions: {contents: read, actions: read}
+concurrency:
+  group: fe-football-edge-mobile-production
+  cancel-in-progress: false
+jobs:
+  restore:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: football-edge-production
+    env: {WRANGLER_SEND_METRICS: 'false'}
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - uses: actions/download-artifact@v4
+        with:
+          name: football-edge-ht-event-release
+          run-id: 39550924531
+          github-token: ${{ github.token }}
+          path: previous-ht
+      - run: node --check ht-mechanism-recovery/release.mjs
+      - run: node ft-overview/test-tab-performance.mjs
+      - run: npm install --no-save --no-package-lock wrangler@4 playwright@1.58.2
+      - run: google-chrome --version
+      - name: Verify current Mobile, preserve all assets and compare HT modules and app core
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node ht-mechanism-recovery/release.mjs prepare
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pre-ht-mechanism-recovery-backup
+          path: |
+            ht-mechanism-release/backup/
+            ht-mechanism-release/backup-version.json
+            ht-mechanism-release/manifest.json
+          retention-days: 90
+      - name: Verify exact HT-only presentation patch
+        run: node ht-mechanism-recovery/test-source.mjs
+      - name: Reproduce hidden and unmounted HT pricing with valid bridge inputs
+        run: node ht-mechanism-recovery/test-browser.cjs --before
+      - name: Navigate candidate HT list to price, chart, five-minute session and back to FT V2
+        run: node ht-mechanism-recovery/test-browser.cjs --candidate
+      - run: npx wrangler deploy --dry-run --config ht-mechanism-release/wrangler.json
+      - name: Restore only the HT route and visibility rules
+        id: publish
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node ht-mechanism-recovery/release.mjs deploy
+      - name: Verify HT automatic mounting and other five tabs on published app
+        run: node ht-mechanism-recovery/test-browser.cjs
+      - name: Verify every public hash and unchanged backend, Desktop and scan control
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node ht-mechanism-recovery/release.mjs verify
+      - name: Restore exact preceding Mobile if acceptance fails
+        if: failure() && steps.publish.outcome == 'success'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node ht-mechanism-recovery/release.mjs rollback
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ht-original-mechanism-route-recovery
+          path: ht-mechanism-release/
+          retention-days: 90

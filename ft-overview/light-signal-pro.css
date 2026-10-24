@@ -46,5 +46,5 @@
 .fe-lsp-original small{font-size:10px;color:#4a6988;line-height:1.55}
 
 /* Restore legacy HT Goals as the primary tab content: original HT chart, picks, odds and valuation. */
-body.fe-tabs-mode[data-fe-tabs-tab="ht"] #feTabsWorkspace .ftabs-content{display:none!important}
-body.fe-tabs-mode[data-fe-tabs-tab="ht"] .app>#h1WatchCard{display:block!important}
+/* HT pricing content remains visible; legacy tools remain opt-in. */
+
