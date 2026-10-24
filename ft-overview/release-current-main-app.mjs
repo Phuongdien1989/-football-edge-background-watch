@@ -18,7 +18,7 @@ const result={schema:'FT_V2_SAME_APP_RELEASE_V1',source_commit:process.env.GITHU
 const out='ft-overview/current-main-app-package',site=out+'/site';
 async function cf(path,options={}){const r=await fetch(api+path,{...options,headers:{Authorization:'Bearer '+token,...options.headers},signal:AbortSignal.timeout(30000)});const j=await r.json();assert(r.ok&&j.success,'CF_ERROR_'+path+'_'+r.status);return j.result;}
 async function active(n){const d=await cf(n+'/deployments'),v=d.deployments?.[0]?.versions;assert(v?.length===1&&v[0].percentage===100,'SPLIT_DEPLOYMENT_'+n);return v[0].version_id;}
-async function get(path){const route=path==='/'?'/':path.endsWith('/index.html')?'/'+path.slice(1,-10):path;const r=await fetch(base+route,{headers:{'Cache-Control':'no-cache'},redirect:'error',signal:AbortSignal.timeout(25000)});assert.equal(r.status,200,'MISSING_LIVE_ASSET_'+path+'_'+r.status);const bytes=Buffer.from(await r.arrayBuffer());assert(bytes.length>0&&bytes.length<4000000,'INVALID_LIVE_ASSET_'+path);return bytes;}
+async function get(path){const route=path==='/'?'/':path.endsWith('/index.html')?'/'+path.slice(1,-10):path;let last;for(let k=0;k<3;k++){try{const r=await fetch(base+route,{headers:{'Cache-Control':'no-cache'},redirect:'follow',signal:AbortSignal.timeout(25000)});assert.equal(r.status,200,'MISSING_LIVE_ASSET_'+path+'_'+r.status);const bytes=Buffer.from(await r.arrayBuffer());assert(bytes.length>0&&bytes.length<4000000,'INVALID_LIVE_ASSET_'+path);return bytes;}catch(e){last=e;if(k<2)await new Promise(resolve=>setTimeout(resolve,700*(k+1)));}}throw Error('ASSET_FETCH_EXHAUSTED_'+path+'_'+String(last.message).slice(0,90));}
 function save(path,bytes){mkdirSync(dirname(path),{recursive:true});writeFileSync(path,bytes);}
 async function rollback(){
  await cf(name+'/deployments',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({strategy:'percentage',versions:[{version_id:pin,percentage:100}]})});
@@ -32,7 +32,7 @@ async function run(){
  result.before=before;assert.equal(before.mobile,pin,'CURRENT_MOBILE_VERSION_DRIFT');
  const htmlBytes=await get('/'),html=htmlBytes.toString('utf8');
  assert.equal(sha(htmlBytes),pinHtml,'CURRENT_HTML_HASH_DRIFT');
- const injection=injectFTV2IntoCurrentShell(html);result.injection=injection;
+ const injection=injectFTV2IntoCurrentShell(html);result.injection={addedBytes:injection.addedBytes,changedElements:injection.changedElements,originalBytes:injection.originalBytes};
  const existing=new Set(REQUIRED_MOBILE_ASSETS);
  // Additional paths referenced in current shell are preserved when identifiable as public static assets.
  for(const match of html.matchAll(/(?:src|href)=["']\/?((?:ft-overview|ui-tabs|ht-candidate|icons)\/[^"'?#\s]+)["']/g)){
