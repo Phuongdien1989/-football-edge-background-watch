@@ -17,9 +17,17 @@ const {chromium}=require('playwright');
   await page.waitForSelector('[data-ftabs-tab="ht"][aria-selected="true"]',{timeout:8000});
   await page.locator('[data-ftabs-tab="ftv2"]').click();
   await page.waitForSelector('#ftAIV2ReadOnly',{state:'visible',timeout:8000});
+  for(const tab of ['overview','ht','ft','hc','valuation']){
+    await page.locator('[data-ftabs-tab="'+tab+'"]').click();
+    await page.waitForSelector('[data-ftabs-tab="'+tab+'"][aria-selected="true"]',{timeout:8000});
+    await page.waitForSelector('.fe-lsp-mechanism',{state:'visible',timeout:8000});
+    assert.equal(await page.locator('.fe-lsp-mechanism .fe-lsp-panel').count(),2,'SHARED_PANELS_MISSING_'+tab);
+  }
+  await page.locator('[data-ftabs-tab="ftv2"]').click();
+  await page.waitForSelector('#ftAIV2ReadOnly',{state:'visible',timeout:8000});
   const status=await page.locator('#ftAIV2ReadOnly').innerText();
   assert(status.length>10,'FTV2_EMPTY_UI');
   assert(!errors.some(e=>/ft-ai-v2|render|tab/i.test(e)),'FATAL_UI_CONSOLE_'+errors.join(' | ').slice(0,180));
-  console.log(JSON.stringify({status:'PASS',tab:'FTV2',ht_navigation:'PASS',return_navigation:'PASS',detached_card:false,ui_length:status.length,light_signal_pro:true,js_pageerrors:errors.length}));
+  console.log(JSON.stringify({status:'PASS',tab:'FTV2',ht_navigation:'PASS',return_navigation:'PASS',detached_card:false,ui_length:status.length,light_signal_pro:true,shared_mechanisms:5,js_pageerrors:errors.length}));
  }finally{await browser.close();}
 })().catch(e=>{console.error('FT_V2_BROWSER_SMOKE_FAIL',e.message);process.exitCode=1});
