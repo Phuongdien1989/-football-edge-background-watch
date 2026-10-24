@@ -63,6 +63,7 @@ async function run(){
  const tabsPatch=patchCurrentTabs(readFileSync(site+'/ui-tabs/integrated.mjs','utf8'));
  save(site+'/ui-tabs/integrated.mjs',tabsPatch.code);
  result.tabs_patch_anchors=tabsPatch.changedAnchors;
+ assert.equal(tabsPatch.changedAnchors,4,'INCOMPLETE_TAB_PATCH');
  save(site+'/index.html',injection.html);
  const modules=['core.mjs','adapter.mjs','experimental-decision.mjs','live-probability.mjs'];
  for(const file of modules)save(site+'/ft-ai-v2/'+file,readFileSync('ft-overview/'+file));
