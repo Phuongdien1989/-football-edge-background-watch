@@ -23,6 +23,11 @@ const {chromium}=require('playwright');
   assert.equal(await page.locator('[data-ftabs-tab="ftv2"][aria-selected="true"]').count(),1,'FTV2_NOT_ACTIVE');
   await page.locator('[data-ftabs-tab="ht"]').click();
   await page.waitForSelector('[data-ftabs-tab="ht"][aria-selected="true"]',{timeout:8000});
+  await page.locator('[data-ftabs-tab="ht"]').click();
+  await page.waitForSelector('.fe-lsp-original [data-ftabs-tools]',{state:'visible',timeout:8000});
+  await page.locator('.fe-lsp-original [data-ftabs-tools]').click();
+  assert.equal(await page.locator('body[data-fe-tabs-tools="true"]').count(),1,'ORIGINAL_HT_TOOL_NOT_OPEN');
+  await page.waitForSelector('#h1WatchCard',{state:'visible',timeout:8000});
   await page.locator('[data-ftabs-tab="ftv2"]').click();
   await page.waitForSelector('#ftAIV2ReadOnly',{state:'visible',timeout:8000});
   for(const tab of ['overview','ht','ft','hc','valuation']){
