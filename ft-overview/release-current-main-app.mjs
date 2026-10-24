@@ -10,8 +10,8 @@ import {injectFTV2IntoCurrentShell} from './current-shell-injection.mjs';
 import {patchCurrentTabs} from './patch-current-tabs.mjs';
 const name='shiny-silence-d892',base='https://'+name+'.ngophuonghuy.workers.dev';
 const token=process.env.CLOUDFLARE_API_TOKEN,account=process.env.CLOUDFLARE_ACCOUNT_ID;
-const pin='01ff3547-af4f-4953-bd68-5cb3d0a3bf41';
-const pinHtml='5a2527a6ec7bb801a2bc735cc77e12eca5330c46d09ad77927c90c5d4dbd096e';
+const pin='68bdd72a-8999-4fd2-b687-21e41890c0d2';
+const pinHtml='8755265ccdf03b5bc6296fdd239903571c9d9b69a6b35056db7bdc2a76fd64d7';
 const sha=x=>createHash('sha256').update(x).digest('hex');
 const api='https://api.cloudflare.com/client/v4/accounts/'+encodeURIComponent(account)+'/workers/scripts/';
 const result={schema:'FT_V2_SAME_APP_RELEASE_V1',source_commit:process.env.GITHUB_SHA,
@@ -44,7 +44,7 @@ async function run(){
  result.before=before;assert.equal(before.mobile,pin,'CURRENT_MOBILE_VERSION_DRIFT');
  const htmlBytes=await get('/'),html=htmlBytes.toString('utf8');
  assert.equal(sha(htmlBytes),pinHtml,'CURRENT_HTML_HASH_DRIFT');
- const injection=injectFTV2IntoCurrentShell(html);result.injection={removedBytes:injection.removedBytes,changedElements:injection.changedElements,originalBytes:injection.originalBytes};
+ const injection=injectFTV2IntoCurrentShell(html);result.injection={addedBytes:injection.addedBytes,changedElements:injection.changedElements,originalBytes:injection.originalBytes};
  const existing=new Set(REQUIRED_MOBILE_ASSETS);
  // Additional paths referenced in current shell are preserved when identifiable as public static assets.
  for(const match of html.matchAll(/(?:src|href)=["']\/?((?:ft-overview|ui-tabs|ht-candidate|icons)\/[^"'?#\s]+)["']/g)){
@@ -60,10 +60,9 @@ async function run(){
   }
  }
  assert(REQUIRED_MOBILE_ASSETS.every(x=>retained[x]),'INCOMPLETE_PROTECTED_ASSET_SET');
- const tabsPatch=patchCurrentTabs(readFileSync(site+'/ui-tabs/integrated.mjs','utf8'));
- save(site+'/ui-tabs/integrated.mjs',tabsPatch.code);
- result.tabs_patch_anchors=tabsPatch.changedAnchors;
- assert.equal(tabsPatch.changedAnchors,4,'INCOMPLETE_TAB_PATCH');
+ const tabsCode=readFileSync(site+'/ui-tabs/integrated.mjs','utf8');
+ assert(tabsCode.includes("['ftv2','FT AI V2']")&&tabsCode.includes('fe-ft-v2-tab-open'),'SIX_TAB_PRODUCTION_NOT_PRESENT');
+ result.tabs_preserved=true;
  save(site+'/index.html',injection.html);
  const modules=['core.mjs','adapter.mjs','experimental-decision.mjs','live-probability.mjs','light-signal-pro-view.mjs','light-signal-pro.css'];
  for(const file of modules)save(site+'/ft-ai-v2/'+file,readFileSync('ft-overview/'+file));
@@ -71,7 +70,7 @@ async function run(){
  result.preserved_count=Object.keys(retained).length;
  result.ht_preserved=REQUIRED_MOBILE_ASSETS.filter(x=>x.startsWith('ht-candidate/')).length===10;
  result.mobile_root_changed_only_by_ft_v2=true;
- result.changed_static_assets=['index.html','ui-tabs/integrated.mjs','ft-ai-v2/integrated.mjs','ft-ai-v2/light-signal-pro-view.mjs','ft-ai-v2/light-signal-pro.css'];
+ result.changed_static_assets=['index.html','ft-ai-v2/integrated.mjs','ft-ai-v2/light-signal-pro-view.mjs','ft-ai-v2/light-signal-pro.css'];
  const config={name,compatibility_date:'2026-10-01',keep_vars:true,assets:{directory:'./site'}};
  save(out+'/wrangler.json',JSON.stringify(config));
  const command=['--yes','wrangler@4','deploy','--config',out+'/wrangler.json'];
@@ -93,10 +92,10 @@ async function run(){
  assert.notEqual(result.version,pin,'VERSION_NOT_CHANGED');
  assert(await verifyPublished('/',sha(Buffer.from(injection.html))),'LIVE_HTML_MISMATCH_AFTER_RETRIES');
  assert(await verifyPublished('/ft-ai-v2/integrated.mjs',sha(readFileSync('ft-overview/ft-ai-v2-integrated.mjs'))),'V2_ASSET_NOT_SERVED_AFTER_RETRIES');
- assert(await verifyPublished('/ui-tabs/integrated.mjs',sha(Buffer.from(tabsPatch.code))),'NEW_TABS_NOT_SERVED_AFTER_RETRIES');
+ assert.equal(sha(await get('/ui-tabs/integrated.mjs')),retained['ui-tabs/integrated.mjs'],'TABS_MODIFIED');
  assert(await verifyPublished('/ft-ai-v2/light-signal-pro.css',sha(readFileSync('ft-overview/light-signal-pro.css'))),'LIGHT_SIGNAL_CSS_NOT_SERVED');
  assert(await verifyPublished('/ft-ai-v2/light-signal-pro-view.mjs',sha(readFileSync('ft-overview/light-signal-pro-view.mjs'))),'LIGHT_SIGNAL_VIEW_NOT_SERVED');
- for(const file of Object.keys(retained).filter(x=>!['index.html','ui-tabs/integrated.mjs'].includes(x)))assert.equal(sha(await get('/'+file)),retained[file],'PROTECTED_ASSET_CHANGED_'+file);
+ for(const file of Object.keys(retained).filter(x=>x!=='index.html'))assert.equal(sha(await get('/'+file)),retained[file],'PROTECTED_ASSET_CHANGED_'+file);
  assert.equal(await active(others[0]),before.backend,'BACKEND_CHANGED');
  assert.equal(await active(others[1]),before.desktop,'DESKTOP_CHANGED');
  result.status='DEPLOYED_ACCEPTANCE_PASS';result.production_deployed=true;
