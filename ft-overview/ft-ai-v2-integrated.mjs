@@ -29,12 +29,13 @@ if(root){
    html+='<div style="font-size:13px;font-weight:700">'+esc(s.league)+' · '+esc(s.home)+' '+esc(s.goals?.home)+'–'+esc(s.goals?.away)+' '+esc(s.away)+' · '+esc(s.minute)+'′</div>';
    html+='<div style="font-size:17px;font-weight:800;margin:10px 0">'+esc(v.title)+'</div>';
    html+='<div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px">';
-   for(const [name,value] of [['LINE',m?.line??'—'],['ODDS',odd(v.odds)],['MODEL',percent(v.winProbability)],['FAIR',odd(v.fairOdds)],['EV',percent(v.estimatedEV)],['BREAK EVEN',percent(v.breakEven)]])
+   for(const [name,value] of [['LINE',m?.line??'—'],['ODDS',odd(v.odds)],['MODEL WEIGHTED',percent(v.weightedWinShare)],['FAIR',odd(v.fairOdds)],['EV',percent(v.estimatedEV)],['BREAK EVEN WEIGHTED',percent(v.breakEven)]])
     html+='<div style="padding:8px;background:#edf6ff;border-radius:10px"><small>'+esc(name)+'</small><strong style="display:block">'+esc(value)+'</strong></div>';
    html+='</div>';
+   if(v.settlementStates)html+='<p style="font-size:12px">Thắng đủ '+percent(v.settlementStates.win)+' · Thắng nửa '+percent(v.settlementStates.halfWin)+' · Hoàn '+percent(v.settlementStates.push)+' · Thua nửa '+percent(v.settlementStates.halfLose)+' · Thua đủ '+percent(v.settlementStates.lose)+'. MODEL WEIGHTED là tỷ trọng thắng có trọng số thanh toán, không phải xác suất thắng đủ.</p>';
    html+='<p style="font-size:12px;margin:10px 0"><b>Dữ liệu LIVE:</b> '+esc(live.evidence?.status||'NO_WINDOW')+' · '+esc(live.reason)+'</p>';
    html+='<p style="font-size:12px"><b>Lý do:</b> '+esc(v.reason.join(' · ')||'Chưa đủ dữ liệu')+'</p>';
-   html+='<details><summary style="font-size:12px">Rủi ro, tính bất định và nguồn dữ liệu</summary><p style="font-size:12px">'+esc(v.warnings.join(' · '))+'</p><p style="font-size:12px">EV nếu xác suất đổi ±5 điểm %: '+percent(v.sensitivity.lowEV)+' đến '+percent(v.sensitivity.highEV)+' (giả định kiểm tra độ nhạy, không phải khoảng tin cậy).</p><p style="font-size:11px">Phiên bản: '+esc(v.modelVersion||'CHƯA CÓ')+' · '+esc(v.policy)+'</p></details>';
+   html+='<details><summary style="font-size:12px">Rủi ro, tính bất định và nguồn dữ liệu</summary><p style="font-size:12px">'+esc(v.warnings.join(' · '))+'</p><p style="font-size:12px">EV nếu tỷ trọng thắng có trọng số đổi ±5 điểm %, giữ nguyên mức vốn chịu thắng/thua: '+percent(v.sensitivity.lowEV)+' đến '+percent(v.sensitivity.highEV)+' (giả định kiểm tra độ nhạy, không phải khoảng tin cậy).</p><p style="font-size:11px">Phiên bản: '+esc(v.modelVersion||'CHƯA CÓ')+' · '+esc(v.policy)+'</p></details>';
   }
   html+='<small style="display:block;margin-top:10px;color:#718cae">Phân tích thử nghiệm; không dự báo chắc thắng. Không làm thay đổi HT/HC/TOP/Push.</small>';
   if(html!==last){root.innerHTML=html;last=html;}

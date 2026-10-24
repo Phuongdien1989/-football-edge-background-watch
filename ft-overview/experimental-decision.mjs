@@ -1,7 +1,7 @@
 // FT V2 Experimental decision review. Pure, read-only, NO independent data collection.
 // A recommendation here is a review of an UNCALIBRATED model, NOT a betting claim.
 import {number,goalsToFullWin} from './core.mjs';
-export const POLICY='FT_V2_EXPERIMENTAL_DECISION_REVIEW_V1';
+export const POLICY='FT_V2_EXPERIMENTAL_DECISION_REVIEW_V2';
 export function reviewFTDecision(assessment){
  const r=assessment||{},s=r.snapshot||{},m=s.market||{},q=r.quote;
  const reasons=[],warnings=[];
@@ -16,6 +16,10 @@ export function reviewFTDecision(assessment){
  else if(evidence==='NO NEW QUALITY SIGNAL')warnings.push('Không có chỉ dấu cơ hội chất lượng mới trong cửa sổ gần đây');
  else warnings.push('Chưa đủ cửa sổ thống kê để kết luận cường độ LIVE');
  const p=q&&number(q.win)!==null?number(q.win):null;
+ const W=number(q?.winWeight),L=number(q?.loseWeight);
+ const exposure=W!==null&&L!==null?W+L:null;
+ // This is a settlement-weighted share, NOT probability of a full win.
+ const share=exposure>0?W/exposure:null;
  const ev=q&&number(q.ev)!==null?number(q.ev):null;
  const edge=ev===null?null:ev;
  let action='DATA_WAIT',title='CHỜ DỮ LIỆU';
@@ -24,23 +28,25 @@ export function reviewFTDecision(assessment){
  else if(needed===0){action='CONTRACT_MISMATCH';title='XÁC MINH HỢP ĐỒNG';reasons.push('Tài đã vượt line theo tỷ số; không suy diễn giá nhà cái là cơ hội miễn phí');}
  else if(!r.modelOK||p===null||ev===null){action='MODEL_WAIT';title='CHỜ XÁC SUẤT ĐỘC LẬP';}
  else if(ev<=0){action='WAIT_PRICE';title='KHÔNG VÀO Ở GIÁ NÀY';reasons.push('Giá không tạo lợi thế kỳ vọng dương theo mô hình hiện có');}
- else{
+ else if(r.recommendation?.action!=='TRIAL_OVER'){
+  action='MODEL_WAIT';title='CHỜ QUYẾT ĐỊNH FT';reasons.push('Bộ đánh giá FT chưa cho phép khuyến nghị thử nghiệm');
+ }else{
   action='TRIAL_OVER';title='CÂN NHẮC TÀI THỬ NGHIỆM';
-  reasons.push('Xác suất mô hình vượt ngưỡng hòa vốn ở giá hiện tại');
+  reasons.push('EV dương sau khi tính đủ thắng, thắng nửa, hoàn tiền, thua nửa và thua');
   if(ev<0.02)warnings.push('EV ước tính thấp hơn 2%; một sai số nhỏ có thể đảo chiều quyết định');
   else if(ev<0.05)warnings.push('EV ước tính trong vùng 2–5%; cần quan sát độ nhạy dự báo');
   else warnings.push('EV ước tính trên 5%; không đồng nghĩa có lợi thế thực tế');
  }
  // Sensitivity is an explicit assumed ±5 percentage point range,
  // NOT a calibrated confidence interval or a change to model forecasts.
- const low=p===null?null:Math.max(0,p-.05),high=p===null?null:Math.min(1,p+.05);
- const lowEV=low===null||odds===null?null:low*odds-1;
- const highEV=high===null||odds===null?null:high*odds-1;
- if(action==='TRIAL_OVER'&&lowEV<=0)warnings.push('EV đổi dấu khi xác suất giảm giả định 5 điểm %');
+ const low=share===null?null:Math.max(0,share-.05),high=share===null?null:Math.min(1,share+.05);
+ const lowEV=low===null||odds===null?null:exposure*(low*odds-1);
+ const highEV=high===null||odds===null?null:exposure*(high*odds-1);
+ if(action==='TRIAL_OVER'&&lowEV!==null&&lowEV<=0)warnings.push('EV đổi dấu khi tỷ trọng thắng có trọng số giảm giả định 5 điểm %');
  return {policy:POLICY,experimental:true,action,title,needed,odds,
-  winProbability:p,breakEven,estimatedEV:edge,fairOdds:q?.fairOdds??null,
+  winProbability:p,weightedWinShare:share,settlementExposure:exposure,settlementStates:q?{win:q.win,halfWin:q.halfWin,push:q.push,halfLose:q.halfLose,lose:q.lose}:null,breakEven,estimatedEV:edge,fairOdds:q?.fairOdds??null,
   evidence,reason:reasons,warnings,
-  sensitivity:{assumedDeltaProbabilityPoints:5,lowWinProbability:low,highWinProbability:high,lowEV,highEV,calibrated:false},
+  sensitivity:{basis:'SETTLEMENT_WEIGHTED_SHARE_FIXED_EXPOSURE',assumedDeltaProbabilityPoints:5,lowWeightedShare:low,highWeightedShare:high,lowEV,highEV,calibrated:false},
   modelVersion:s.model?.version??null,validated:s.model?.validated===true,
   marketAligned:r.marketFresh===true,dataFresh:r.fresh===true};
 }
