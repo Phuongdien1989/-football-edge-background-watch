@@ -1,0 +1,13 @@
+import assert from 'node:assert/strict';
+import {patchMechanismTabs} from './patch-mechanism-tabs.mjs';
+const activation="document.body.dataset.feTabsTools=tab==='ht'?'true':'false';if(tab==='ht'){const ht=document.getElementById('h1WatchCard');if(ht){ht.classList.remove('fe-p11-collapsed');if(ht.tagName==='DETAILS')ht.open=true;}}/* HT_NATIVE_EXPAND_V2 */";
+const renderer='html=renderSignalMechanism({tab:current,rows,chosen,fixture,packet,route,displayAction});';
+const before="const tabs=[['ftv2','FT AI V2']];/* FE_TAB_PERF_V2 */"+activation+renderer;
+const after=patchMechanismTabs(before);assert.equal(after.anchors,2);
+assert(after.code.includes("if(current!=='ht')html=renderSignalMechanism"));
+assert(after.code.includes("document.body.dataset.feTabsTools='false'"));
+assert(!after.code.includes('HT_NATIVE_EXPAND_V2'));assert(after.code.includes('FE_TAB_PERF_V2'));
+assert.deepEqual(patchMechanismTabs(after.code),{code:after.code,anchors:0});
+assert.throws(()=>patchMechanismTabs(before.replace(renderer,'')),/DRIFT/);
+assert.throws(()=>patchMechanismTabs('wrong app'),/CURRENT_SIX_TAB/);
+console.log('HT_PRICING_ROUTE_AND_FTV2_PERFORMANCE_PRESERVED');

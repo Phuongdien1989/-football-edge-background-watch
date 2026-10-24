@@ -1,0 +1,22 @@
+import assert from 'node:assert/strict';import {mkdirSync,writeFileSync} from 'node:fs';
+import {makeFTValidationReport} from './replay-validation-report.mjs';
+import {buildFTObservation} from './observation.mjs';import {buildFTDecision} from './decision-trace.mjs';import {resolveFTOutcome} from './outcome.mjs';
+const t=Date.now(),fixture={fixture:{id:42,status:{short:'2H',elapsed:67}},goals:{home:1,away:1}};
+const obs=buildFTObservation({id:'ft:42:a',fixture_id:42,decision_at:t-500,fixture,sources:{fixture:{status:'OK',received_at:t-600,data:fixture},statistics:{status:'EMPTY',received_at:t-580,data:[]}}});
+const dec=buildFTDecision({observation:obs,decision_at:t-400,state:'NOT_EVALUATED',reason:'STATS_EMPTY',source_hash:'a'.repeat(64)});
+const result=resolveFTOutcome(obs,{fixture:{id:42,status:{short:'FT'}},score:{fulltime:{home:2,away:1}},goals:{home:2,away:1}},t-100,t);
+const manifest={scope:'SCANNED_FT_ONLY',at:t-501,selected:[42],deferred:[43,44]};
+let checks=0;function test(name,fn){fn();checks++;console.log('PASS '+name);}
+test('linked does not imply valid forecast or ROI',()=>{const x=makeFTValidationReport({records:[obs,dec,result],manifests:[manifest]});assert.equal(x.replay.linked_count,1);assert.equal(x.replay.linked_pct,100);assert.equal(x.accuracy,null);assert.equal(x.roi,null);assert.equal(x.releaseGate,'BLOCKED');});
+test('missing decision remains incomplete, not losing tip',()=>{const x=makeFTValidationReport({records:[obs,result]});assert.equal(x.replay.counts.MISSING_DECISION,1);assert.equal(x.calibration,null);});
+test('missing final result remains separate from missing decision',()=>{const x=makeFTValidationReport({records:[obs,dec]});assert.equal(x.replay.counts.MISSING_OUTCOME,1);});
+test('missing source clock not falsely passed as accurate',()=>{const x=makeFTValidationReport({records:[obs]});assert.equal(x.quality.provider_source_age_unknown,1);assert.equal(x.quality.review,1);});
+test('deferred IDs counted but not hallucinated as raw observations',()=>{const x=makeFTValidationReport({records:[obs,dec,result],manifests:[manifest]});assert.equal(x.capture.scanned_candidates,3);assert.equal(x.capture.deferred_without_historical_snapshot,2);assert.equal(x.replay.total_observations,1);});
+test('same-time conflicting outcomes detected',()=>{const correction={...result,score:{home:3,away:1}};const x=makeFTValidationReport({records:[obs,dec,result,correction]});assert.equal(x.replay.counts.CONFLICTING_OUTCOME,1);assert.equal(x.replay.linked_count,0);});
+test('invalid manifests quarantined',()=>{const x=makeFTValidationReport({records:[],manifests:[{...manifest,selected:[42,42]}]});assert.equal(x.capture.manifest_invalid,1);});
+test('successful paired trial hook counted separately from independent verification',()=>{const m={...manifest,attempts:[{fixture_id:42,capture_status:'PAIR_STAGED',decision_status:'PAIR_STORED',storage_confirmed:true}]};const x=makeFTValidationReport({records:[],manifests:[m]});assert.equal(x.capture.selected_hook_confirmed,1);assert.equal(x.capture.selected_capture_successes,'NOT_INDEPENDENTLY_VERIFIED');assert.equal(x.roi,null);});
+test('inconsistent hook confirmation never counted as success',()=>{const m={...manifest,attempts:[{fixture_id:42,capture_status:'PAIR_STAGED',decision_status:'PAIR_WRITE_UNCONFIRMED',storage_confirmed:true}]};const x=makeFTValidationReport({records:[],manifests:[m]});assert.equal(x.capture.selected_hook_confirmed,0);assert.equal(x.capture.selected_hook_failed,1);});
+test('manifest lacking outcomes counted unknown rather than failed',()=>{const x=makeFTValidationReport({records:[],manifests:[manifest]});assert.equal(x.capture.selected_hook_unknown,1);assert.equal(x.capture.selected_hook_failed,0);});
+test('empty report does not print fake 0% measured outcome accuracy',()=>{const x=makeFTValidationReport({records:[]});assert.equal(x.replay.linked_pct,null);assert.equal(x.accuracy,null);assert.equal(x.push_delivery,'NOT_OBSERVED');});
+mkdirSync('ft-audit-output',{recursive:true});
+writeFileSync('ft-audit-output/ft-3c-validation-report.json',JSON.stringify({tests:checks,status:'PASS',illustrative:makeFTValidationReport({records:[obs,dec,result],manifests:[manifest]}),source:'SYNTHETIC_ONLY',production_validated:false},null,2));

@@ -1,0 +1,102 @@
+/* FT AI V2 isolated mobile preview — matches current light Football Edge CSS.
+   All selectors scoped under .ftv2-app. NO global/body/HT/HC overrides. */
+.ftv2-app{--ftbg:#eff6fc;--ftpanel:#fff;--ftblue:#147cf5;--ftgreen:#08a978;--ftnavy:#17345c;--ftmuted:#7186a0;--ftline:#e2ecf5;--ftdanger:#c65b49;box-sizing:border-box;min-height:100vh;padding-bottom:88px;background:var(--ftbg);color:var(--ftnavy);font:13px/1.48 -apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif}
+.ftv2-app *{box-sizing:border-box}
+.ftv2-app button{font:inherit;cursor:pointer}
+.ftv2-app button:focus-visible{outline:3px solid #5aafff;outline-offset:2px}
+.ftv2-demo-banner{padding:8px 10px;background:#ffedd4;color:#955a17;text-align:center;font-size:10px;font-weight:800;letter-spacing:.015em}
+.ftv2-header{padding:18px 14px 12px;display:flex;align-items:center;justify-content:space-between;gap:8px}
+.ftv2-header>div{display:flex;align-items:center;gap:9px;min-width:0}
+.ftv2-logo{display:grid;place-items:center;flex:none;width:37px;height:37px;border-radius:12px;background:linear-gradient(135deg,#147cf5,#0699b3);color:#fff;font-size:12px;font-weight:850}
+.ftv2-header strong{display:block;font-size:17px;font-weight:830;letter-spacing:-.45px}
+.ftv2-header small{display:block;font-size:8px;color:#7186a0;letter-spacing:.6px}
+.ftv2-header-tag{font-size:9px;color:#116aad;border:1px solid #cce2fa;background:#eaf4ff;padding:6px 9px;border-radius:20px;white-space:nowrap;font-weight:750}
+.ftv2-mechanisms{position:sticky;top:0;z-index:4;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:5px;padding:9px 10px 11px;background:#eff6fc;border-bottom:1px solid #e1eaf4}
+.ftv2-mechanisms span{display:grid;place-items:center;text-align:center;padding:9px 2px;background:#fff;border:1px solid #e0eaf4;border-radius:10px;color:#64809e;font-size:9px;font-weight:750;min-height:38px}
+.ftv2-mechanisms .active{background:#147cf5;color:#fff;border-color:#147cf5}
+.ftv2-context{display:flex;justify-content:space-between;padding:10px 14px 0;font-size:10px;font-weight:740;color:#4b7197}
+.ftv2-context span:first-child{color:#0a956b}
+.ftv2-main{max-width:650px;margin:0 auto;padding:12px 12px 18px}
+.ftv2-list-head{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:2px 2px 12px}
+.ftv2-list-head h1{margin:0;font-size:18px;letter-spacing:-.5px;line-height:1.3}
+.ftv2-list-head h1 span{font-size:10px;font-weight:750;color:#08a978}
+.ftv2-list-head p{font-size:10px;color:#7186a0;margin:5px 0 0}
+.ftv2-count{white-space:nowrap;border:1px solid #dce9f6;border-radius:11px;color:#64809f;font-size:10px;background:#fff;padding:7px 9px;font-weight:800}
+.ftv2-filter{display:flex;gap:6px;margin:0 0 12px}
+.ftv2-filter button{border:1px solid #dce8f3;border-radius:11px;background:#fff;color:#52718f;padding:8px 13px;font-size:11px;font-weight:730}
+.ftv2-filter button[aria-pressed=true]{background:#147cf5;color:#fff;border-color:#147cf5}
+.ftv2-list{display:grid;gap:9px}
+.ftv2-match-card,.ftv2-panel,.ftv2-detail-head{background:#fff;border:1px solid #deeaf5;border-radius:16px;box-shadow:0 5px 16px #1f4c7a08}
+.ftv2-match-card{padding:12px}
+.ftv2-match-league{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:10px;color:#6a829e}
+.ftv2-live{border-radius:20px;padding:3px 7px;color:#0b8a63;background:#e2f7ed;font-size:10px;font-weight:750;white-space:nowrap}
+.ftv2-scoreline{display:grid;grid-template-columns:minmax(0,1fr) 75px minmax(0,1fr);align-items:center;gap:6px;margin:11px 0;text-align:center}
+.ftv2-scoreline strong{font-size:23px;letter-spacing:-.65px;white-space:nowrap;font-variant-numeric:tabular-nums}
+.ftv2-team{font-size:12px;font-weight:760;overflow-wrap:anywhere;line-height:1.3;text-align:left}
+.ftv2-team.right{text-align:right}
+.ftv2-card-mid{border-top:1px solid #e9eff6;padding-top:10px;display:grid;grid-template-columns:minmax(0,1fr) 88px;align-items:center;gap:9px}
+.ftv2-card-mid small,.ftv2-ev small{display:block;font-size:9px;color:#7c90a6;letter-spacing:.06em}
+.ftv2-card-mid b{display:block;font-size:14px;margin:3px 0;color:#153961}
+.ftv2-subline{display:block;color:#70849b;font-size:10px}
+.ftv2-ev{border-radius:10px;background:#f3f7fa;border:1px solid #e6eef4;text-align:center;padding:8px 3px}
+.ftv2-ev strong{font-size:17px;color:#7186a0;font-variant-numeric:tabular-nums}
+.ftv2-ev.positive{background:#ebfaf3;border-color:#c9f1dd}
+.ftv2-ev.positive strong{color:#078d63}
+.ftv2-card-foot{display:flex;align-items:center;justify-content:space-between;gap:6px;margin-top:11px}
+.ftv2-card-foot>div,.ftv2-detail-flag{display:flex;gap:5px;flex-wrap:wrap}
+.ftv2-rank{background:#e5f8ef;color:#087e60;border-radius:6px;padding:4px 6px;font-size:9px;font-weight:780}
+.ftv2-rank.neutral{background:#ecf2f8;color:#687f96}
+.ftv2-rank.demo{background:#fff1da;color:#9a6a1b}
+.ftv2-rank.warn{background:#fff0e9;color:#aa5730}
+.ftv2-card-foot button{flex:none;border:1px solid #cae5f8;background:#eaf5ff;border-radius:9px;padding:8px 10px;color:#0c6bc0;font-size:10px;font-weight:780}
+.ftv2-card-foot button:hover{background:#dbefff}
+.ftv2-note{font-size:10px;line-height:1.6;background:#e8f0f8;color:#6d829a;padding:12px;border-radius:12px;margin:14px 0}
+.ftv2-empty{padding:34px 16px;border:1px dashed #cadcec;border-radius:14px;background:#fff;color:#8293a7;text-align:center;font-size:12px;line-height:1.6}
+.ftv2-empty.small{padding:19px 12px;font-size:11px}
+.ftv2-back{border:0;color:#147cf5;background:transparent;font-size:11px;font-weight:740;padding:6px 0 12px;text-align:left}
+.ftv2-detail-head{padding:14px;margin-bottom:10px}
+.ftv2-detail-head .ftv2-scoreline{margin:12px 0}
+.ftv2-detail-flag{justify-content:center}
+.ftv2-detail-tabs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:5px;margin:12px 0}
+.ftv2-detail-tabs button{border:1px solid #dfeaf4;background:#fff;border-radius:9px;padding:10px 2px;color:#637e9a;font-size:10px;font-weight:780;min-width:0}
+.ftv2-detail-tabs button[aria-pressed=true]{background:#147cf5;color:#fff;border-color:#147cf5}
+.ftv2-valuation-hero{background:linear-gradient(130deg,#f1fcf7,#fff);border:1px solid #cfeee1;border-radius:16px;padding:14px;margin:10px 0}
+.ftv2-eyebrow{font-size:10px;font-weight:750;color:#078860;letter-spacing:.03em}
+.ftv2-big-pick{font-size:17px;font-weight:800;letter-spacing:-.3px;line-height:1.4;margin:6px 0 12px}
+.ftv2-stat-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px}
+.ftv2-stat-grid>div{background:#fff;border:1px solid #e1ede9;border-radius:11px;padding:10px 6px}
+.ftv2-stat-grid small{font-size:9px;color:#738a99;display:block}
+.ftv2-stat-grid strong{display:block;font-size:16px;margin-top:5px;color:#254867;font-variant-numeric:tabular-nums}
+.ftv2-stat-grid strong.ftv2-green{color:#078e65}
+.ftv2-valuation-note{color:#627e79;font-size:10px;margin:11px 0 0;line-height:1.6}
+.ftv2-panel{padding:13px;margin:11px 0}
+.ftv2-panel h3{font-size:13px;font-weight:800;margin:0 0 5px}
+.ftv2-subheading{font-size:10px;color:#7589a1;margin:3px 0 11px;line-height:1.55}
+.ftv2-factor-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;margin-top:12px}
+.ftv2-factor-grid>div{padding:10px;border-radius:11px;background:#f4f8fc;border:1px solid #e9f0f6}
+.ftv2-factor-grid small{color:#7892aa;font-size:10px;display:block}
+.ftv2-factor-grid strong{font-size:12px;color:#245074;display:block;margin-top:5px}
+.ftv2-bars{height:158px;display:flex;align-items:end;justify-content:space-between;gap:6px;padding-top:6px}
+.ftv2-bar-group{display:flex;flex-direction:column;align-items:center;justify-content:end;flex:1;height:100%;gap:4px;min-width:0}
+.ftv2-bar-value{color:#67819d;font-size:10px;white-space:nowrap}
+.ftv2-bar-track{display:flex;align-items:flex-end;height:106px;max-width:38px;width:88%;background:#f1f6fa;border-radius:6px 6px 0 0;overflow:hidden}
+.ftv2-bar-fill{background:linear-gradient(180deg,#36c79a,#08a978);border-radius:5px 5px 0 0;width:100%}
+.ftv2-bar-group small{font-size:10px;color:#6883a1}
+.ftv2-trend{display:block;width:100%;height:auto;margin-top:8px;background:linear-gradient(#f7fbff,#fff);border:1px solid #e4eef6;border-radius:9px}
+.ftv2-trend path{fill:none;stroke:#147cf5;stroke-width:3;stroke-linecap:round;stroke-linejoin:round}
+.ftv2-graph-range{display:flex;justify-content:space-between;color:#7186a0;font-size:10px;margin:5px 0 0}
+.ftv2-scroll{max-width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch}
+.ftv2-table{border-collapse:collapse;width:100%;min-width:385px;font-size:10px;font-variant-numeric:tabular-nums;text-align:center}
+.ftv2-table th{font-size:9px;background:#eff6fc;color:#5c7793;padding:9px 5px;border-bottom:1px solid #dfeaf5;white-space:nowrap}
+.ftv2-table td{padding:9px 5px;border-bottom:1px solid #ecf1f6;white-space:nowrap;color:#355575}
+.ftv2-table .ftv2-highlight td{background:#eefbf5;font-weight:750;border-top:1px solid #bde9d5;border-bottom:1px solid #bde9d5}
+.ftv2-table .ftv2-green{color:#078e65}
+.ftv2-source-row{display:flex;justify-content:space-between;gap:9px;border-top:1px solid #edf2f7;padding:10px 0;font-size:11px}
+.ftv2-source-row span{color:#7186a0}
+.ftv2-source-row strong{text-align:right;font-size:11px}
+.ftv2-footer{position:fixed;z-index:5;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:650px;display:grid;grid-template-columns:repeat(5,1fr);align-items:center;background:#fff;border-top:1px solid #dfebf4;box-shadow:0 -5px 20px #173d6d0b;padding:9px 5px calc(9px + env(safe-area-inset-bottom));}
+.ftv2-footer>span{display:flex;flex-direction:column;align-items:center;justify-content:center;color:#8d9fb0;font-size:22px;line-height:1.1;gap:3px;min-height:44px}
+.ftv2-footer small{font-size:9px}
+.ftv2-footer .active{color:#147cf5}
+@media(min-width:650px){.ftv2-app{max-width:650px;margin:0 auto;box-shadow:0 0 0 1px #d8e7f3,0 15px 55px #24567c15;border-radius:22px 22px 0 0}}
+@media(max-width:370px){.ftv2-app{font-size:12px}.ftv2-mechanisms{gap:3px;padding-inline:6px}.ftv2-mechanisms span{font-size:8px}.ftv2-main{padding-inline:8px}.ftv2-header strong{font-size:15px}.ftv2-header-tag{font-size:8px;padding-inline:5px}.ftv2-card-mid{grid-template-columns:minmax(0,1fr) 76px}.ftv2-detail-tabs button{font-size:9px}}

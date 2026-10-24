@@ -1,0 +1,50 @@
+/* Football Edge · Light Signal Pro — scoped shared visual system V1.
+   Presentation-only. No engine changes, no network, no fake states. */
+:root{--fe-lsp-blue:#087bff;--fe-lsp-navy:#143464;--fe-lsp-bg:#f4f8ff;--fe-lsp-line:#dae7f6;--fe-lsp-green:#08885b;--fe-lsp-warn:#a36d07;--fe-lsp-red:#bd3945}
+#feTabsWorkspace{color:var(--fe-lsp-navy)}
+#feTabsWorkspace .ftabs-nav button{font-size:11px!important;letter-spacing:0!important}
+#feTabsWorkspace .ftabs-nav button[aria-selected=true]{background:#087bff!important;color:white!important;border-color:#087bff!important}
+#feTabsWorkspace .ftabs-content{max-width:100%;min-width:0}
+.fe-lsp{font:12px/1.5 system-ui,-apple-system,Segoe UI,sans-serif;color:var(--fe-lsp-navy);min-width:0}
+.fe-lsp *{box-sizing:border-box}
+.fe-lsp-header{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:9px 0 12px}
+.fe-lsp h2{font-size:17px!important;margin:0!important;font-weight:800;letter-spacing:0}
+.fe-lsp-desc{font-size:11px;color:#6885a6}
+.fe-lsp-chip{display:inline-block;border-radius:99px;padding:3px 9px;background:#e9f3ff;color:#126ec7;font-size:10px;font-weight:700}
+.fe-lsp-layout{display:grid;grid-template-columns:minmax(230px,.85fr) minmax(0,1.15fr);gap:12px;align-items:start}
+.fe-lsp-panel{background:#fff;border:1px solid var(--fe-lsp-line);border-radius:16px;padding:13px;box-shadow:0 4px 15px #0e54a509;min-width:0}
+.fe-lsp-panel h3{font-size:13px!important;margin:0 0 10px!important;color:#153c74}
+.fe-lsp-list{display:grid;gap:7px}
+.fe-lsp-item{display:flex;align-items:center;gap:8px;text-align:left;width:100%;min-width:0;border:1px solid #dce9f7;border-radius:11px;background:#fff;padding:9px 10px;cursor:pointer;color:#173e70}
+.fe-lsp-item[data-active=true]{border-color:#53a6f7;background:#eef7ff;box-shadow:inset 3px 0 #087bff}
+.fe-lsp-rank{display:grid;place-items:center;background:#eaf2fe;width:26px;height:26px;flex-shrink:0;border-radius:8px;color:#147af0;font-weight:800}
+.fe-lsp-match{min-width:0;flex:1}.fe-lsp-match strong{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px}.fe-lsp-match small{color:#6685a8;font-size:10px}
+.fe-lsp-ev{font-weight:800;font-size:11px;color:#1477ca;white-space:nowrap}
+.fe-lsp-ev[data-positive=true]{color:var(--fe-lsp-green)}
+.fe-lsp-fixture{display:flex;flex-direction:column;gap:5px;border-bottom:1px solid #e6eff9;padding-bottom:11px;margin-bottom:12px}
+.fe-lsp-league{color:#6483a8;font-size:10px}.fe-lsp-score{font-size:16px;font-weight:850;color:#15386e}
+.fe-lsp-decision{background:#eaf7f2;border:1px solid #c8ebde;border-radius:12px;padding:11px;margin-bottom:12px}
+.fe-lsp-decision[data-tone=wait]{background:#fff8e9;border-color:#f0dfb0}
+.fe-lsp-decision[data-tone=neutral]{background:#eff6ff;border-color:#d7e8fb}
+.fe-lsp-decision strong{display:block;font-size:15px;color:#08774e}
+.fe-lsp-decision[data-tone=wait] strong{color:#a46c04}
+.fe-lsp-decision[data-tone=neutral] strong{color:#126abf}
+.fe-lsp-decision small{display:block;color:#5f7d94}
+.fe-lsp-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px}
+.fe-lsp-metric{border:1px solid #e0eaf7;border-radius:10px;padding:9px 8px;background:#fbfdff;min-width:0}
+.fe-lsp-metric small{display:block;color:#6b86a5;font-size:10px}.fe-lsp-metric b{font-size:14px;font-variant-numeric:tabular-nums}
+.fe-lsp-sections{display:grid;gap:8px;margin-top:11px}
+.fe-lsp-detail{border:1px solid #e0eaf7;border-radius:10px;padding:10px;background:#fff;font-size:11px}
+.fe-lsp-detail summary{cursor:pointer;color:#1c5caa;font-weight:750}
+.fe-lsp-empty{padding:24px 10px;text-align:center;color:#7187a2;background:#f6faff;border:1px dashed #dce9f5;border-radius:12px}
+.fe-lsp-flag{font-size:10px;color:#8c680f}.fe-lsp-note{display:block;color:#8297ad;font-size:10px;margin:11px 0 0}
+@media(max-width:720px){.fe-lsp-layout{grid-template-columns:1fr}.fe-lsp-header{flex-wrap:wrap}.fe-lsp-panel{padding:11px}.fe-lsp-stats{grid-template-columns:repeat(3,minmax(0,1fr))}.fe-lsp-metric b{font-size:12px}}
+
+/* Prominent route to the original HT/FT/HC engine recommendation and price card. */
+.fe-lsp-original{margin-top:12px;background:#eef6ff;border:1px solid #c9e2fc;border-radius:12px;padding:11px;display:grid;gap:7px}
+.fe-lsp-original button{width:100%;min-height:42px;border:1px solid #087bff;border-radius:10px;background:#087bff;color:#fff;font-size:12px;font-weight:750;cursor:pointer}
+.fe-lsp-original small{font-size:10px;color:#4a6988;line-height:1.55}
+
+/* Restore legacy HT Goals as the primary tab content: original HT chart, picks, odds and valuation. */
+/* HT pricing content remains visible; legacy tools remain opt-in. */
+

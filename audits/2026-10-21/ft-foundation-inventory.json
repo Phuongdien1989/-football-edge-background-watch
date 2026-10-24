@@ -1,0 +1,173 @@
+{
+  "at": "2026-10-21T09:52:58.981Z",
+  "mode": "READ_ONLY",
+  "scanner_toggled": false,
+  "provider_calls": 0,
+  "d1_write_queries": 0,
+  "deployed": false,
+  "queries": [
+    {
+      "key": "tables",
+      "sql": "SELECT name FROM sqlite_master WHERE type='table' AND name IN ('fixture_history','live_snapshots','entry_decisions','engine_signals','market_snapshots','fe_notify_live_state')",
+      "rows_read": 35,
+      "rows_written": 0
+    },
+    {
+      "key": "history",
+      "sql": "SELECT fixture_id,kickoff,status,halftime_home,halftime_away,fulltime_home,fulltime_away,first_seen_at,last_seen_at FROM fixture_history ORDER BY kickoff DESC LIMIT 500",
+      "rows_read": 4,
+      "rows_written": 0
+    },
+    {
+      "key": "snapshots",
+      "sql": "SELECT fixture_id,captured_at,minute,status,line,price,payload_json FROM live_snapshots WHERE engine='FT' ORDER BY captured_at DESC LIMIT 500",
+      "rows_read": 500,
+      "rows_written": 0
+    },
+    {
+      "key": "decisions",
+      "sql": "SELECT fixture_id,captured_at,minute,line,price,resolution,outcome,payload_json FROM entry_decisions WHERE engine='FT' ORDER BY captured_at DESC LIMIT 500",
+      "rows_read": 500,
+      "rows_written": 0
+    },
+    {
+      "key": "live",
+      "sql": "SELECT fixture_id,payload FROM fe_notify_live_state LIMIT 100",
+      "rows_read": 100,
+      "rows_written": 0
+    }
+  ],
+  "versions": {
+    "football-edge-background-watch": [
+      {
+        "version_id": "e7d2090c-d0e1-4f58-9f5a-4360acd2ced3",
+        "percentage": 100
+      }
+    ],
+    "shiny-silence-d892": [
+      {
+        "version_id": "3166663f-f039-48f5-92ae-888890bb9455",
+        "percentage": 100
+      }
+    ],
+    "football-edge-desktop-b2-test": [
+      {
+        "version_id": "a332ee39-abb2-422d-a021-db78ef19cc10",
+        "percentage": 100
+      }
+    ]
+  },
+  "samples": {
+    "history": {
+      "sample_rows": 2,
+      "distinct_fixtures": 2,
+      "with_line_price": 0,
+      "payload_rows": 0,
+      "payload_keys": [],
+      "source_time_keys": [],
+      "min_captured_at": null,
+      "max_captured_at": null,
+      "completed_with_ft_score": 0
+    },
+    "snapshots": {
+      "sample_rows": 500,
+      "distinct_fixtures": 35,
+      "with_line_price": 500,
+      "payload_rows": 500,
+      "payload_keys": [
+        "break_even",
+        "edge",
+        "market_reason",
+        "model_ev",
+        "model_prob",
+        "policy_reason",
+        "price_zone",
+        "rank_why",
+        "signal_state"
+      ],
+      "source_time_keys": [],
+      "min_captured_at": 1792236430284,
+      "max_captured_at": 1792426736786
+    },
+    "decisions": {
+      "sample_rows": 500,
+      "distinct_fixtures": 8,
+      "with_line_price": 500,
+      "payload_rows": 500,
+      "payload_keys": [
+        "auto_settle_supported",
+        "away",
+        "behavior_state",
+        "break_even",
+        "candidate_supported",
+        "captured_at",
+        "data_level",
+        "edge",
+        "edge_level",
+        "engine",
+        "entry_score",
+        "fixture_id",
+        "home",
+        "id",
+        "league",
+        "line",
+        "market_level",
+        "market_prob",
+        "market_type",
+        "minute",
+        "model_ev",
+        "model_prob",
+        "odds_format",
+        "outcome",
+        "policy_reason",
+        "policy_status",
+        "price",
+        "price_zone",
+        "resolution",
+        "resolved_at",
+        "sample_type",
+        "schema",
+        "selection",
+        "signal_state",
+        "signature",
+        "unit_pl"
+      ],
+      "source_time_keys": [],
+      "min_captured_at": 1792306221208,
+      "max_captured_at": 1792424840789
+    },
+    "signals": {
+      "table_missing": true
+    },
+    "markets": {
+      "table_missing": true
+    },
+    "live": {
+      "sample_rows": 100,
+      "distinct_fixtures": 100,
+      "with_line_price": 0,
+      "payload_rows": 100,
+      "payload_keys": [
+        "__fe_deleted"
+      ],
+      "source_time_keys": [],
+      "min_captured_at": null,
+      "max_captured_at": null,
+      "rolling_history_rows": 0
+    }
+  },
+  "errors": [],
+  "rollback_exists": true,
+  "health": {
+    "deploy_commit": "3cd210d2d74aff547de4587ab4a3c96b982a728c",
+    "enabled": false,
+    "next_alarm": null
+  },
+  "tables": [
+    "entry_decisions",
+    "live_snapshots",
+    "fixture_history",
+    "fe_notify_live_state"
+  ],
+  "status": "PASS"
+}

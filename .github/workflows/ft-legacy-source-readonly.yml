@@ -1,0 +1,46 @@
+name: FT existing legacy D1 sources — one-time read-only inventory
+on:
+  push:
+    branches: [fix/ft-foundation-20261021]
+    paths:
+      - 'ft-audit-fix/legacy-ft-source-readonly.mjs'
+      - 'ft-audit-fix/legacy-ft-source-plan.mjs'
+      - '.github/workflows/ft-legacy-source-readonly.yml'
+permissions: {contents: read}
+concurrency:
+  group: ft-legacy-sources-once
+  cancel-in-progress: false
+jobs:
+  legacy_sources:
+    if: contains(github.event.head_commit.message, '[ft-legacy-source-once]') && github.run_attempt == 1
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: football-edge-production
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Verify immutable closed SQL allowlist offline
+        run: node ft-audit-fix/test-legacy-ft-source-plan.mjs
+      - name: Check real UTC D1 usage without querying D1
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          D1_READ_ONLY_AUDIT_ONCE: CONFIRM
+        run: node ft-audit-fix/d1-readonly-analytics.mjs
+      - name: Inspect legacy FT sources with indexed SELECT only
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          FT_LEGACY_SOURCE_READ_ONCE: CONFIRM
+        run: node ft-audit-fix/legacy-ft-source-readonly.mjs
+      - name: Archive aggregate results with no raw match identities
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ft-legacy-source-readonly-aggregate
+          path: |
+            ft-audit-output/ft-d1-readonly-usage.json
+            ft-audit-output/ft-legacy-source-readonly.json
+          retention-days: 30

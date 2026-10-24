@@ -1,0 +1,73 @@
+name: Refine HT card CSS, preserve original mechanism
+on:
+  push:
+    branches: [ui/ht-card-refinement-20261024]
+    paths: ['ht-presentation-polish/**', 'ht-early-candidate/style.css', '.github/workflows/ht-presentation-polish.yml']
+permissions: {contents: read, actions: read}
+concurrency:
+  group: fe-football-edge-mobile-production
+  cancel-in-progress: false
+jobs:
+  refine:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: football-edge-production
+    env: {WRANGLER_SEND_METRICS: 'false'}
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - uses: actions/download-artifact@v4
+        with:
+          name: ht-original-mechanism-route-recovery
+          run-id: 40098596792
+          github-token: ${{ github.token }}
+          path: previous-ht-route
+      - run: node ht-presentation-polish/test-scope.mjs
+      - run: node --check ht-presentation-polish/release.mjs
+      - run: npm install --no-save --no-package-lock wrangler@4 playwright@1.58.2
+      - run: google-chrome --version
+      - name: Back up exact current bundle and change one HT CSS asset
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node ht-presentation-polish/release.mjs prepare
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pre-ht-card-refinement-backup
+          path: |
+            ht-polish-release/backup/
+            ht-polish-release/backup-version.json
+            ht-polish-release/manifest.json
+          retention-days: 90
+      - name: Measure existing card and verify current HT behavior
+        run: node ht-presentation-polish/test-browser.cjs --baseline
+      - name: Verify refined card, identical values, five-minute session and all six tabs
+        run: node ht-presentation-polish/test-browser.cjs --candidate
+      - run: npx wrangler deploy --dry-run --config ht-polish-release/wrangler.json
+      - name: Publish HT CSS only
+        id: publish
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node ht-presentation-polish/release.mjs deploy
+      - name: Verify actual published HT navigation and behavior at four widths
+        run: node ht-presentation-polish/test-browser.cjs
+      - name: Verify every public hash and unchanged backend, Desktop and scan control
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node ht-presentation-polish/release.mjs verify
+      - name: Restore preceding Mobile if acceptance fails
+        if: failure() && steps.publish.outcome == 'success'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node ht-presentation-polish/release.mjs rollback
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ht-card-refinement-proof
+          path: ht-polish-release/
+          retention-days: 90

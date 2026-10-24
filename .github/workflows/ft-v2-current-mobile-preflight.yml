@@ -1,0 +1,23 @@
+name: FT V2 — current Mobile release baseline (READ ONLY)
+on:
+  push:
+    branches: [fix/ft-foundation-20261021]
+    paths:
+      - 'ft-overview/current-mobile-preflight.mjs'
+      - '.github/workflows/ft-v2-current-mobile-preflight.yml'
+permissions: {contents: read}
+jobs:
+  read_production_baseline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: football-edge-production
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: GET-only production versions and asset hashes
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node ft-overview/current-mobile-preflight.mjs

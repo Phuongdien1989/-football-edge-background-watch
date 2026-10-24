@@ -1,0 +1,32 @@
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+import {REQUIRED_MOBILE_ASSETS,assertFullMobileAssetInventory,assertFTMobileAssetIsolation} from './mobile-asset-isolation.mjs';
+let n=0;
+function test(name,fn){fn();n++;console.log('PASS '+name);}
+const original=REQUIRED_MOBILE_ASSETS.map(path=>({path,sha256:'a'.repeat(64)}));
+const next=()=>structuredClone(original);
+const reject=(fn,pattern)=>assert.throws(fn,pattern);
+test('28 canonical paths include 10 HT assets',()=>{
+ assert.equal(REQUIRED_MOBILE_ASSETS.length,28);
+ assert.equal(REQUIRED_MOBILE_ASSETS.filter(x=>x.startsWith('ht-candidate/')).length,10);
+});
+test('valid complete asset list is approved',()=>assert.equal(assertFullMobileAssetInventory(original,{requireHashes:true}).status,'FULL_28_PRESERVED'));
+test('historical old 18-file Mobile release is rejected before upload',()=>reject(()=>assertFullMobileAssetInventory(original.slice(0,18),{requireHashes:true}),/HT_OR_SHARED_ASSET_OMITTED/));
+test('one missing valuation module is a hard failure',()=>reject(()=>assertFullMobileAssetInventory(original.filter(x=>x.path!=='ht-candidate/valuation.mjs')),/HT_OR_SHARED_ASSET_OMITTED/));
+test('one missing HT session module is a hard failure',()=>reject(()=>assertFullMobileAssetInventory(original.filter(x=>x.path!=='ht-candidate/recommendation-session.mjs')),/HT_OR_SHARED_ASSET_OMITTED/));
+test('one missing public shared tab script fails',()=>reject(()=>assertFullMobileAssetInventory(original.filter(x=>x.path!=='ui-tabs/integrated.mjs')),/HT_OR_SHARED_ASSET_OMITTED/));
+test('duplicate path fails closed',()=>reject(()=>assertFullMobileAssetInventory([...original,original[0]]),/DUPLICATE_MOBILE_ASSET/));
+test('tampered hash on any file fails closed',()=>{const a=next();a[4].sha256='notahash';reject(()=>assertFullMobileAssetInventory(a,{requireHashes:true}),/INVALID_MOBILE_ASSET_HASH/)});
+test('unchanged candidate is isolated',()=>{const r=assertFTMobileAssetIsolation(original,next());assert.equal(r.status,'FT_STATIC_ISOLATED');assert.equal(r.ht_pricing_unchanged,true);assert.equal(r.changed.length,0);});
+test('FT overview asset may evolve without HT change',()=>{const a=next();a.find(x=>x.path==='ft-overview/ui.mjs').sha256='b'.repeat(64);const r=assertFTMobileAssetIsolation(original,a);assert.deepEqual(r.changed,['ft-overview/ui.mjs']);});
+test('new FT V2 namespaced asset permitted',()=>{const a=next();a.push({path:'ft-v2/prediction-card.mjs',sha256:'c'.repeat(64)});const r=assertFTMobileAssetIsolation(original,a);assert.deepEqual(r.changed,['ft-v2/prediction-card.mjs']);});
+test('HT valuation byte changes prohibited',()=>{const a=next();a.find(x=>x.path==='ht-candidate/valuation.mjs').sha256='b'.repeat(64);reject(()=>assertFTMobileAssetIsolation(original,a),/PROTECTED_MOBILE_ASSET_CHANGED_ht-candidate\/valuation.mjs/)});
+test('HT UI byte changes prohibited',()=>{const a=next();a.find(x=>x.path==='ht-candidate/ui.mjs').sha256='b'.repeat(64);reject(()=>assertFTMobileAssetIsolation(original,a),/PROTECTED_MOBILE_ASSET_CHANGED_ht-candidate\/ui.mjs/)});
+test('shared tab integration must not silently change',()=>{const a=next();a.find(x=>x.path==='ui-tabs/integrated.mjs').sha256='b'.repeat(64);reject(()=>assertFTMobileAssetIsolation(original,a),/PROTECTED_MOBILE_ASSET_CHANGED/)});
+test('Push service worker must not silently change',()=>{const a=next();a.find(x=>x.path==='push-sw.js').sha256='b'.repeat(64);reject(()=>assertFTMobileAssetIsolation(original,a),/PROTECTED_MOBILE_ASSET_CHANGED/)});
+test('root HTML needs separate documented approval',()=>{const a=next();a.find(x=>x.path==='index.html').sha256='b'.repeat(64);reject(()=>assertFTMobileAssetIsolation(original,a),/PROTECTED_MOBILE_ASSET_CHANGED_index.html/);assert.deepEqual(assertFTMobileAssetIsolation(original,a,{allowIndexShell:true}).changed,['index.html']);});
+test('adding unrelated assets under HT is not FT scope',()=>{const a=next();a.push({path:'ht-candidate/override.mjs',sha256:'b'.repeat(64)});reject(()=>assertFTMobileAssetIsolation(original,a),/NON_FT_ASSET_ADDED/)});
+test('any missing icon triggers hard block',()=>{const a=next().filter(x=>x.path!=='icons/icon-192.png');reject(()=>assertFTMobileAssetIsolation(original,a),/HT_OR_SHARED_ASSET_OMITTED/)});
+test('legacy uploader PRECHECK imports full 28-file contract',()=>{const s=readFileSync('mobile-outbox-candidate/production-preflight.mjs','utf8');assert(s.includes('const files=REQUIRED_MOBILE_ASSETS;'));assert(s.includes('assertFullMobileAssetInventory(manifest,{requireHashes:true})'));});
+test('legacy uploader DEPLOY blocks incomplete inventory before spawn',()=>{const s=readFileSync('mobile-outbox-candidate/production-release.mjs','utf8');const a=s.indexOf('assertFullMobileAssetInventory(packageManifest.files,{requireHashes:true})');const b=s.indexOf("const deploy=spawnSync(");assert(a>0&&b>a);});
+console.log('FE_FT_MOBILE_HT_ISOLATION_PASS '+JSON.stringify({tests:n,protected_assets:28,ht_assets:10,deploy:false,scanner_actions:0,d1_writes:0,production_files_changed:false}));

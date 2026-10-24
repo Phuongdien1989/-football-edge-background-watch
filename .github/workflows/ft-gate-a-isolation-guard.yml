@@ -1,0 +1,26 @@
+name: FT Gate A staging isolation contract — NO deployment
+on:
+  push:
+    branches: [fix/ft-foundation-20261021]
+    paths:
+      - 'ft-pilot/gate-a-isolation-guard.mjs'
+      - 'ft-pilot/staging-isolation.review.toml'
+      - '.github/workflows/ft-gate-a-isolation-guard.yml'
+permissions: {contents: read}
+jobs:
+  isolation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Assert OFF-only isolated staging and forbid production references
+        run: node ft-pilot/gate-a-isolation-guard.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ft-gate-a-isolation-static-NO-DEPLOY
+          path: ft-audit-output/ft-gate-a-isolation/
+          retention-days: 60

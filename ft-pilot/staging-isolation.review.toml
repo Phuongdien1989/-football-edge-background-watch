@@ -1,0 +1,19 @@
+# STAGING ISOLATION PROPOSAL ONLY. DELIBERATELY NOT DEPLOYABLE.
+# Requires Gate A approval and brand-new Worker, D1, DO identities.
+# NEVER replace placeholders with production D1 or DO IDs.
+name = "football-edge-ft-isolated-shadow-REVIEW-ONLY"
+main = "ft-pilot/shadow-worker.mjs"
+compatibility_date = "2026-09-11"
+workers_dev = false
+compatibility_flags = ["nodejs_compat"]
+[vars]
+FT_PILOT_ENABLED = "false"
+FT_PILOT_EPOCH = "REPLACE_ONLY_AFTER_GATE_A"
+FT_PILOT_LOGIC_VERSION = "REPLACE_WITH_VERIFIED_SHA256"
+[durable_objects]
+bindings = [{ name = "SHADOW_DO", class_name = "FTPilotShadowDO" }]
+[[d1_databases]]
+binding = "FT_PILOT_DB"
+database_name = "REPLACE_WITH_NEW_ISOLATED_STAGING_D1"
+database_id = "REPLACE_WITH_NEW_ISOLATED_STAGING_UUID"
+# No routes, cron, migration, providers, scanner or Push. Missing DO migration intentionally.

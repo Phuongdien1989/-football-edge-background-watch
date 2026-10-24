@@ -1,0 +1,35 @@
+import assert from 'node:assert/strict';
+import {mkdirSync,writeFileSync} from 'node:fs';
+import {inspectFTObservation,inspectFTDecision,inspectFTOutcome} from './replay-integrity.mjs';
+const t=1000000;
+const fixture={fixture:{id:42,status:{short:'2H',elapsed:67}},goals:{home:1,away:1}};
+const source=(data,received_at=t-1,source_at=null)=>({status:'OK',data,received_at,source_at});
+const base={schema:'FT_OBSERVATION_V1_DRAFT',id:'42:1000000',fixture_id:42,decision_at:t,fixture,
+ sources:{fixture:source(fixture),statistics:source([]),events:source([]),odds:source([]),half_statistics:source([])}};
+const decision={schema:'FT_DECISION_V1_DRAFT',observation_id:base.id,fixture_id:42,input_at:t,decision_at:t+1,state:'NOT_EVALUATED',evaluation:null,push_delivery:'NOT_OBSERVED'};
+const outcome={schema:'FT_OUTCOME_V2_DRAFT',observation_id:base.id,fixture_id:42,observed_at:t+4,resolved_at:t+4,state:'RESOLVED',status:'FT',settlement_basis:'FULL_MATCH_REGULATION',score:{home:2,away:1}};
+let checks=0;function test(name,fn){fn();checks++;console.log('PASS '+name);}
+const inspect=inspectFTObservation;
+test('unknown provider clocks remain REVIEW not hard veto',()=>{const x=inspect(base);assert.equal(x.status,'REVIEW');assert.equal(x.can_use_for_model,true);assert.equal(x.provider_age_certified,false);});
+test('complete source clocks ACCEPT',()=>{const o=structuredClone(base);for(const v of Object.values(o.sources))v.source_at=t-2;assert.equal(inspect(o).status,'ACCEPT');});
+test('future receipt rejected',()=>{const o=structuredClone(base);o.sources.odds.received_at=t+1;assert.equal(inspect(o).status,'REJECT');});
+test('future provider timestamp rejected',()=>{const o=structuredClone(base);o.sources.odds.source_at=t+1;assert.equal(inspect(o).status,'REJECT');});
+test('provider timestamp later than receipt rejected even if before forecast',()=>{const o=structuredClone(base);o.sources.odds.source_at=t;o.sources.odds.received_at=t-1;assert.equal(inspect(o).status,'REJECT');});
+test('postmatch fixture cannot be prediction input',()=>{const o=structuredClone(base);o.fixture.fixture.status.short='FT';assert(inspect(o).errors.includes('POST_MATCH_FIXTURE_IN_FORECAST'));});
+test('final score contamination rejected',()=>{const o=structuredClone(base);o.fixture.score={fulltime:{home:2,away:2}};assert(inspect(o).errors.includes('FULLTIME_SCORE_LEAKAGE'));});
+test('captured fixture source final score is leakage even with safe top-level fixture',()=>{const o=structuredClone(base);o.sources.fixture.data={...o.fixture,score:{fulltime:{home:2,away:1}}};assert(inspect(o).errors.includes('SOURCE_FIXTURE_FUTURE_LABEL_LEAKAGE'));});
+test('captured fixture source final phase is leakage',()=>{const o=structuredClone(base);o.sources.fixture.data=[{...o.fixture,fixture:{...o.fixture.fixture,status:{short:'FT'}}}];assert(inspect(o).errors.includes('SOURCE_FIXTURE_FUTURE_LABEL_LEAKAGE'));});
+test('null final score in live source must remain permitted',()=>{const o=structuredClone(base);o.sources.fixture.data={...o.fixture,score:{fulltime:null}};assert.notEqual(inspect(o).status,'REJECT');});
+test('market source unavailable does not imply model loss',()=>{const o=structuredClone(base);o.sources.odds={status:'MISSING',received_at:null,source_at:null,data:null};assert.equal(inspect(o).can_use_for_model,true);});
+test('supplementary source error is REVIEW not rejection',()=>{const o=structuredClone(base);o.sources.statistics={status:'ERROR',received_at:t-1,source_at:null,data:null};assert.equal(inspect(o).status,'REVIEW');});
+test('missing xG is not integrity rejection',()=>{const o=structuredClone(base);o.sources.statistics.data=[];assert.equal(inspect(o).can_use_for_model,true);});
+test('clock inversion on decision rejected',()=>{assert.equal(inspectFTDecision(base,{...decision,decision_at:t-1}).status,'REJECT');});
+test('decision id mismatch rejected',()=>{assert.equal(inspectFTDecision(base,{...decision,observation_id:'other'}).status,'REJECT');});
+test('not evaluated is not a losing recommendation',()=>{const x=inspectFTDecision(base,decision);assert(x.warnings.includes('NOT_EVALUATED_NOT_A_NEGATIVE_RECOMMENDATION'));assert.equal(x.roi,null);});
+test('actual final outcome linked, accuracy not fabricated',()=>{const x=inspectFTOutcome(base,decision,outcome);assert.equal(x.status,'REVIEW');assert.equal(x.roi,null);});
+test('outcome before decision rejected',()=>{const x=inspectFTOutcome(base,decision,{...outcome,observed_at:t});assert.equal(x.status,'REJECT');});
+test('canceled match cannot be recorded as settled regulation FT',()=>{const x=inspectFTOutcome(base,decision,{...outcome,status:'CANC'});assert.equal(x.status,'REJECT');assert(x.errors.includes('OUTCOME_NOT_FINAL_REGULATION_STATUS'));});
+test('unsettled missing outcome cannot be scored as FT',()=>{const x=inspectFTOutcome(base,decision,{...outcome,status:'NS'});assert.equal(x.status,'REJECT');});
+test('fixture identity mismatch rejects outcome',()=>{const x=inspectFTOutcome(base,decision,{...outcome,fixture_id:55});assert.equal(x.status,'REJECT');});
+mkdirSync('ft-audit-output',{recursive:true});
+writeFileSync('ft-audit-output/ft-3c-integrity-tests.json',JSON.stringify({checks,status:'PASS',scope:'PURE_STAGED',production:false},null,2));

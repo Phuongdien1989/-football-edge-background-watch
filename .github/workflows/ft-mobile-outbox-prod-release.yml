@@ -1,0 +1,71 @@
+name: Football Edge owner-approved Mobile Outbox ONLY release
+# Owner approved Mobile-only production release, with version drift and rollback controls.
+on:
+  push:
+    branches: [fix/ft-foundation-20261021]
+    paths:
+      - 'mobile-outbox-candidate/production-release.mjs'
+      - 'mobile-outbox-candidate/production-preflight.mjs'
+      - '.github/workflows/ft-mobile-outbox-prod-release.yml'
+permissions: {contents: read}
+concurrency:
+  group: fe-football-edge-mobile-production
+  cancel-in-progress: false
+jobs:
+  mobile_only_release:
+    if: >-
+      startsWith(github.event.head_commit.message, 'release(fe-mobile-outbox): owner-approved Mobile-only production')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: football-edge-production
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Verify live public HTML exact source fingerprint and build candidate
+        run: |
+          node --input-type=module <<'JS'
+          import {createHash} from 'node:crypto';
+          import {writeFileSync,mkdirSync} from 'node:fs';
+          const r=await fetch('https://shiny-silence-d892.ngophuonghuy.workers.dev/',{headers:{'Cache-Control':'no-cache'},signal:AbortSignal.timeout(30000),redirect:'error'});
+          if(r.status!==200||!(r.headers.get('content-type')||'').includes('text/html'))throw Error('MOBILE_PUBLIC_BASELINE_UNAVAILABLE');
+          const body=Buffer.from(await r.arrayBuffer()),sha=createHash('sha256').update(body).digest('hex');
+          if(sha!=='005a74b4768a00f92ac462592b3de63106b2a4db35732103f6095cfed9fdb46d')throw Error('SOURCE_DRIFT_STOP');
+          mkdirSync('mobile-outbox-candidate',{recursive:true});writeFileSync('mobile-outbox-candidate/baseline.html',body);
+          JS
+          node mobile-outbox-candidate/build_live_mobile_20261022.mjs mobile-outbox-candidate/baseline.html mobile-outbox-candidate/candidate_mobile.html
+      - name: Verify indexedDB, shared ACK and exact source-only change
+        run: |
+          npm install --no-save --no-package-lock fake-indexeddb@6
+          node tests/test-mobile-outbox-candidate.mjs
+          node ft-audit-fix/test-mobile-live-diff-scope.mjs
+          node ft-audit-fix/test-mobile-shared-ack-qa.mjs
+      - name: Verify deployed Worker version, asset-only bindings and backup exact resources
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          FE_MOBILE_OUTBOX_RELEASE_APPROVED: 'true'
+        run: node mobile-outbox-candidate/production-preflight.mjs
+      - name: Wrangler dry-run — do not mutate Cloudflare
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: npx --yes wrangler@4 deploy --dry-run --config ft-audit-output/mobile-release/wrangler.json
+      - name: Publish ONLY Mobile Outbox candidate
+        id: publish
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          FE_MOBILE_OUTBOX_RELEASE_APPROVED: 'true'
+        run: node mobile-outbox-candidate/production-release.mjs deploy
+      - name: Publish artifact / evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: football-edge-mobile-outbox-owner-approved-release
+          path: |
+            ft-audit-output/mobile-release/manifest.json
+            ft-audit-output/mobile-release/preflight-error.json
+            ft-audit-output/mobile-release/deployment.json
+          retention-days: 90

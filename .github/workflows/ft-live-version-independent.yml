@@ -1,0 +1,27 @@
+name: FT independent no-write last active version probe
+on:
+  push:
+    branches: [fix/ft-foundation-20261021]
+    paths: ['ft-audit-fix/live-version-independent.mjs','.github/workflows/ft-live-version-independent.yml']
+permissions: {contents: read}
+concurrency: {group: ft-last-live-readonly-once, cancel-in-progress: false}
+jobs:
+  inspect:
+    if: contains(github.event.head_commit.message,'[fe-last-readonly-once]') && github.run_attempt == 1
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    environment: football-edge-production
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Independent GET only active versions and health
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          FT_LIVE_VERSION_AUDIT_LAST: ONCE
+        run: node ft-audit-fix/live-version-independent.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: {name: ft-last-independent-live-readonly, path: ft-audit-output/ft-live-version-independent.json, retention-days: 30}
