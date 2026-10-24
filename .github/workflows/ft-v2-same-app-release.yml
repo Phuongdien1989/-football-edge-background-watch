@@ -10,6 +10,7 @@ on:
 permissions: {contents: read}
 jobs:
   current_app:
+    if: startsWith(github.event.head_commit.message, 'release(ft-v2): owner-reviewed light signal pro production')
     runs-on: ubuntu-latest
     timeout-minutes: 12
     environment: football-edge-production
