@@ -1,7 +1,7 @@
 name: FT V2 Experimental decision reviewer — NO deploy
 on:
   push:
-    branches: [fix/ft-foundation-20261021]
+    branches: [fix/ft-foundation-20261021, fix/ft-pricing-evidence-20261024]
     paths:
       - 'ft-overview/**'
       - '.github/workflows/ft-v2-experimental-review.yml'
@@ -17,6 +17,9 @@ jobs:
         with: {node-version: '22'}
       - run: node ft-overview/test-main-app-assets.mjs
       - run: node ft-overview/test-experimental-decision.mjs
+      - run: node ft-overview/test-decision-evidence.mjs
+      - run: node ft-overview/test-same-app-integration.mjs
+      - run: node --check ft-overview/ft-ai-v2-integrated.mjs
       - run: node ft-overview/test-pilot-e2e.mjs
       - run: node ft-overview/test-validation-dashboard.mjs
       - run: node ft-overview/test-cohort-report.mjs
