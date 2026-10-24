@@ -5,7 +5,7 @@ export function injectFTV2IntoCurrentShell(html){
    if(!html.includes(marker))throw Error('REQUIRED_CURRENT_FEATURE_MISSING_'+marker);
  }
  if(html.includes('id="ftAIV2Card"'))throw Error('LEGACY_DETACHED_CARD_PRESENT');
- if(html.includes('/ft-ai-v2/light-signal-pro.css'))throw Error('LIGHT_SIGNAL_ALREADY_INSTALLED');
+ if(html.includes('/ft-ai-v2/light-signal-pro.css'))return {html,originalBytes:Buffer.byteLength(html),addedBytes:0,changedElements:[]};
  if(html.split('</head>').length!==2)throw Error('HTML_HEAD_ANCHOR_AMBIGUOUS');
  const link='<link rel="stylesheet" href="/ft-ai-v2/light-signal-pro.css">\n';
  const next=html.replace('</head>',link+'</head>');
