@@ -125,3 +125,6 @@ The separate preview `/app/#ftOverviewCard` displays the exact pinned original
 Mobile layout with this addition. This *layout-only* route blocks API, Push and
 Worker connections by CSP and never contains demo fixtures. The standalone `/`
 route remains explicitly fictional DEMO. Production integration is not deployed.
+
+## FT V2 experimental decision-review overlay (24 Oct 2026)
+The new pure function `ft-overview/experimental-decision.mjs` reviews existing FT Overview `assess` outputs and renders a distinct evidence, decision and sensitivity panel on the existing trial card. It does NOT change forecasting PMF, live-rate calibration, provider, D1, Push, default OFF pilot or legacy recommendation logic. The ±5pp probability sensitivity is a stress assumption, **not a statistical confidence interval**. It reports why a positive EV is fragile and why the same @2.10 quote can lead to trial over, wait price, model wait or contract mismatch based on state. No live calibrated model is claimed. Run `node ft-overview/test-experimental-decision.mjs`.
