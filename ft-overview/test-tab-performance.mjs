@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import {patchMechanismTabs} from './patch-mechanism-tabs.mjs';
-const src="const tabs=[['ftv2','FT AI V2']];/* FE_TAB_PERF_V2 */document.body.dataset.feTabsTools='false';render();requestAnimationFrame(";
+const src="const tabs=[['ftv2','FT AI V2']];/* FE_TAB_PERF_V2 */document.body.dataset.feTabsTools=tab==='ht'?'true':'false';render();requestAnimationFrame(";
 const p=patchMechanismTabs(src);
 assert.equal(p.anchors,1);
 assert(p.code.includes('HT_NATIVE_EXPAND_V2'));assert(p.code.includes("classList.remove('fe-p11-collapsed')"));
-assert.throws(()=>patchMechanismTabs(p.code),/ANCHOR_MISSING/);
+assert.throws(()=>patchMechanismTabs(p.code),/ALREADY_APPLIED/);
 console.log('HT_NATIVE_RESTORE_PATCH_PASS');
