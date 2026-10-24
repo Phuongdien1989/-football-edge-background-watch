@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Football Edge — FT V2 Validation (Offline)</title>
+<style>
+:root{font:14px/1.5 system-ui,-apple-system,Segoe UI,sans-serif;color:#dce9fc;background:#081322}
+main{max-width:1060px;margin:24px auto;padding:0 18px}h1{font-size:1.55rem;margin-bottom:4px}p{color:#a9bfd7}
+.card{background:#111f35;border:1px solid #2e4564;border-radius:12px;padding:17px;margin:14px 0}
+header{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.tag{color:#9cddfc;background:#163a52;padding:4px 10px;border-radius:20px;font-size:12px}
+label{display:inline-block;margin:10px 0}input{color:inherit}strong{color:#fff}
+table{border-collapse:collapse;width:100%}th,td{padding:10px 7px;text-align:left;border-bottom:1px solid #2d405a}th{color:#9eb9d7}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px}
+.metric{background:#192c45;border-radius:9px;padding:12px}.metric b{display:block;font-size:23px}
+small{color:#a9bfd7}button{background:#1a5478;color:white;border:0;border-radius:7px;padding:8px 14px;cursor:pointer}
+#message{white-space:pre-wrap} .scroll{overflow-x:auto}
+</style></head><body><main><header><div><h1>FT V2 · Validation Dashboard</h1><small>EXPERIMENTAL · Offline · Không kết nối production</small></div><span class="tag">CHƯA NGHIỆM THU</span></header>
+<p>Chọn tệp JSON gồm <code>pairs</code>, <code>outcomes</code> và <code>forecasts</code> đã được ghi nhận đúng thời điểm. Không có tệp thì hiển thị 0 mẫu, không tạo dữ liệu minh họa.</p>
+<section class="card"><label for="evidence">Tải dữ liệu kiểm chứng từ máy (JSON): </label> <input id="evidence" type="file" accept=".json,application/json">
+<button id="export" type="button">Xuất báo cáo JSON</button><p id="message" role="status"></p></section>
+<section class="grid" id="metrics"></section>
+<section class="card"><h2>Nhóm đánh giá</h2><div class="scroll"><table><thead><tr><th>Tiêu chí</th><th>Nhóm</th><th>Mẫu</th><th>Tỷ lệ thắng</th><th>EV ước tính</th><th>Brier</th></tr></thead><tbody id="groups"></tbody></table></div></section>
+<section class="card"><h2>Thiếu bằng chứng / bị loại</h2><div id="excluded"></div></section>
+<section class="card"><h2>Giới hạn</h2><ul id="warnings"></ul></section>
+</main><script type="module">
+import {buildValidationDashboard} from './validation-dashboard.mjs';
+const $=id=>document.getElementById(id);
+const fmt=x=>Number.isFinite(x)?(100*x).toFixed(1)+'%':'—';
+const txt=(parent,tag,value)=>{const el=document.createElement(tag);el.textContent=String(value);parent.appendChild(el);return el};
+let report=buildValidationDashboard();
+function render(){
+ $('metrics').replaceChildren();for(const [k,v] of Object.entries(report.metrics)){const el=txt($('metrics'),'div','');el.className='metric';txt(el,'small',k);txt(el,'b',v)}
+ $('groups').replaceChildren();for(const g of report.groups){const tr=document.createElement('tr');
+  for(const v of [g.dimension,g.label,g.sample,fmt(g.observedWinRate),fmt(g.estimatedEV),Number.isFinite(g.brier)?g.brier.toFixed(4):'—'])txt(tr,'td',v);
+  $('groups').appendChild(tr)}
+ $('excluded').replaceChildren();const entries=Object.entries(report.exclusionReasons);
+ if(!entries.length)txt($('excluded'),'p','Không có bản ghi bị loại trong dữ liệu đã nạp');
+ else for(const [key,value] of entries)txt($('excluded'),'p',key+': '+value);
+ $('warnings').replaceChildren();for(const w of report.warnings)txt($('warnings'),'li',w);
+ $('message').textContent='Trạng thái: '+report.status+' · Mẫu hợp lệ: '+report.metrics.matched;
+}
+$('evidence').addEventListener('change',async event=>{
+ const file=event.target.files?.[0];if(!file)return;
+ try{
+  if(file.size>3_000_000)throw Error('Tệp vượt 3MB');
+  const obj=JSON.parse(await file.text());report=buildValidationDashboard(obj);render();
+ }catch(e){$('message').textContent='Không thể đọc bằng chứng: '+e.message}
+});
+$('export').addEventListener('click',()=>{
+ const blob=new Blob([JSON.stringify(report,null,2)],{type:'application/json'});
+ const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='ft-v2-validation-report.json';a.click();URL.revokeObjectURL(url);
+});render();
+</script></body></html>
