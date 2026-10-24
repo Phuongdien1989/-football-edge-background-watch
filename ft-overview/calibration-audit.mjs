@@ -18,7 +18,7 @@ export function auditFTCalibration(rows,{minSamples=30}={}){
   else if(!validatePMF(pmf))reason='MISSING_VALID_DECISION_PMF';
   else if(r?.model_generated_at!==at)reason='MODEL_ASOF_MISMATCH';
   else if(r?.source_received_at>at||!Number.isSafeInteger(r?.source_received_at))reason='FUTURE_OR_UNKNOWN_SOURCE';
-  else if(!finite(r?.line)||Math.abs(r.line-Math.round(r.line)-.5)>1e-8)reason='NON_BINARY_LINE';
+  else if(!finite(r?.line)||Math.abs((r.line-Math.floor(r.line))-.5)>1e-8)reason='NON_BINARY_LINE';
   else if(!finite(r?.market_odds)||r.market_odds<=1)reason='UNVERIFIED_MARKET_ODDS';
   else if(r?.settlement_basis!=='FULL_MATCH_REGULATION')reason='SETTLEMENT_UNVERIFIED';
   else if(!Array.isArray(r?.observed_stats)||r.observed_stats.some(v=>!Number.isSafeInteger(v?.received_at)||v.received_at>at))reason='FUTURE_OR_UNKNOWN_STATS';
