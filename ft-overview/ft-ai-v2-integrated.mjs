@@ -6,11 +6,13 @@ import {reviewFTDecision} from './experimental-decision.mjs';
 import {liveProbability} from './live-probability.mjs';
 import {lightSignalFTV2View} from './light-signal-pro-view.mjs';
 // The host tab owns navigation; this module only renders into its assigned panel.
-let teardownFTV2=null;
+let teardownFTV2=null,activeFTV2Root=null;
 function attachFTV2Tab(){
- if(teardownFTV2){teardownFTV2();teardownFTV2=null;}
  const root=document.getElementById('ftAIV2ReadOnly');
- if(!root||root.dataset.ftV2Mounted==='true')return;
+ if(!root)return;
+ if(root===activeFTV2Root&&root.dataset.ftV2Mounted==='true')return;
+ if(teardownFTV2){teardownFTV2();teardownFTV2=null;}
+ activeFTV2Root=root;
  root.dataset.ftV2Mounted='true';
  const store=createStore({trialRecommendations:true});
  const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -42,7 +44,7 @@ function attachFTV2Tab(){
  // Refresh while this tab is open; keep legacy scanner scheduling untouched.
  const refresh=()=>{if(!root.isConnected){cleanup();return;}if(document.visibilityState==='visible')sync();};
  const timer=setInterval(refresh,15000);
- function cleanup(){clearInterval(timer);root.removeEventListener('click',onClick);window.removeEventListener('fe-notify-sync-updated',sync);document.removeEventListener('visibilitychange',visibility);root.dataset.ftV2Mounted='false';}
+ function cleanup(){clearInterval(timer);root.removeEventListener('click',onClick);window.removeEventListener('fe-notify-sync-updated',sync);document.removeEventListener('visibilitychange',visibility);root.dataset.ftV2Mounted='false';if(activeFTV2Root===root)activeFTV2Root=null;}
  teardownFTV2=cleanup;
 }
 window.addEventListener('fe-ft-v2-tab-open',attachFTV2Tab);
