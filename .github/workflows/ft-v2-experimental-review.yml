@@ -16,6 +16,7 @@ jobs:
       - uses: actions/setup-node@v4
         with: {node-version: '22'}
       - run: node ft-overview/test-experimental-decision.mjs
+      - run: node ft-overview/test-calibration-audit.mjs
       - run: node ft-overview/test-live-probability.mjs
       - run: node ft-overview/test.mjs
       - run: node --check ft-overview/ui.mjs
