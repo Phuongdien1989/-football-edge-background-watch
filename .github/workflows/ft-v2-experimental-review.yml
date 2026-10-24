@@ -15,6 +15,9 @@ jobs:
         with: {persist-credentials: false}
       - uses: actions/setup-node@v4
         with: {node-version: '22'}
+      - run: node ft-overview/test-light-signal-mechanisms.mjs
+      - run: node --check ft-overview/light-signal-mechanisms.mjs
+      - run: node --check ft-overview/patch-mechanism-tabs.mjs
       - run: node ft-overview/test-light-signal-pro-view.mjs
       - run: node --check ft-overview/light-signal-pro-view.mjs
       - run: node --check ft-overview/current-shell-injection.mjs
