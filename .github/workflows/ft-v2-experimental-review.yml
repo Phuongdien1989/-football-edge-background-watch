@@ -1,0 +1,20 @@
+name: FT V2 Experimental decision reviewer — NO deploy
+on:
+  push:
+    branches: [fix/ft-foundation-20261021]
+    paths:
+      - 'ft-overview/**'
+      - '.github/workflows/ft-v2-experimental-review.yml'
+permissions: {contents: read}
+jobs:
+  decision_review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - run: node ft-overview/test-experimental-decision.mjs
+      - run: node ft-overview/test.mjs
+      - run: node --check ft-overview/ui.mjs
