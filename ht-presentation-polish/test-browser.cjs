@@ -34,10 +34,10 @@ const origin='https://shiny-silence-d892.ngophuonghuy.workers.dev',baseline=proc
   assert.equal(await card.getAttribute('data-htp-id'),'990091');assert.equal(await card.getAttribute('data-state'),'ACTIVE');
   assert.equal(await card.locator('.htp-league').innerText(),'Regression League · QA');assert((await card.innerText()).includes('@ 2.70'));
   assert.equal(await card.locator('.htp-session').count(),1);const deadline=await page.evaluate(()=>FEHTPricingView.sessions().sessions.find(x=>x.fixtureId===990091).expiresAt);
-  await card.scrollIntoViewIfNeeded();const closedHeight=await card.evaluate(e=>e.getBoundingClientRect().height);await card.screenshot({path:out+'/ht-compact-'+width+'.png'});
+  await card.scrollIntoViewIfNeeded();const closedHeight=await card.evaluate(e=>e.getBoundingClientRect().height);await page.screenshot({path:out+'/ht-compact-'+width+'.png',clip:await card.boundingBox()});
   await card.locator('details summary').click();await card.locator('.htp-chart').waitFor({state:'visible'});assert.equal(await card.locator('.htp-chart>div').count(),5);
   const metrics=await card.evaluate(e=>({values:[...e.querySelectorAll('.htp-values b')].map(x=>x.textContent),title:getComputedStyle(e.querySelector('h3')).fontSize,odds:getComputedStyle(e.querySelector('.htp-odds')).fontSize,overflow:e.scrollWidth>e.clientWidth+1}));metrics.closedHeight=closedHeight;assert.equal(metrics.title,baseline?'16px':'15px');assert.equal(metrics.odds,baseline?'24px':'22px');assert.equal(metrics.overflow,false);
-  await card.screenshot({path:out+'/ht-auto-route-'+width+'.png'});
+  await page.screenshot({path:out+'/ht-auto-route-'+width+'.png',clip:await card.boundingBox()});
   await page.evaluate(()=>{__htRecoveryQA.items[0].latest.market_rows[0].values[0].odd=2.8;__htRecoveryQA.items[0].latest.market_at=Date.now();window.dispatchEvent(new Event('fe-ht-context-updated'));});
   await page.waitForFunction(()=>document.querySelector('.htp-session-prices')?.textContent.includes('@2.80'));
   assert((await card.locator('.htp-session-prices').innerText()).includes('@2.70'));assert.equal(await page.evaluate(()=>FEHTPricingView.sessions().sessions.find(x=>x.fixtureId===990091).expiresAt),deadline);
