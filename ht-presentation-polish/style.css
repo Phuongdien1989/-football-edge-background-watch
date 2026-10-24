@@ -1,0 +1,45 @@
+.htp-card{--ht-ink:#193b5b;--ht-muted:#60768b;--ht-line:#e2eaf1;--ht-green:#087e63;box-sizing:border-box;min-width:0;padding:14px;margin:12px 0;border:1px solid var(--ht-line);border-radius:15px;background:#fff;color:var(--ht-ink);font:13px/1.55 system-ui,-apple-system,"Segoe UI",sans-serif;box-shadow:0 3px 14px #193b5b06;overflow-wrap:anywhere}
+.htp-card *{box-sizing:border-box}
+.htp-card header{display:flex;justify-content:space-between;align-items:center;gap:8px;padding-bottom:2px}
+.htp-eyebrow{font-size:10px;font-weight:650;letter-spacing:.09em;color:#436585}
+.htp-trial{font-size:10px;font-weight:500;color:#517391;background:#f6f9fc;border:1px solid #e6edf4;border-radius:20px;padding:2px 8px}
+.htp-card h3,#feTabsWorkspace .htp-card h3{font-size:15px!important;line-height:1.45;font-weight:650!important;letter-spacing:0!important;text-transform:none!important;margin:9px 0 4px;color:var(--ht-ink)}
+.htp-card .htp-league,#feTabsWorkspace .htp-card .htp-league{font-size:11px;font-weight:400;line-height:1.5;color:var(--ht-muted);margin:0 0 10px;letter-spacing:0;text-transform:none;overflow-wrap:anywhere}
+.htp-game{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:11px}
+.htp-game span{font-size:10px;font-weight:550;color:#08795f;background:#edf8f3;padding:3px 8px;border-radius:20px}
+.htp-game b{font-size:20px;line-height:1.2;font-variant-numeric:tabular-nums;font-weight:650;letter-spacing:.03em}
+.htp-decision{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:6px 8px;padding:11px 12px;border:1px solid #dceee5;border-left:3px solid #239e7c;border-radius:11px;background:#f3faf6}
+.htp-decision h4{font-size:13px;line-height:1.45;margin:0 0 3px;font-weight:650;letter-spacing:.01em;color:#254b60}
+.htp-odds{font-size:22px;line-height:1.2;font-weight:650;color:var(--ht-green);font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+.htp-state{font-size:10px;font-weight:550;line-height:1.5;color:#08775b;background:#e3f3eb;border:1px solid #d3eadf;padding:3px 8px;border-radius:20px;white-space:nowrap}
+.htp-card .htp-decision p,#feTabsWorkspace .htp-card .htp-decision p{flex-basis:100%;margin:5px 0 0;color:#5a7484;font-size:11.5px;line-height:1.6}
+.htp-card:not([data-state=ACTIVE]) .htp-decision{background:#f7f9fc;border-color:#e2e9f0;border-left-color:#a8b8c8}
+.htp-card:not([data-state=ACTIVE]) .htp-state{background:#edf1f6;border-color:#e0e7ee;color:#5b7187}
+.htp-card:not([data-state=ACTIVE]) .htp-odds{color:#4f6880}
+.htp-card[data-state=WAIT_PRICE] .htp-decision{background:#fffbf2;border-color:#f0e5cc;border-left-color:#c69b49}
+.htp-card[data-state=WAIT_PRICE] .htp-state{background:#fbf1da;border-color:#f0e1bd;color:#8b692c}
+.htp-comparison{display:grid;gap:8px;margin:13px 0}
+.htp-bar-row{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(38px,1fr) 43px;align-items:center;gap:7px;font-size:10.5px;color:#4d687f;line-height:1.45}
+.htp-bar-row b{text-align:right;font-size:11.5px;font-weight:600;color:#294b68;font-variant-numeric:tabular-nums}
+.htp-bar{height:5px;border-radius:5px;background:#edf2f7;overflow:hidden}
+.htp-bar i{display:block;height:100%;border-radius:5px}.htp-model{background:#21a183}.htp-price{background:#729de4}
+.htp-values{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:0;margin:12px 0;padding:10px 0 11px;border-top:1px solid var(--ht-line);border-bottom:1px solid var(--ht-line)}
+.htp-values>div{padding:0 6px;text-align:center;min-width:0}.htp-values>div+div{border-left:1px solid var(--ht-line)}
+.htp-values small{display:flex;align-items:center;justify-content:center;min-height:2.8em;font-size:10.5px;color:var(--ht-muted);line-height:1.4;letter-spacing:0}
+.htp-values b{display:block;font-size:16px;margin-top:4px;font-weight:600;font-variant-numeric:tabular-nums;line-height:1.4}.htp-positive{color:var(--ht-green)}
+.htp-session{padding:11px;border:1px solid #e0e9f1;border-radius:11px;background:#f8fafd}
+.htp-session-head{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:10px;font-weight:600;letter-spacing:.06em;color:#49667f}
+.htp-session-head b{font-size:15px;font-weight:650;color:var(--ht-green);letter-spacing:0;font-variant-numeric:tabular-nums}
+.htp-progress{height:3px;border-radius:3px;background:#e5edf3;overflow:hidden;margin:9px 0 10px}.htp-progress i{display:block;height:100%;background:#24a184;border-radius:3px}
+.htp-session-prices{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));text-align:center;gap:8px}.htp-session-prices>div+div{border-left:1px solid #dfe8ef}
+.htp-session-prices small{display:block;font-size:10.5px;color:var(--ht-muted);line-height:1.5}.htp-session-prices b{display:block;font-size:16px;font-weight:600;font-variant-numeric:tabular-nums;margin-top:2px}
+.htp-card .htp-session p,#feTabsWorkspace .htp-card .htp-session p{font-size:10.5px;line-height:1.6;color:var(--ht-muted);margin:8px 0 0}
+.htp-card details{margin-top:11px;color:#5e758a;font-size:11px;line-height:1.65}
+.htp-card summary{cursor:pointer;font-size:11.5px;color:#365a77;font-weight:550;padding:8px 10px;border:1px solid #e5ecf3;border-radius:9px;background:#fafcfe;line-height:1.5}
+.htp-card summary::marker{color:#6d8ba5}.htp-card summary:focus-visible{outline:2px solid #3489d8;outline-offset:3px}
+.htp-card details p,#feTabsWorkspace .htp-card details p{font-size:11px;line-height:1.65;color:#60768b;margin:9px 0}
+.htp-card .htp-disclaimer,#feTabsWorkspace .htp-card .htp-disclaimer{margin:9px 0 0;color:#687e91;font-size:10.5px;line-height:1.55}
+.htp-chart{display:flex;gap:8px;align-items:end;height:100px;margin:12px 0}.htp-chart>div{display:flex;flex-direction:column;justify-content:end;align-items:center;flex:1;gap:5px;height:100%;min-width:0}
+.htp-chart i{display:block;min-height:2px;width:55%;background:#55a9ae;border-radius:4px 4px 0 0}.htp-chart span,.htp-chart small{font-size:10.5px;color:#607a90}.htp-wait{font-size:11.5px;line-height:1.6}
+[data-ht-price]{display:block!important;color:#087d62!important;font-size:10px!important;line-height:1.5;margin-top:4px}
+@media(max-width:359px){.htp-card{padding:11px;border-radius:13px}.htp-values>div{padding:0 3px}.htp-values b{font-size:15px}.htp-bar-row{gap:5px;grid-template-columns:minmax(0,1.35fr) minmax(28px,.8fr) 41px}.htp-decision{padding:10px}.htp-state{padding:3px 6px}.htp-game b{font-size:19px}}
