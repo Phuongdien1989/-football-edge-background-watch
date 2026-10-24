@@ -19,11 +19,15 @@ jobs:
       - uses: actions/setup-node@v4
         with: {node-version: '22'}
       - run: node ft-overview/test-same-app-integration.mjs
-      - name: Package against current live Mobile version; release blocked until exhaustive manifest verified
+      - run: node --check ft-overview/ft-ai-v2-integrated.mjs
+      - run: node ft-overview/test-experimental-decision.mjs
+      - run: node ft-overview/test-live-probability.mjs
+      - name: Package against current live Mobile version; release guarded by audited restored 28-asset inventory and active version
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           FT_V2_SAME_APP_RELEASE: APPROVED_20261024
+          FT_V2_COMPLETE_MANIFEST_VERIFIED: RECOVERY_28_VERIFIED_20261023
         run: node ft-overview/release-current-main-app.mjs
       - uses: actions/upload-artifact@v4
         if: always()
