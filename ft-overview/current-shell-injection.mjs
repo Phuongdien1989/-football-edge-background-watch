@@ -1,18 +1,14 @@
-// Current production already contains a detached V2 card. Remove ONLY that card,
-// preserve its script, and let the shared tabs own the V2 workspace.
+// Presentation-only injection into the current six-tab production Mobile shell.
 export function injectFTV2IntoCurrentShell(html){
  if(typeof html!=='string'||html.length<20000)throw Error('INVALID_CURRENT_MOBILE_HTML');
- if(!html.includes('ftOverviewCard')||!html.includes('ui-tabs/integrated')||!html.includes('ht-candidate/'))throw Error('CURRENT_SHELL_REQUIRED_FEATURE_MISSING');
- const start='<details class="card fo-native" id="ftAIV2Card"';
- const end='</details>\n<script type="module" src="/ft-ai-v2/integrated.mjs"></script>';
- const a=html.indexOf(start),b=html.indexOf(end,a);
- if(a<0||b<0||html.indexOf(start,a+1)!==-1)throw Error('DETACHED_V2_CARD_ANCHOR_MISMATCH');
- const oldBlock=html.slice(a,b+'</details>'.length);
- const link='<link rel="stylesheet" href="/ft-ai-v2/light-signal-pro.css">';
- if(html.includes(link))throw Error('LIGHT_SIGNAL_CSS_ALREADY_INSTALLED');
- const next=html.replace(oldBlock,'').replace('</head>',link+'\n</head>');
- if(next.replace('', '')!==next||next.includes('id="ftAIV2Card"'))throw Error('DETACHED_CARD_NOT_REMOVED');
- if(!next.includes('/ft-ai-v2/integrated.mjs'))throw Error('FT_V2_MODULE_SCRIPT_MISSING');
- return {html:next,originalBytes:Buffer.byteLength(html),removedBytes:Buffer.byteLength(oldBlock),
- changedElements:['remove_detached_ftAIV2Card','preserve_module_script','add_light_signal_css']};
+ for(const marker of ['ftOverviewCard','ui-tabs/integrated','ht-candidate/','/ft-ai-v2/integrated.mjs']){
+   if(!html.includes(marker))throw Error('REQUIRED_CURRENT_FEATURE_MISSING_'+marker);
+ }
+ if(html.includes('id="ftAIV2Card"'))throw Error('LEGACY_DETACHED_CARD_PRESENT');
+ if(html.includes('/ft-ai-v2/light-signal-pro.css'))throw Error('LIGHT_SIGNAL_ALREADY_INSTALLED');
+ if(html.split('</head>').length!==2)throw Error('HTML_HEAD_ANCHOR_AMBIGUOUS');
+ const link='<link rel="stylesheet" href="/ft-ai-v2/light-signal-pro.css">\n';
+ const next=html.replace('</head>',link+'</head>');
+ if(next.replace(link,'')!==html)throw Error('SHELL_UNEXPECTED_CHANGE');
+ return {html:next,originalBytes:Buffer.byteLength(html),addedBytes:Buffer.byteLength(link),changedElements:['light-signal-css-only']};
 }
