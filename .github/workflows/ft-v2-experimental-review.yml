@@ -16,6 +16,9 @@ jobs:
       - uses: actions/setup-node@v4
         with: {node-version: '22'}
       - run: node ft-overview/test-light-signal-pro-view.mjs
+      - run: node --check ft-overview/light-signal-pro-view.mjs
+      - run: node --check ft-overview/current-shell-injection.mjs
+      - run: node --check ft-overview/release-current-main-app.mjs
       - run: node ft-overview/test-same-app-integration.mjs
       - run: node --check ft-overview/ft-ai-v2-integrated.mjs
       - run: node ft-overview/test-main-app-assets.mjs
