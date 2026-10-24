@@ -1,0 +1,34 @@
+name: FT V2 — same Mobile app packaging preflight
+on:
+  push:
+    branches: [fix/ft-foundation-20261021]
+    paths:
+      - 'ft-overview/release-current-main-app.mjs'
+      - 'ft-overview/current-shell-injection.mjs'
+      - 'ft-overview/ft-ai-v2-integrated.mjs'
+      - '.github/workflows/ft-v2-same-app-release.yml'
+permissions: {contents: read}
+jobs:
+  current_app:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    environment: football-edge-production
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - run: node ft-overview/test-same-app-integration.mjs
+      - name: Package against current live Mobile version; release blocked until exhaustive manifest verified
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          FT_V2_SAME_APP_RELEASE: APPROVED_20261024
+        run: node ft-overview/release-current-main-app.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ft-v2-current-main-app-package
+          path: |
+            ft-overview/current-main-app-package/result.json
+            ft-overview/current-main-app-package/wrangler.json
