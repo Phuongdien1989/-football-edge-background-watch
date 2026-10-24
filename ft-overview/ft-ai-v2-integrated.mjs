@@ -4,6 +4,7 @@ import {createStore} from './core.mjs';
 import {readLegacy} from './adapter.mjs';
 import {reviewFTDecision} from './experimental-decision.mjs';
 import {liveProbability} from './live-probability.mjs';
+// The host tab owns navigation; this module only renders into its assigned panel.
 const root=document.getElementById('ftAIV2ReadOnly');
 if(root){
  const store=createStore({trialRecommendations:true});
