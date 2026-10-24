@@ -7,7 +7,7 @@ const installed="import {renderSignalMechanism} from '../ft-ai-v2/light-signal-m
 const patched=patchMechanismTabs(installed.replace('if(body.innerHTML!==shell)', '/* FE_TAB_PERF_V2 */if(body.innerHTML!==shell)'));
 assert.equal(patched.anchors,1);
 assert(patched.code.includes('FE_TAB_PERF_V2'));
-assert(patched.code.includes("tab==='ht'?'true':'false'"));
+assert(patched.code.includes('HT_NATIVE_EXPAND_V2'));
 const obs={at:Date.now(),status:'2H',minute:68,home:'A & B',away:'C < D',goals:{home:1,away:0},metrics:{shots:11,sot:5,xg:null}};
 const fixture={id:123,masterRank:1,masterPrimary:'ht',signals:{ht:{engine:'ht',observation:obs,score:72,state:'WATCH',freshness:'CURRENT',source:'LEGACY',reason:'Sample source reason'},ft:{engine:'ft',observation:obs,score:56,state:'WAIT',freshness:'CURRENT'},hc:{engine:'hc',observation:obs,gap:0.3,state:'WATCH',freshness:'CURRENT'},valuation:{engine:'valuation',observation:obs,line:2.5,odds:1.9,fairOdds:1.8,ev:.05,modelOK:true,state:'TRIAL',freshness:'CURRENT'}}};
 const props={rows:[fixture],chosen:fixture,fixture:123,packet:{},route:(a,id)=>'#fe-tabs/'+a+(id?'/'+id:''),displayAction:()=> 'Chờ xác nhận nguồn'};
