@@ -1,4 +1,4 @@
-name: Football Edge Light Signal Pro all tabs guarded release
+name: Football Edge guarded Mobile HT original card fix
 on:
   push:
     branches: [fix/ft-foundation-20261021]
