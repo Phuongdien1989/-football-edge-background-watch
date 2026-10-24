@@ -1,15 +1,22 @@
-// Pure source check: fails if any FT V2 module import cannot be copied into the current app namespace.
 import assert from 'node:assert/strict';
 import {readFileSync,existsSync} from 'node:fs';
 import {injectFTV2IntoCurrentShell} from './current-shell-injection.mjs';
-const root=readFileSync('ft-overview/frozen-original-mobile.html','utf8');
-assert.throws(()=>injectFTV2IntoCurrentShell(root),/CURRENT_SHELL_REQUIRED_FEATURE_MISSING/);
-const mock='<html><body>'+('A'.repeat(20100))+' ftOverviewCard ui-tabs/integrated ht-candidate/</body></html>';
-const patched=injectFTV2IntoCurrentShell(mock);
-assert(patched.html.includes('ftAIV2Card'));
-assert(patched.html.replace(patched.html.slice(patched.html.indexOf('<details'),patched.html.indexOf('</body>')),'')===mock);
-assert.throws(()=>injectFTV2IntoCurrentShell(patched.html),/FT_V2_ALREADY_INSTALLED/);
+import {patchCurrentTabs} from './patch-current-tabs.mjs';
+const original=readFileSync('ui-tabs-preview/integrated.mjs','utf8');
+const patched=patchCurrentTabs(original);
+assert.equal(patched.changedAnchors,4);
+assert(patched.code.includes("['ftv2','FT AI V2']"));
+assert(patched.code.includes("fe-ft-v2-tab-open"));
+assert.throws(()=>patchCurrentTabs(patched.code),/ANCHOR_NOT_UNIQUE/);
+const old='<details class="card fo-native" id="ftAIV2Card" style="margin:14px 0;padding:14px;border:1px solid #cbdff4;border-radius:18px"><summary style="font-size:14px;font-weight:700">FT AI V2 · EXPERIMENTAL — mở phân tích</summary><div id="ftAIV2ReadOnly" style="padding:12px 0;color:#234761">Đang chờ dữ liệu trận đấu hiện hành…</div></details>';
+const input='<html><body>'+'A'.repeat(21000)+' ftOverviewCard ui-tabs/integrated ht-candidate/'+old+'\n<script type="module" src="/ft-ai-v2/integrated.mjs"></script></body></html>';
+const v=injectFTV2IntoCurrentShell(input);
+assert(!v.html.includes('id="ftAIV2Card"'));
+assert(v.html.includes('/ft-ai-v2/integrated.mjs'));
+assert.equal(v.html.replace(old,''),input.replace(old,''));
+assert.throws(()=>injectFTV2IntoCurrentShell(v.html),/DETACHED_V2_CARD_ANCHOR_MISMATCH/);
 const entry=readFileSync('ft-overview/ft-ai-v2-integrated.mjs','utf8');
 for(const mod of ['core.mjs','adapter.mjs','experimental-decision.mjs','live-probability.mjs'])
  assert(entry.includes("'./"+mod+"'")&&existsSync('ft-overview/'+mod),'MISSING_V2_MODULE_'+mod);
-console.log('FT_V2_SAME_APP_SHELL_ISOLATION_PASS');
+assert(entry.includes("fe-ft-v2-tab-open"));
+console.log('FT_V2_SHARED_TABS_INTEGRATION_PASS');
