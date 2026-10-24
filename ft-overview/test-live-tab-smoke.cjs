@@ -32,6 +32,8 @@ const {chromium}=require('playwright');
     await page.waitForSelector('[data-ftabs-tab="'+tab+'"][aria-selected="true"]',{timeout:8000});
     if(tab==='ht'){
       await page.waitForSelector('#h1WatchCard',{state:'visible',timeout:8000});
+      assert.equal(await page.locator('#h1WatchCard.fe-p11-collapsed').count(),0,'HT_NATIVE_CARD_STILL_COLLAPSED');
+      assert.equal(await page.locator('#h1WatchCard').evaluate(e=>e.tagName==='DETAILS'&&!e.open),false,'HT_NATIVE_DETAILS_CLOSED');
       assert.equal(await page.locator('.fe-lsp-mechanism:visible').count(),0,'HT_OLD_CARD_NOT_PRIMARY');
     }else{
       await page.waitForSelector('.fe-lsp-mechanism',{state:'visible',timeout:8000});
