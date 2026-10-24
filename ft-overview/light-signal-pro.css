@@ -44,3 +44,7 @@
 .fe-lsp-original{margin-top:12px;background:#eef6ff;border:1px solid #c9e2fc;border-radius:12px;padding:11px;display:grid;gap:7px}
 .fe-lsp-original button{width:100%;min-height:42px;border:1px solid #087bff;border-radius:10px;background:#087bff;color:#fff;font-size:12px;font-weight:750;cursor:pointer}
 .fe-lsp-original small{font-size:10px;color:#4a6988;line-height:1.55}
+
+/* Restore legacy HT Goals as the primary tab content: original HT chart, picks, odds and valuation. */
+body.fe-tabs-mode[data-fe-tabs-tab="ht"] #feTabsWorkspace .ftabs-content{display:none!important}
+body.fe-tabs-mode[data-fe-tabs-tab="ht"] .app>#h1WatchCard{display:block!important}
