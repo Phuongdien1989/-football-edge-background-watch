@@ -28,7 +28,10 @@ try{
  report.markers={ft_overview:root.content.includes('ftOverviewCard'),
  ui_tabs:root.content.includes('ui-tabs/integrated'),
  ht_valuation:root.content.includes('ht-candidate/valuation'),
- ft_v2_review:root.content.includes('FT V2 · QUYẾT ĐỊNH')||root.content.includes('FT V2')};
+ ft_v2_review:root.content.includes('FT V2 · QUYẾT ĐỊNH')||root.content.includes('FT V2'),
+ detached_v2_card:root.content.includes('id="ftAIV2Card"'),
+ ft_v2_module:root.content.includes('/ft-ai-v2/integrated.mjs'),
+ tab_workspace:root.content.includes('feTabsWorkspace')};
  const paths=['/ft-overview/core.mjs','/ft-overview/ui.mjs','/ft-overview/adapter.mjs',
  '/ui-tabs/integrated.mjs','/ht-candidate/valuation.mjs','/push-sw.js','/manifest.webmanifest'];
  report.required_assets={};
