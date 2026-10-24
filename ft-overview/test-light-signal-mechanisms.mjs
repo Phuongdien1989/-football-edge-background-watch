@@ -4,7 +4,7 @@ import {renderSignalMechanism} from './light-signal-mechanisms.mjs';
 import {patchMechanismTabs} from './patch-mechanism-tabs.mjs';
 const orig=readFileSync('ui-tabs-preview/integrated.mjs','utf8');
 const installed="import {renderSignalMechanism} from '../ft-ai-v2/light-signal-mechanisms.mjs';\n"+orig.replace(' html+=\'<div class="ftabs-note">Cùng dữ liệu nguồn và kết luận của từng cơ chế. Chuyển tab không gọi quét, không thay Smart Follow.</div>\';',' html+=\'<div class="ftabs-note">Cùng dữ liệu nguồn và kết luận của từng cơ chế. Chuyển tab không gọi quét, không thay Smart Follow.</div>\';\n html=renderSignalMechanism({tab:current,rows,chosen,fixture,packet,route,displayAction});');
-const patched=patchMechanismTabs(installed.replace('if(body.innerHTML!==shell)', '/* FE_TAB_PERF_V2 */if(body.innerHTML!==shell)'));
+const patched=patchMechanismTabs((installed+"document.body.dataset.feTabsTools='false';render();requestAnimationFrame(").replace('if(body.innerHTML!==shell)', '/* FE_TAB_PERF_V2 */if(body.innerHTML!==shell)'));
 assert.equal(patched.anchors,1);
 assert(patched.code.includes('FE_TAB_PERF_V2'));
 assert(patched.code.includes("tab==='ht'?'true':'false'"));
