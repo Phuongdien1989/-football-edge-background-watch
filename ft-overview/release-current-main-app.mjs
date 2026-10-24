@@ -10,7 +10,7 @@ import {injectFTV2IntoCurrentShell} from './current-shell-injection.mjs';
 import {patchMechanismTabs} from './patch-mechanism-tabs.mjs';
 const name='shiny-silence-d892',base='https://'+name+'.ngophuonghuy.workers.dev';
 const token=process.env.CLOUDFLARE_API_TOKEN,account=process.env.CLOUDFLARE_ACCOUNT_ID;
-const pin='1c910b52-752f-4406-9dbc-4890ef817db5';
+const pin='f355f367-d6bd-466c-bac3-d2569eb14a12';
 const pinHtml='24e012d6c3ca3c21b32982a5b37f0adb9827c16d7354c3d5657d63f546e2b0ae';
 const sha=x=>createHash('sha256').update(x).digest('hex');
 const api='https://api.cloudflare.com/client/v4/accounts/'+encodeURIComponent(account)+'/workers/scripts/';
