@@ -6,7 +6,9 @@ import {reviewFTDecision} from './experimental-decision.mjs';
 import {liveProbability} from './live-probability.mjs';
 import {lightSignalFTV2View} from './light-signal-pro-view.mjs';
 // The host tab owns navigation; this module only renders into its assigned panel.
+let teardownFTV2=null;
 function attachFTV2Tab(){
+ if(teardownFTV2){teardownFTV2();teardownFTV2=null;}
  const root=document.getElementById('ftAIV2ReadOnly');
  if(!root||root.dataset.ftV2Mounted==='true')return;
  root.dataset.ftV2Mounted='true';
@@ -24,19 +26,24 @@ function attachFTV2Tab(){
   const rows=store.read(Date.now());
   if(!rows.some(x=>x.id===selected))selected=rows.find(x=>x.rank)?.id??rows[0]?.id??null;
   const row=rows.find(x=>x.id===selected);
-  const ranked=rows.filter(x=>x.rank).slice(0,5);
   const review=row?reviewFTDecision(row):null;
   const live=row?liveProbability(row.snapshot):null;
   const html=lightSignalFTV2View({rows,selected,review,live});
   if(html!==last){root.innerHTML=html;last=html;}
  }
- root.addEventListener('click',event=>{const t=event.target.closest('[data-ft-v2-select]');if(t){selected=Number(t.dataset.ftV2Select);render();}});
- window.addEventListener('fe-notify-sync-updated',render);
- document.addEventListener('visibilitychange',render);
+ const onClick=event=>{const t=event.target.closest('[data-ft-v2-select]');if(t){selected=Number(t.dataset.ftV2Select);render();}};
+ root.addEventListener('click',onClick);
+ let queued=false;
+ const sync=()=>{if(queued||document.visibilityState==='hidden'||!root.isConnected)return;queued=true;requestAnimationFrame(()=>{queued=false;if(root.isConnected)render();});};
+ window.addEventListener('fe-notify-sync-updated',sync);
+ const visibility=()=>{if(document.visibilityState==='visible')sync();};
+ document.addEventListener('visibilitychange',visibility);
  render();
  // Refresh while this tab is open; keep legacy scanner scheduling untouched.
- const refresh=()=>{if(!root.isConnected){clearInterval(timer);return;}render();};
- const timer=setInterval(refresh,4000);
+ const refresh=()=>{if(!root.isConnected){cleanup();return;}if(document.visibilityState==='visible')sync();};
+ const timer=setInterval(refresh,15000);
+ function cleanup(){clearInterval(timer);root.removeEventListener('click',onClick);window.removeEventListener('fe-notify-sync-updated',sync);document.removeEventListener('visibilitychange',visibility);root.dataset.ftV2Mounted='false';}
+ teardownFTV2=cleanup;
 }
 window.addEventListener('fe-ft-v2-tab-open',attachFTV2Tab);
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',attachFTV2Tab,{once:true});else attachFTV2Tab();
