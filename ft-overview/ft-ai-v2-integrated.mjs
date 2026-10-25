@@ -2,11 +2,12 @@
 // Reads existing read-only bridges. No provider requests, D1 writes, engine setters, Push or timers except UI refresh.
 import {createStore} from './core.mjs';
 import {readLegacy} from './adapter.mjs';
-import {reviewFTDecision} from './experimental-decision.mjs';
+import {reviewFTDecision,createFTSessions} from './experimental-decision.mjs';
 import {liveProbability} from './live-probability.mjs';
 import {lightSignalFTV2View} from './light-signal-pro-view.mjs';
 // The host tab owns navigation; this module only renders into its assigned panel.
 let teardownFTV2=null,activeFTV2Root=null;
+const ftSessions=createFTSessions();
 function attachFTV2Tab(){
  const root=document.getElementById('ftAIV2ReadOnly');
  if(!root)return;
@@ -30,7 +31,8 @@ function attachFTV2Tab(){
   const row=rows.find(x=>x.id===selected);
   const review=row?reviewFTDecision(row):null;
   const live=row?liveProbability(row.snapshot):null;
-  const html=lightSignalFTV2View({rows,selected,review,live});
+  const session=row?ftSessions.update(row,review,Date.now()):null;
+  const html=lightSignalFTV2View({rows,selected,review,live,session,now:Date.now()});
   if(html!==last){root.innerHTML=html;last=html;}
  }
  const onClick=event=>{const t=event.target.closest('[data-ft-v2-select]');if(t){selected=Number(t.dataset.ftV2Select);render();}};
@@ -49,3 +51,4 @@ function attachFTV2Tab(){
 }
 window.addEventListener('fe-ft-v2-tab-open',attachFTV2Tab);
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',attachFTV2Tab,{once:true});else attachFTV2Tab();
+

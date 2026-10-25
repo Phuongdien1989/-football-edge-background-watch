@@ -48,3 +48,23 @@
 /* Restore legacy HT Goals as the primary tab content: original HT chart, picks, odds and valuation. */
 /* HT pricing content remains visible; legacy tools remain opt-in. */
 
+
+
+/* FT AI V2 valuation only. HT/HC and their pricing cards are untouched. */
+#ftAIV2ReadOnly .fe-lsp-ft-reading{display:grid;gap:3px;padding:10px 0 12px}
+#ftAIV2ReadOnly .fe-lsp-ft-reading>span{font-size:10px;color:#7086a0}
+#ftAIV2ReadOnly .fe-lsp-ft-reading strong{font-size:13px}
+#ftAIV2ReadOnly .fe-lsp-ft-reading small{color:#7086a0;font-size:10px}
+#ftAIV2ReadOnly .fe-lsp-ft-pick{font-size:16px;font-weight:750;margin:5px 0;font-variant-numeric:tabular-nums}
+#ftAIV2ReadOnly .fe-lsp-ft-entry,#ftAIV2ReadOnly .fe-lsp-ft-session{display:grid;gap:5px;margin-top:10px;border:1px solid #dce9f5;border-radius:11px;padding:11px;background:#f8fbff}
+#ftAIV2ReadOnly .fe-lsp-ft-entry small,#ftAIV2ReadOnly .fe-lsp-ft-session small{font-size:10px;color:#6b829b}
+#ftAIV2ReadOnly .fe-lsp-ft-session[data-ft-session=ACTIVE]{background:#f0faf6;border-color:#cae9dd}
+#ftAIV2ReadOnly .fe-lsp-ft-session[data-ft-session=PAUSED],#ftAIV2ReadOnly .fe-lsp-ft-session[data-ft-session=INVALIDATED]{background:#fff9ed;border-color:#eddfbe}
+#ftAIV2ReadOnly .fe-lsp-ft-compare{display:grid;gap:9px;margin:13px 0;font-size:11px}
+#ftAIV2ReadOnly .fe-lsp-ft-compare>small{color:#69819a}
+#ftAIV2ReadOnly .fe-lsp-ft-bar{display:grid;grid-template-columns:minmax(70px,1fr) minmax(45px,1.2fr) 42px;align-items:center;gap:7px;font-size:10px;margin:6px 0}
+#ftAIV2ReadOnly .fe-lsp-ft-bar>div{height:6px;background:#e7eff8;border-radius:8px;overflow:hidden}
+#ftAIV2ReadOnly .fe-lsp-ft-bar i{display:block;height:100%;background:#138ecb;border-radius:8px}
+#ftAIV2ReadOnly .fe-lsp-ft-bar:nth-of-type(2) i{background:#109c72}
+#ftAIV2ReadOnly .fe-lsp-ft-bar>b{text-align:right;font-variant-numeric:tabular-nums}
+#ftAIV2ReadOnly .fe-lsp-ft-settlement{margin-top:12px}
