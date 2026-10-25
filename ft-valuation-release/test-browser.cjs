@@ -60,7 +60,7 @@ const origin='https://shiny-silence-d892.ngophuonghuy.workers.dev',baseline=fals
     await page.waitForSelector('#ftAIV2ReadOnly[data-ft-v2-mounted="true"]');
     assert(await page.evaluate(()=>{const r=document.getElementById('ftAIV2ReadOnly');for(let i=0;i<20;i++){window.dispatchEvent(new Event('fe-notify-sync-updated'));window.dispatchEvent(new Event('fe-ft-v2-tab-open'));}return document.getElementById('ftAIV2ReadOnly')===r;}),'FTV2_ROOT_REMOUNTED');
     await page.waitForSelector('#ftAIV2ReadOnly [data-ft-session="ACTIVE"]');
-    const ft=page.locator('#ftAIV2ReadOnly');assert.equal(await ft.locator('[data-ft-v2-select]').count(),2);
+    const ft=page.locator('#ftAIV2ReadOnly');assert.equal(await ft.locator('[data-ft-v2-select]').count(),4);assert.equal(await ft.locator('[data-ft-v2-select="910001"]').count(),1);assert.equal(await ft.locator('[data-ft-v2-select="910002"]').count(),1);
     assert((await ft.innerText()).includes('Tài FT 2.5 @ 2.70'));assert((await ft.innerText()).includes('FT QA League'));
     assert((await ft.innerText()).includes('Điều kiện giá'));assert.equal(await ft.locator('[role=meter]').count(),2);
     assert((await ft.innerText()).includes('LIVE chưa hiệu chỉnh xác suất'));assert((await ft.innerText()).includes('Mốc đầu: Tài 2.5 @ 2.70'));
