@@ -1,0 +1,23 @@
+import assert from 'node:assert/strict';
+import {assess,priceOver} from './core.mjs';
+import {reviewFTDecision,createFTSessions} from './experimental-decision.mjs';
+import {lightSignalFTV2View} from './light-signal-pro-view.mjs';
+const at=1900000000000;
+const snapshot=(patch={})=>({id:9001,at,revision:at,minute:55,status:'2H',goals:{home:1,away:0},home:'Home',away:'Away',league:'Test League',metrics:{shots:10,sot:5},history:[{at:at-180000,goals:{home:1,away:0},metrics:{shots:8,sot:3}}],model:{independent:true,at,kind:'RESEARCH',validated:false,version:'QA',pmf:[.2,.4,.3,.1],lambda90:3.2},market:{line:1.5,over:2.1,under:1.8,at,score:{home:1,away:0},bookmaker:'QA',period:'FT',basis:'FULL_MATCH'},...patch});
+const row=(s=snapshot(),now=at)=>assess(s,now,{trialRecommendations:true});
+let r=row(),v=reviewFTDecision(r);assert.equal(v.action,'TRIAL_OVER');assert.equal(v.valuation.liveAdjusted,false);assert.equal(v.valuation.matchState,'CHANCES_ADDED');assert.equal(v.valuation.remainingGoals,1.3);assert.equal(v.valuation.expectedTotal,2.3);
+const high=row(snapshot({market:{...snapshot().market,over:2.7}}));assert.equal(reviewFTDecision(high).winProbability,v.winProbability,'odds cannot change independent probability');
+const noPrice={...r,marketFresh:false,quote:null};const noPriceReview=reviewFTDecision(noPrice);assert.equal(noPriceReview.action,'WAIT_PRICE');assert.equal(noPriceReview.fairOdds,1.25);assert.equal(noPriceReview.estimatedEV,null);
+const noWindow=row(snapshot({history:[]}));assert.equal(reviewFTDecision(noWindow).valuation.matchState,'OBSERVING');
+const noChance=row(snapshot({history:[{at:at-180000,goals:{home:1,away:0},metrics:{shots:10,sot:5}}]}));assert.equal(reviewFTDecision(noChance).valuation.matchState,'NO_NEW_QUALITY_SIGNAL');assert(!JSON.stringify(reviewFTDecision(noChance).valuation).includes('UNDER_PRICED_MORE_LIKELY') || noChance.binary.over<.5);
+for(const line of [2,2.25,2.75,3]){const rr=row(snapshot({market:{...snapshot().market,line}}));const vv=reviewFTDecision(rr);assert.equal(vv.breakEven,null);assert.equal(vv.sensitivity.lowEV,null);assert.equal(vv.fairOdds,priceOver(snapshot().model.pmf,1,line,2.1).fairOdds);assert.equal(vv.valuation.marketOver,null);}
+const sessions=createFTSessions();let s=sessions.update(r,v,at);assert.equal(s.status,'ACTIVE');assert.equal(s.expiresAt,at+300000);
+const changed=row(snapshot({market:{...snapshot().market,over:2.7}}));s=sessions.update(changed,reviewFTDecision(changed),at+10000);assert.equal(s.original.odds,2.1);assert.equal(s.expiresAt,at+300000);
+const poor=row(snapshot({market:{...snapshot().market,over:1.1}}));s=sessions.update(poor,reviewFTDecision(poor),at+20000);assert.equal(s.status,'PAUSED');assert.equal(s.original.odds,2.1);
+s=sessions.update(r,v,at+30000);assert.equal(s.status,'ACTIVE');assert.equal(s.expiresAt,at+300000);
+s=sessions.update(r,v,at+300000);assert.equal(s.status,'EXPIRED');s=sessions.update(r,v,at+315000);assert.equal(s.status,'EXPIRED','refresh cannot create a new session from same observation');
+const freshAt=at+320000;const refreshed=snapshot({at:freshAt,revision:freshAt,model:{...snapshot().model,at:freshAt},market:{...snapshot().market,at:freshAt}});const freshRow=row(refreshed,freshAt);s=sessions.update(freshRow,reviewFTDecision(freshRow),freshAt);assert.equal(s.status,'ACTIVE');assert.equal(s.startedAt,freshAt);
+const scored=row({...refreshed,at:freshAt+1000,goals:{home:2,away:0},market:{...refreshed.market,line:2.5,score:{home:2,away:0}}},freshAt+1000);s=sessions.update(scored,reviewFTDecision(scored),freshAt+1000);assert.equal(s.status,'INVALIDATED');assert.equal(sessions.update(scored,reviewFTDecision(scored),freshAt+2000).status,'INVALIDATED');
+const html=lightSignalFTV2View({rows:[{...r,rank:1}],selected:9001,review:v,session:sessions.read()[0],now:at});for(const t of ['Match outlook','PRICE DECISION','Tài FT','Điều kiện giá','Model ↔ Market','Recommendation window','5 phút','Test League'])assert(html.includes(t),t);
+assert(!html.includes('NaN'));assert(!html.includes('undefined'));assert(html.includes('ĐÁNH GIÁ LẠI SAU BIẾN ĐỘNG'));
+console.log('FT_VALUATION_SESSION_PASS: independent odds, half/integer/quarter settlement, fair without live odds, no invented LIVE probability, immutable five-minute session, pause/resume, expiry/new observation, goal invalidation, UI labels');
