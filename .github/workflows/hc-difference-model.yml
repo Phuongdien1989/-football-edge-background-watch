@@ -1,0 +1,31 @@
+name: HC step 3 independent goal difference model
+on:
+  push:
+    branches: [feat/hc-difference-model-20261026]
+    paths: ['hc-model/**', '.github/workflows/hc-difference-model.yml', 'audits/2026-10-26/HC_STEP3_MODEL.md']
+permissions: {contents: read}
+jobs:
+  research:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Model, score/basis separation, bridge isolation and source-rule tests
+        run: |
+          node --check hc-model/core.mjs
+          node --check hc-model/adapter.mjs
+          node --check hc-model/rule-policy.mjs
+          set -o pipefail
+          node hc-model/test.mjs | tee hc-model-test-report.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: hc-step3-model-source-and-tests
+          path: |
+            hc-model/
+            hc-model-test-report.txt
+            audits/2026-10-26/HC_STEP3_MODEL.md
+          retention-days: 90
