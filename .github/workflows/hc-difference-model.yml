@@ -1,4 +1,4 @@
-name: HC step 3 independent goal difference model
+name: HC steps 3-4 difference model and exact Asian pricing
 on:
   push:
     branches: [feat/hc-difference-model-20261026]
@@ -20,12 +20,15 @@ jobs:
           node --check hc-model/rule-policy.mjs
           set -o pipefail
           node hc-model/test.mjs | tee hc-model-test-report.txt
+          node hc-model/test-valuation.mjs | tee hc-model-valuation-report.txt
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: hc-step3-model-source-and-tests
+          name: hc-step3-4-model-and-pricing-tests
           path: |
             hc-model/
             hc-model-test-report.txt
+            hc-model-valuation-report.txt
             audits/2026-10-26/HC_STEP3_MODEL.md
+            audits/2026-10-26/HC_STEP4_SETTLEMENT_VALUATION.md
           retention-days: 90
