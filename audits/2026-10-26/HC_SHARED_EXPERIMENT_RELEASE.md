@@ -1,0 +1,13 @@
+# Shared Football Edge experiment — HC release authorization
+
+User explicitly clarified that the whole current app is an experimental environment and authorized publishing HC alongside all other mechanisms for ongoing observation. This supersedes earlier assumptions that source-rule verification/calibration must block publishing the research UI. It does not turn research estimates into validated recommendations.
+
+Release branch: release/hc-shared-experiment-20261026. Base: HC research checkpoint 2fb563496d4cc17a5fe6eb8848df72683f495c12. Target: existing Mobile shiny-silence-d892, default HC tab; no separate URL/query needed. Original HC remains available; HT/FT, ranking, backend, Desktop, D1 and scanner controls unchanged.
+
+The panel's research prices and five-minute memento are enabled by default. Unverified source basis retains explicitly hypothetical scenarios and no automatic actionable recommendation; model scope/uncalibrated LIVE status remains visible. This is publication for practical observation, not approval of predictive efficacy. No scanner activation or real Push test by the release.
+
+Preflight pins previous Mobile 24036780-fc63-46e0-a4b9-bf9f9d70c39a and backend e7d2090c-d0e1-4f58-9f5a-4360acd2ced3, validates all 36 baseline public assets against the last release artifact and preserves a complete backup. New bundle has 47 assets: root additive loader, 35 original files byte-identical, 11 HC modules/styles. No partial asset publication. Wrangler dry-run and four-width real app-shell tests precede upload; repeat navigation tests against public assets and verify all 47 public hashes afterward. HT sessions/ten-minute retained quotes and FT V2 score/time/pricing remain in regression. All browser inputs synthetic; no claim of actual phone delivery or performance.
+
+Release uses the existing Cloudflare GitHub environment and shared Mobile deployment concurrency lock. Failed post-deployment checks restore the prior Mobile version only if the active deployment is owned by this release. Backend and Desktop versions and manual scanner booleans checked; an enabled scanner's changing next-alarm time is not treated as a control change. The previous Mobile remains the immediate rollback after successful publication. Older backend rollback is not changed.
+
+Workflow reports current deployed version, actual scanner before/after, public hashes, backups, tests and rollback outcome. Inspect final run, not this source document, for actual deployment result. The original draft PR #25 is the research checkpoint; the shared release PR contains the same research modules plus default-enabled loader and release tooling.
