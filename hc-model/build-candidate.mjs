@@ -4,11 +4,11 @@ const hash=b=>createHash('sha256').update(b).digest('hex'),manifest=JSON.parse(r
 assert.equal(manifest.source_commit,'c8182745b3b01f678cac92cf62720f4bda007ec9');assert.equal(deployed.version,'24036780-fc63-46e0-a4b9-bf9f9d70c39a');assert.equal(manifest.candidate.length,36);
 for(const f of manifest.candidate)assert.equal(hash(readFileSync(join(baseline,'site',f.path))),f.sha256,'BASELINE_ASSET_CHANGED_'+f.path);
 mkdirSync(out,{recursive:true});cpSync(join(baseline,'site'),join(out,'site'),{recursive:true});mkdirSync(join(out,'site/hc-model'),{recursive:true});
-const files=['core.mjs','adapter.mjs','rule-policy.mjs','valuation.mjs','valuation-adapter.mjs','contract-audit.mjs','view.mjs','view.css','integrated.mjs'];for(const f of files)cpSync(new URL(f,import.meta.url),join(out,'site/hc-model',f));
+const files=['core.mjs','adapter.mjs','rule-policy.mjs','valuation.mjs','valuation-adapter.mjs','contract-audit.mjs','view.mjs','view.css','session.mjs','integrated.mjs'];for(const f of files)cpSync(new URL(f,import.meta.url),join(out,'site/hc-model',f));
 const root=join(out,'site/index.html'),html=readFileSync(root,'utf8'),marker='<!-- HC_RESEARCH_CANDIDATE_OPT_IN_V1 -->';assert(!html.includes(marker));assert.equal(html.split('</body>').length,2);
 writeFileSync(root,html.replace('</body>',`${marker}<link rel="stylesheet" href="/hc-model/view.css"><script type="module" src="/hc-model/integrated.mjs"></script></body>`));
 const list=folder=>readdirSync(folder,{withFileTypes:true}).flatMap(e=>e.isDirectory()?list(join(folder,e.name)):[join(folder,e.name)]),all=list(join(out,'site')).map(p=>({path:p.slice(join(out,'site').length+1),sha256:hash(readFileSync(p))}));
 for(const f of manifest.candidate.filter(f=>f.path!=='index.html'))assert.equal(all.find(x=>x.path===f.path).sha256,f.sha256);
 const patched=readFileSync(root,'utf8');assert.equal(patched.replace(patched.slice(patched.indexOf(marker),patched.indexOf('</body>')),''),html);
 writeFileSync(join(out,'manifest.json'),JSON.stringify({source_commit:process.env.GITHUB_SHA||null,baseline_source:manifest.source_commit,baseline_version:deployed.version,existing_assets_unchanged:35,modified_existing:['index.html'],added_assets:files.length,candidate:all,production_deployed:false},null,2));
-console.log('PASS complete candidate bundle: 35 existing assets unchanged; root additive loader; 9 new HC assets; no deploy');
+console.log('PASS complete candidate bundle: 35 existing assets unchanged; root additive loader; 10 new HC assets; no deploy');

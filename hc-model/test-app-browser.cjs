@@ -94,29 +94,35 @@ const origin='https://shiny-silence-d892.ngophuonghuy.workers.dev',baseline=fals
 
    }else if(tab==='hc'){
     try{await page.waitForSelector('[data-hc-research-panel]:not([hidden]) .hc-research-card',{timeout:10000});}catch(e){console.log('HC_DIAGNOSTIC '+JSON.stringify(await page.evaluate(()=>({url:location.href,api:typeof FEHCResearchPreview,mode:window.FETabsIntegrated?.mode(),packet:window.FETabsIntegrated?.read()?.lists,panel:document.querySelector('[data-hc-research-panel]')?.outerHTML,rows:window.FEHCResearchPreview?.read(),stats:window.FEHCResearchPreview?.stats()}))));console.log('HC_ERRORS '+JSON.stringify({errors,badAssets}));await page.screenshot({path:out+'/hc-failure.png',fullPage:true});throw e;}
-    const panel=page.locator('[data-hc-research-panel]');assert.equal(await panel.locator('.hc-research-card').count(),1);
+    const panel=page.locator('[data-hc-research-panel]'),contract=panel.locator('.hc-contract');assert.equal(await panel.locator('.hc-research-card').count(),1);
     assert.equal(await panel.locator('[data-fixture="920002"]').count(),1,'DISPLAY_ORDER_CHANGED');
     assert.equal(await page.locator('.fe-lsp-mechanism .fe-lsp-panel').count(),2,'LEGACY_HC_REPLACED');
     const exact=await page.evaluate(()=>FEHCResearchPreview.contracts());assert.equal(exact[0].sourceId,'live:book:qa');assert.equal(exact[0].settlementVerified,false);assert.equal(exact[0].timestampBasis,'HUB_RECEIPT');
     await page.locator('.fe-lsp-item[href="#fe-tabs/hc/920001"]').click();await panel.locator('[data-fixture="920001"]').waitFor();
     await panel.locator('.hc-scenarios>summary').click();assert.equal(await panel.locator('.hc-scenarios[open]').count(),1);
-    const firstFair=await panel.locator('.hc-numbers strong').nth(1).innerText();
+    const firstFair=await contract.locator('.hc-numbers strong').nth(1).innerText();
+    const hcDeadline=await page.evaluate(()=>FEHCResearchPreview.sessions().find(s=>s.fixtureId===920001).expiresAt);
+    assert((await panel.locator('[data-hc-original]').innerText()).includes('@ 2.10'));
     await page.evaluate(()=>{__hcQA.items[1].latest.market.quotes[0].homeOdd=2.7;dispatchEvent(new Event('fe-notify-sync-updated'));});
-    await page.waitForFunction(()=>document.querySelector('[data-hc-research-panel] .hc-numbers strong')?.textContent==='2.70');
-    assert.equal(await panel.locator('.hc-numbers strong').nth(1).innerText(),firstFair,'ODDS_CHANGED_MODEL_PROBABILITY');assert.equal(await panel.locator('.hc-scenarios[open]').count(),1,'DETAIL_STATE_LOST');
+    await page.waitForFunction(()=>document.querySelector('[data-hc-research-panel] .hc-contract .hc-numbers strong')?.textContent==='2.70');
+    assert.equal(await contract.locator('.hc-numbers strong').nth(1).innerText(),firstFair,'ODDS_CHANGED_MODEL_PROBABILITY');assert((await panel.locator('[data-hc-original]').innerText()).includes('@ 2.10'));assert((await panel.locator('[data-hc-current]').innerText()).includes('@ 2.70'));assert.equal(await page.evaluate(()=>FEHCResearchPreview.sessions().find(s=>s.fixtureId===920001).expiresAt),hcDeadline);assert.equal(await panel.locator('.hc-scenarios[open]').count(),1,'DETAIL_STATE_LOST');
     await panel.locator('.hc-source-audit>summary').click();assert((await panel.innerText()).includes('Market ID: 33'));assert((await panel.innerText()).includes('Chủ nhà chấp'));
     await page.screenshot({path:out+'/hc-linked-'+width+'.png',fullPage:true});
     const overflow=await panel.evaluate(e=>({bad:e.scrollWidth>e.clientWidth+1,items:[...e.querySelectorAll('*')].filter(x=>x.scrollWidth>x.clientWidth+2).slice(0,8).map(x=>({tag:x.tagName,cls:x.className,w:x.clientWidth,sw:x.scrollWidth}))}));if(overflow.bad)console.log('HC_OVERFLOW_DETAIL '+JSON.stringify(overflow));assert.equal(overflow.bad,false,'HC_OVERFLOW');
     const reads=await page.evaluate(()=>FEHCResearchPreview.stats().reads);await page.evaluate(()=>{for(let i=0;i<100;i++)dispatchEvent(new Event('fe-notify-sync-updated'));});
     await page.waitForTimeout(250);assert((await page.evaluate(()=>FEHCResearchPreview.stats().reads))-reads<=3,'HC_EVENT_STORM_REPEATED_READS');
     await page.evaluate(()=>{__hcQA.controls=[{id:920001,cooldownUntil:Date.now()+100000}];dispatchEvent(new Event('fe-notify-sync-updated'));});
-    await panel.locator('[data-status="DATA_WAIT"]').waitFor();assert.equal(await panel.locator('.hc-numbers').count(),0,'COOLDOWN_PRICE_LEAK');
+    await panel.locator('[data-status="DATA_WAIT"]').waitFor();assert.equal(await contract.locator('.hc-numbers').count(),0,'COOLDOWN_PRICE_LEAK');
     await page.evaluate(()=>{__hcQA.controls=[];__hcQA.items[1].latest.captured_at=Date.now()-61000;dispatchEvent(new Event('fe-notify-sync-updated'));});
-    await panel.locator('[data-status="DATA_WAIT"]').waitFor();assert.equal(await panel.locator('.hc-numbers').count(),0,'STALE_PRICE_LEAK');
+    await panel.locator('[data-status="DATA_WAIT"]').waitFor();assert.equal(await contract.locator('.hc-numbers').count(),0,'STALE_PRICE_LEAK');
     await page.evaluate(()=>{const it=__hcQA.items[1];it.latest.captured_at=Date.now();it.latest.market.quotes[0].quoteAt=Date.now();__hcQA.bundles=__hcQA.bundles.filter(b=>b.meta.fixture_id!==920001);dispatchEvent(new Event('fe-notify-sync-updated'));});
     await panel.locator('[data-status="MODEL_WAIT"]').waitFor();assert((await panel.innerText()).includes('MISSING_DEEP_CONTEXT'));
     await page.evaluate(()=>{__hcQA.items=__hcQA.items.filter(i=>i.id!==920001);dispatchEvent(new Event('fe-notify-sync-updated'));});
+    await panel.locator('[data-fixture="920001"][data-hc-recorded="true"]').waitFor();
+    assert((await panel.locator('[data-hc-original]').innerText()).includes('@ 2.10'));assert.equal(await panel.locator('[data-hc-session="PAUSED"]').count(),1);
+    await page.evaluate(expiry=>{window.__realHCClock=Date.now;Date.now=()=>expiry+1;FEHCResearchPreview.refresh();},hcDeadline);
     await page.waitForFunction(()=>!document.querySelector('[data-hc-research-panel] [data-fixture="920001"]'));
+    await page.evaluate(()=>{Date.now=__realHCClock;__hcQA.items[0].latest.captured_at=Date.now();__hcQA.items[0].latest.market.quotes[0].quoteAt=Date.now();});
     await page.locator('[data-ftabs-tab="hc"]').click();await panel.locator('[data-fixture="920002"]').waitFor();
    }else assert.equal(await page.locator('.fe-lsp-mechanism .fe-lsp-panel').count(),2,'OTHER_TAB_CHANGED_'+tab);
   }
@@ -137,7 +143,7 @@ const origin='https://shiny-silence-d892.ngophuonghuy.workers.dev',baseline=fals
   assert.equal(await page.locator('[data-ht-recorded-detail]').count(),0,'HISTORICAL_QUOTE_NOT_EXPIRED');
   assert.equal(await page.locator('[data-ht-recorded-link="990092"]').count(),0);
   assert.deepEqual(errors,[]);assert.deepEqual(badAssets,[]);
-  results.push({width,status:'PASS',HC_real_shell_readonly_bridge:true,HC_source_rule_wait_and_cooldown:true,HC_selected_fixture_and_quote_updates:true,HT_real_module_auto_mount:true,selected_fixture_preserved:true,pricing_session_and_goal_chart:'PASS',quote_update_original_deadline_and_goal_invalidation:'PASS',other_five_tabs_and_ftv2_stable_root:'PASS',metrics,blocked_requests:blocked});await ctx.close();
+  results.push({width,status:'PASS',HC_real_shell_readonly_bridge:true,HC_source_rule_wait_and_cooldown:true,HC_selected_fixture_and_quote_updates:true,HC_five_minute_original_current_and_historical_expiry:true,HT_real_module_auto_mount:true,selected_fixture_preserved:true,pricing_session_and_goal_chart:'PASS',quote_update_original_deadline_and_goal_invalidation:'PASS',other_five_tabs_and_ftv2_stable_root:'PASS',metrics,blocked_requests:blocked});await ctx.close();
  }
  const off=await browser.newContext({serviceWorkers:'block'});await off.route('**/*',route=>{const u=new URL(route.request().url());if(u.origin!==origin||u.pathname.startsWith('/api/')||route.request().method()!=='GET')return route.abort();const p=u.pathname==='/'?'index.html':u.pathname.slice(1);try{return route.fulfill({status:200,body:readFileSync('hc-research-package/site/'+p),contentType:p.endsWith('.css')?'text/css':/\.(?:m?js)$/.test(p)?'application/javascript':'text/html'});}catch{return route.fulfill({status:404,body:''});}});const offPage=await off.newPage();await offPage.goto(origin+'/#fe-tabs/hc',{waitUntil:'networkidle'});assert.equal(await offPage.locator('[data-hc-research-panel]').count(),0,'PREVIEW_NOT_OPT_IN');assert.equal(await offPage.evaluate(()=>typeof FEHCResearchPreview),'undefined');await off.close();
  }finally{await browser.close();}
