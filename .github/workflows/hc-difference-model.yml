@@ -1,8 +1,8 @@
-name: HC steps 3-4 difference model and exact Asian pricing
+name: HC steps 3-5 model, pricing and isolated card preview
 on:
   push:
     branches: [feat/hc-difference-model-20261026]
-    paths: ['hc-model/**', '.github/workflows/hc-difference-model.yml', 'audits/2026-10-26/HC_STEP3_MODEL.md']
+    paths: ['hc-model/**', '.github/workflows/hc-difference-model.yml', 'audits/2026-10-26/HC_STEP*.md']
 permissions: {contents: read}
 jobs:
   research:
@@ -21,14 +21,24 @@ jobs:
           set -o pipefail
           node hc-model/test.mjs | tee hc-model-test-report.txt
           node hc-model/test-valuation.mjs | tee hc-model-valuation-report.txt
+          node hc-model/test-view.mjs | tee hc-model-view-report.txt
+      - name: Browser preview at four widths
+        run: |
+          npm install --no-save --no-package-lock playwright@1.58.2
+          set -o pipefail
+          node hc-model/test-browser.cjs | tee hc-model-browser-report.txt
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: hc-step3-4-model-and-pricing-tests
+          name: hc-step3-5-model-pricing-preview
           path: |
             hc-model/
             hc-model-test-report.txt
             hc-model-valuation-report.txt
+            hc-model-view-report.txt
+            hc-model-browser-report.txt
+            hc-preview-*.png
             audits/2026-10-26/HC_STEP3_MODEL.md
             audits/2026-10-26/HC_STEP4_SETTLEMENT_VALUATION.md
+            audits/2026-10-26/HC_STEP5_CARD_PREVIEW.md
           retention-days: 90
