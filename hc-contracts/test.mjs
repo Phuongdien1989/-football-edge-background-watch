@@ -1,0 +1,26 @@
+import assert from 'node:assert/strict';import{readFileSync}from'node:fs';import{runInNewContext,Script}from'node:vm';import{patchHCContracts}from'./patch.mjs';
+const now=1900000000000,context={live:true,fixtureId:100,at:now,marketAt:now,score:{home:0,away:1}},runtime=readFileSync(new URL('./runtime.js',import.meta.url),'utf8');
+const source=process.argv[2]?readFileSync(process.argv[2],'utf8'):null;
+const env={ultraMedian:arr=>{const s=arr.filter(Number.isFinite).sort((a,b)=>a-b);return s.length?s.length%2?s[(s.length-1)/2]:(s[s.length/2-1]+s[s.length/2])/2:null;},watchClamp:(x,a,b)=>Math.max(a,Math.min(b,x)),Date:class extends Date{static now(){return now;}}};
+runInNewContext(runtime+';globalThis.api={hcContractLine,hcMarketQuotes,hcMarketFromRows};',env);const {hcContractLine:line,hcMarketQuotes:quotes,hcMarketFromRows:market}=env.api;
+const row=(book,line=-.75,ho=1.9,ao=2.0,patch={})=>({source:'live',fixture_id:100,bookmaker:book,bet_id:33,category:'asian_handicap',update:now,values:[{selection_side:'home',handicap:line,odd:ho,main:true},{selection_side:'away',handicap:-line,odd:ao,main:true}],...patch});
+assert.equal(line('-1/1.5'),-1.25);assert.equal(line('1/1.5'),1.25);assert.equal(line('-0/0.5'),-.25);assert.equal(line('-.75'),-.75);for(const v of ['1/2','abc1',true,'',null,'1/-1.5'])assert.equal(line(v),null);
+let q=market([row('A',-.5,2.05),row('B',-.75,1.9),row('C',-1,1.95)],'Home','Away',context);assert.equal(q.line,-.75);assert.equal(q.homeOdd,1.9);assert.equal(q.bookmaker,'B');assert.equal(q.consensus,false);assert.equal(q.consensusReference.indicativeOnly,true);assert.equal(q.basis,'UNVERIFIED');assert.equal(q.tradeReady,false);assert.deepEqual(JSON.parse(JSON.stringify(q.observedScore)),context.score);
+q=market([row('A',-.5),row('B',-.75)],'H','A',context);assert([-0.5,-0.75].includes(q.line));assert.equal(q.consensusReference.medianLine,-.625);
+let mixed=row('A');mixed.values=[{selection_side:'home',handicap:-.5,odd:1.7},{selection_side:'away',handicap:.75,odd:2.1},{selection_side:'home',handicap:-.75,odd:1.9},{selection_side:'away',handicap:.5,odd:2.2}];q=quotes([mixed],context);assert.equal(q.length,2);assert(q.every(x=>x.line===-.5?x.awayOdd===2.2:x.awayOdd===2.1));
+assert.equal(quotes([row('A',-.75,1.1,2,{update:now-61000})],context).length,0);assert.equal(quotes([row('A',-.75,1.1,2,{update:now+6000})],context).length,0);assert.equal(quotes([row('A',-.75,1.1,2,{feed_status:{stopped:true}})],context).length,0);
+assert.equal(quotes([row('A',-.75,1,2)],context).length,0);assert.equal(quotes([row('A',-.75,2,2,{fixture_id:101})],context).length,0);assert.equal(quotes([row('A',-.75,2,2,{score:{home:0,away:0}})],context).length,0);
+assert.equal(quotes([row('A',-.75,2,2,{source:'prematch'})],context).length,0);assert.equal(quotes([row('A',-.75,2,2,{source:'prematch'})],{}).length,1,'PRE analytics remain supported');
+q=quotes([row('A',-.75,1.7,2,{update:now-1000}),row('A',-.75,1.9,2)],context);assert.equal(q.length,1);assert.equal(q[0].homeOdd,1.9);
+assert.equal(quotes([row('A',-.75,1.7,2),row('A',-.75,1.9,2)],context).length,0,'conflicting quotes at same time must not be chosen arbitrarily');
+q=quotes([row('A',-.75,1.9,2,{update:null})],context)[0];assert.equal(q.timestampBasis,'HUB_RECEIPT');assert.equal(q.quoteAt,now);assert.equal(q.basisVerified,false);
+q=quotes([row('A',-.75,1.9,2,{settlement_basis:'REMAINING_MATCH',settlement_verified:true})],context)[0];assert.equal(q.basis,'REMAINING_MATCH');
+if(source){const patched=patchHCContracts(source);assert(patched.restoredExactly);assert.equal(patched.operations,11);assert.throws(()=>patchHCContracts(patched.html),/ALREADY_APPLIED/);
+ const match=/<script\b[^>]*>([\s\S]*?)<\/script>/g;for(const m of patched.html.matchAll(match))if(m[1].trim()&&!/type="module"/.test(m[0].slice(0,m[0].indexOf('>'))))new Script(m[1]);
+ const history=patched.html.slice(patched.html.indexOf('  function hcMarketHistory('),patched.html.indexOf('  function hcDataQuality('));runInNewContext(history+';globalThis.historyAPI={hcMarketHistory,hcMarketMovement};',env);
+ const {hcMarketHistory:remember,hcMarketMovement:movement}=env.historyAPI,item={marketHistory:[]},snap=(mkt,at)=>({captured_at:at,minute:55,goals:{home:0,away:1},market:mkt});
+ const a=market([row('A')],'H','A',context),b=market([row('B',-.75,1.7,2.2)],'H','A',context);remember(item,a,snap(a,now-60000));remember(item,b,snap(b,now));assert.equal(movement(item,snap(b,now)).status,'BASELINE','book change is not a market move');
+ const changed=market([row('A',-1,1.3,2.8)],'H','A',context);remember(item,changed,snap(changed,now));const m=movement(item,snap(changed,now));assert.equal(m.lineDir,'HOME_STRENGTHEN');assert.equal(m.priceDir,'FLAT');assert.equal(m.priceComparable,false);
+ const sameLine=market([row('A',-.75,1.7,2.2)],'H','A',context);const it={marketHistory:[]};remember(it,a,snap(a,now-60000));remember(it,sameLine,snap(sameLine,now));assert.equal(movement(it,snap(sameLine,now)).priceDir,'HOME_STRENGTHEN');
+}
+console.log('HC_CONTRACT_PASS: exact same-source paired quote, main/alternative lines, split sign, median reference only, stale/future/suspended/mismatch rejection, explicit unknown basis, PRE compatibility, history source isolation and same-line price comparison; no model/threshold edits');
