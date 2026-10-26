@@ -92,7 +92,7 @@ const origin='https://shiny-silence-d892.ngophuonghuy.workers.dev',baseline=fals
     await page.waitForSelector('#ftAIV2ReadOnly [data-ft-session="INVALIDATED"]');assert((await ft.innerText()).includes('ĐÁNH GIÁ LẠI SAU BIẾN ĐỘNG'));
 
    }else if(tab==='hc'){
-    await page.waitForSelector('[data-hc-research-panel]:not([hidden]) .hc-research-card');
+    try{await page.waitForSelector('[data-hc-research-panel]:not([hidden]) .hc-research-card',{timeout:10000});}catch(e){console.log('HC_DIAGNOSTIC '+JSON.stringify(await page.evaluate(()=>({url:location.href,api:typeof FEHCResearchPreview,mode:window.FETabsIntegrated?.mode(),packet:window.FETabsIntegrated?.read()?.lists,panel:document.querySelector('[data-hc-research-panel]')?.outerHTML,rows:window.FEHCResearchPreview?.read(),stats:window.FEHCResearchPreview?.stats()}))));console.log('HC_ERRORS '+JSON.stringify({errors,badAssets}));await page.screenshot({path:out+'/hc-failure.png',fullPage:true});throw e;}
     const panel=page.locator('[data-hc-research-panel]');assert.equal(await panel.locator('.hc-research-card').count(),1);
     assert.equal(await panel.locator('[data-fixture="920002"]').count(),1,'DISPLAY_ORDER_CHANGED');
     assert.equal(await page.locator('.fe-lsp-mechanism .fe-lsp-panel').count(),2,'LEGACY_HC_REPLACED');
