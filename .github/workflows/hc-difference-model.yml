@@ -3,11 +3,11 @@ on:
   push:
     branches: [feat/hc-difference-model-20261026]
     paths: ['hc-model/**', '.github/workflows/hc-difference-model.yml', 'audits/2026-10-26/HC_STEP*.md']
-permissions: {contents: read}
+permissions: {contents: read, actions: read}
 jobs:
   research:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
         with: {persist-credentials: false}
@@ -22,11 +22,23 @@ jobs:
           node hc-model/test.mjs | tee hc-model-test-report.txt
           node hc-model/test-valuation.mjs | tee hc-model-valuation-report.txt
           node hc-model/test-view.mjs | tee hc-model-view-report.txt
+          node hc-model/test-integration.mjs | tee hc-model-integration-report.txt
       - name: Browser preview at four widths
         run: |
           npm install --no-save --no-package-lock playwright@1.58.2
           set -o pipefail
           node hc-model/test-browser.cjs | tee hc-model-browser-report.txt
+      - uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          run-id: 40266648827
+          name: hc-exact-quote-release-proof
+          path: hc-baseline
+      - name: Complete candidate package and actual app shell regression
+        run: |
+          node hc-model/build-candidate.mjs hc-baseline hc-research-package
+          set -o pipefail
+          node hc-model/test-app-browser.cjs | tee hc-model-app-browser-report.txt
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -37,8 +49,12 @@ jobs:
             hc-model-valuation-report.txt
             hc-model-view-report.txt
             hc-model-browser-report.txt
+            hc-model-integration-report.txt
+            hc-model-app-browser-report.txt
+            hc-research-package/
             hc-preview-*.png
             audits/2026-10-26/HC_STEP3_MODEL.md
             audits/2026-10-26/HC_STEP4_SETTLEMENT_VALUATION.md
             audits/2026-10-26/HC_STEP5_CARD_PREVIEW.md
+            audits/2026-10-26/HC_STEP6_BRIDGE_CANDIDATE.md
           retention-days: 90
