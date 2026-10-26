@@ -43,3 +43,17 @@
 .htp-chart i{display:block;min-height:2px;width:55%;background:#55a9ae;border-radius:4px 4px 0 0}.htp-chart span,.htp-chart small{font-size:10.5px;color:#607a90}.htp-wait{font-size:11.5px;line-height:1.6}
 [data-ht-price]{display:block!important;color:#087d62!important;font-size:10px!important;line-height:1.5;margin-top:4px}
 @media(max-width:359px){.htp-card{padding:11px;border-radius:13px}.htp-values>div{padding:0 3px}.htp-values b{font-size:15px}.htp-bar-row{gap:5px;grid-template-columns:minmax(0,1.35fr) minmax(28px,.8fr) 41px}.htp-decision{padding:10px}.htp-state{padding:3px 6px}.htp-game b{font-size:19px}}
+
+
+/* Retain the recorded HT quote; current qualification stays independent. */
+#feTabsWorkspace .htp-recorded{display:grid;gap:5px;margin:10px 0;padding:11px;border:1px solid #bcded6;border-radius:10px;background:#f1faf7;color:#244d47;line-height:1.55}
+#feTabsWorkspace .htp-recorded>small{font-size:10px;color:#5d7973;line-height:1.6}
+#feTabsWorkspace .htp-recorded>strong{font-size:17px;font-weight:650;font-variant-numeric:tabular-nums}
+#feTabsWorkspace .htp-recorded>span{font-size:11px;font-variant-numeric:tabular-nums}
+#feTabsWorkspace .htp-card[data-state=RECORDED] .htp-recorded{background:#f6f8fa;border-color:#dce4eb;color:#426079}
+#feTabsWorkspace [data-ht-retained-list]{margin-top:13px}
+#feTabsWorkspace .htp-retained-heading{font-size:11px;font-weight:650;color:#3b6279;margin-bottom:7px}
+#feTabsWorkspace .htp-retained-link{display:grid;gap:3px;padding:10px 12px;margin:6px 0;border:1px solid #d7e7e7;border-radius:10px;background:#f8fcfb;color:#315969;text-decoration:none;overflow-wrap:anywhere}
+#feTabsWorkspace .htp-retained-link>span{font-size:11px;font-weight:550}
+#feTabsWorkspace .htp-retained-link>b{font-size:13px;font-weight:600;font-variant-numeric:tabular-nums}
+#feTabsWorkspace .htp-retained-link>small{font-size:10px;color:#6e818c}
