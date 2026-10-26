@@ -12,6 +12,8 @@ export function reviewFTDecision(assessment){
  const independent=r.modelOK&&validatePMF(s.model?.pmf)&&total!==null&&number(m.line)!==null?priceOver(s.model.pmf,total,m.line,2):null;
  const evidence=r.data?.label||'NO_WINDOW';
  const sample=s.model?.sample||{};
+ if(s.model?.scoreTimeConditioned)warnings.push('Đã cập nhật theo tỷ số và phút quan sát; sức ép, xG và thẻ đỏ chưa có hệ số hiệu chỉnh.');
+ if(number(s.metrics?.red)>0)warnings.push('Có thẻ đỏ: mô hình chưa định lượng tác động, cần xem lại giả định.');
  if(s.model?.validated!==true)warnings.push('Mô hình nghiên cứu chưa hiệu chỉnh theo kết quả LIVE');
  if(sample.home!=null&&sample.away!=null)warnings.push('Mẫu lịch sử: '+sample.home+' / '+sample.away+' trận; không coi hai mẫu là bằng chứng độc lập');
  if(evidence==='CHANCES ADDED')reasons.push('Cơ hội ghi bàn mới xuất hiện trong cửa sổ thống kê; chưa tự động đổi xác suất');
@@ -24,7 +26,7 @@ export function reviewFTDecision(assessment){
  if(r.blocked){reasons.push('Dữ liệu trận không đủ mới hoặc đang cooldown/lỗi thống kê');}
  else if(!r.marketFresh||needed===null){action='WAIT_PRICE';title='CHỜ GIÁ KHỚP TRẬN';reasons.push('Phải xác minh FT tổng cả trận, đúng tỷ số, line và thời điểm');}
  else if(needed===0){action='CONTRACT_MISMATCH';title='XÁC MINH HỢP ĐỒNG';reasons.push('Tài đã vượt line theo tỷ số; không suy diễn giá nhà cái là cơ hội miễn phí');}
- else if(!r.modelOK||p===null||ev===null){action='MODEL_WAIT';title='CHỜ XÁC SUẤT ĐỘC LẬP';}
+ else if(!r.modelOK||p===null||ev===null){action='MODEL_WAIT';title='CHỜ XÁC SUẤT ĐỘC LẬP';if(s.model?.waitReason==='ADDED_TIME_NOT_MODELED')reasons.push('Đang bù giờ; chưa có mô hình thời gian còn lại được xác minh.');}
  else if(ev<=0){action='WAIT_PRICE';title='KHÔNG VÀO Ở GIÁ NÀY';reasons.push('Giá không tạo lợi thế kỳ vọng dương theo mô hình hiện có');}
  else{
   action='TRIAL_OVER';title='CÂN NHẮC TÀI THỬ NGHIỆM';
@@ -63,7 +65,7 @@ export function valuationView(r,independent=null){
  return {matchState,marketDirection,comparison,baselineGoals90:number(model.lambda90),remainingGoals:modelMean,expectedTotal:total!==null&&modelMean!==null?total+modelMean:null,
   marketOver:binary?.over??null,modelOver:r.quote?.win??null,fairOdds:fair,
   minimumOdds:fair,minimumRule:'STRICTLY_ABOVE_FAIR_AT_SAME_LINE',line:number(m.line),
-  liveAdjusted:false,liveLabel:matchState==='CHANCES_ADDED'?'Có thêm cơ hội LIVE':matchState==='NO_NEW_QUALITY_SIGNAL'?'Chưa thêm chỉ dấu chất lượng':matchState==='DATA_WAIT'?'Chờ dữ liệu mới':'Đang tích lũy diễn biến',
+  scoreTimeConditioned:model.scoreTimeConditioned===true,modelVersion:model.version??null,sourceAt:s.at,liveAdjusted:false,liveLabel:matchState==='CHANCES_ADDED'?'Có thêm cơ hội LIVE':matchState==='NO_NEW_QUALITY_SIGNAL'?'Chưa thêm chỉ dấu chất lượng':matchState==='DATA_WAIT'?'Chờ dữ liệu mới':'Đang tích lũy diễn biến',
   explanation:'Giá cao không làm giảm xác suất mô hình. Có khả năng có bàn và có giá vào tốt là hai đánh giá riêng.',
   missing:[!r.modelOK?'Phân phối bàn độc lập':null,!r.marketFresh?'Giá cùng tỷ số và thời điểm':null,r.blocked?'Dữ liệu LIVE hợp lệ':null].filter(Boolean)};
 }
@@ -82,7 +84,7 @@ export function createFTSessions({duration=300000,maxFixtures=100}={}){
   const expired=prior&&now>=prior.expiresAt;
   const canStart=review.action==='TRIAL_OVER'&&row.fresh&&!row.blocked&&row.marketFresh;
   if((!prior||(prior.status==='INVALIDATED'&&sourceAt>prior.invalidatedAt)||(expired&&sourceAt>prior.lastSourceAt))&&canStart){
-   prior={fixtureId:id,startedAt:now,expiresAt:now+duration,sourceAt,lastSourceAt:sourceAt,contract:key,eventKey,status:'ACTIVE',original:{line:review.valuation.line,odds:review.odds,fairOdds:review.fairOdds,estimatedEV:review.estimatedEV,minute:row.snapshot.minute},reason:'Phiên tham chiếu 5 phút; chỉ cân nhắc khi dữ liệu và giá hiện tại vẫn hợp lệ.'};
+   prior={fixtureId:id,startedAt:now,expiresAt:now+duration,sourceAt,lastSourceAt:sourceAt,contract:key,eventKey,status:'ACTIVE',original:{line:review.valuation.line,odds:review.odds,fairOdds:review.fairOdds,estimatedEV:review.estimatedEV,winProbability:review.winProbability,remainingGoals:review.valuation.remainingGoals,expectedTotal:review.valuation.expectedTotal,modelVersion:review.valuation.modelVersion,minute:row.snapshot.minute},reason:'Phiên tham chiếu 5 phút; chỉ cân nhắc khi dữ liệu và giá hiện tại vẫn hợp lệ.'};
    sessions.delete(id);sessions.set(id,prior);while(sessions.size>maxFixtures)sessions.delete(sessions.keys().next().value);
   }else if(prior&&prior.status!=='INVALIDATED'){
    prior.status=expired?'EXPIRED':canStart?'ACTIVE':'PAUSED';prior.lastSourceAt=Math.max(prior.lastSourceAt||0,sourceAt||0);
@@ -92,3 +94,4 @@ export function createFTSessions({duration=300000,maxFixtures=100}={}){
  }
  return Object.freeze({update,read:()=>structuredClone([...sessions.values()])});
 }
+

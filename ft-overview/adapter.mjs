@@ -1,4 +1,5 @@
 import {number,researchBaseline} from './core.mjs';
+import {ftStateModel} from './live-probability.mjs';
 const time = x => { const n=number(x); if(n!==null)return n<1e12?n*1000:n;const t=Date.parse(x);return Number.isFinite(t)?t:null; };
 export function marketFromRows(rows, s) {
   for (const r of rows || []) {
@@ -22,7 +23,7 @@ function metricSnapshot(it) {
   const s=it.latest || {},p=s.stats_presence || {},values=s.metrics?.total || {};
   return {at:number(s.captured_at),goals:{home:number(s.goals?.home),away:number(s.goals?.away)},metrics:Object.fromEntries(['shots','sot','inbox','xg'].map(k=>[k,p[k]===true?number(values[k]):null]))};
 }
-export function readLegacy(bridge, bundleBridge) {
+export function readLegacy(bridge, bundleBridge,{conditionedFT=false}={}) {
   if(!bridge?.read)return [];
   const d=bridge.read(),map=new Map(),bundles=bundleBridge?.read?.() || [];
   const bundleById=new Map(bundles.map(b=>[Number(b.meta?.fixture_id),b]));
@@ -37,10 +38,14 @@ export function readLegacy(bridge, bundleBridge) {
     // HC metrics have no total. Retain separately observed goal-engine metrics
     // only when their observation timestamp is identical.
     if(engine==='HC'&&old?.at===at){snapshot.metrics=old.metrics;snapshot.history=old.history;snapshot.statsError=old.statsError;snapshot.legacy=old.legacy;}
+    if(conditionedFT&&s.stats_presence?.red===true)snapshot.metrics.red=number(s.metrics?.total?.red);
     const rows=s.market_rows || it.serverRow?.snapshot?.market_rows || [];
     snapshot.market=marketFromRows(rows,snapshot) || (old?.at===at ? old.market:null);
     const b=bundleById.get(id),n=b?.normalized || {},meta=b?.meta;
-    if(meta){snapshot.contextAt=number(b.observed_at);snapshot.model=researchBaseline({homeId:meta.teams?.home?.id,awayId:meta.teams?.away?.id,homeRecent:n.home_recent,awayRecent:n.away_recent,kickoff:time(meta.fixture?.timestamp || meta.fixture?.date),at,minute:snapshot.minute,status:snapshot.status});}
+    if(meta){snapshot.contextAt=number(b.observed_at);const input={homeId:meta.teams?.home?.id,awayId:meta.teams?.away?.id,homeRecent:n.home_recent,awayRecent:n.away_recent,kickoff:time(meta.fixture?.timestamp || meta.fixture?.date),at,minute:snapshot.minute,status:snapshot.status};
+     if(conditionedFT){const result=ftStateModel({...input,fixtureId:id,goals:snapshot.goals});snapshot.model=result.model||{waitReason:result.reason};}
+     else snapshot.model=researchBaseline(input);
+    }
     map.set(id,snapshot);
   }
   // PRE selection can be evaluated from a previously fetched DEEP bundle.
@@ -49,8 +54,10 @@ export function readLegacy(bridge, bundleBridge) {
     if(!id||map.has(id)||f?.status?.short!=='NS')continue;
     const at=number(b.observed_at);if(at===null)continue;
     const s={id,revision:at,at,minute:0,status:'NS',goals:{home:0,away:0},home:meta.teams?.home?.name || '',away:meta.teams?.away?.name || '',metrics:{},history:[],statsError:false};
-    s.model=researchBaseline({homeId:meta.teams?.home?.id,awayId:meta.teams?.away?.id,homeRecent:n.home_recent,awayRecent:n.away_recent,kickoff:time(f.timestamp || f.date),at,minute:0,status:'NS'});
+    const input={homeId:meta.teams?.home?.id,awayId:meta.teams?.away?.id,homeRecent:n.home_recent,awayRecent:n.away_recent,kickoff:time(f.timestamp || f.date),at,minute:0,status:'NS'};
+    if(conditionedFT){const result=ftStateModel({...input,fixtureId:id,goals:s.goals});s.model=result.model||{waitReason:result.reason};}else s.model=researchBaseline(input);
     s.market=marketFromRows(n.market?.prematch,s);map.set(id,s);
   }
   return [...map.values()];
 }
+
