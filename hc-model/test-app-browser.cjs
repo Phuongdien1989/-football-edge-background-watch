@@ -1,5 +1,5 @@
 const assert=require('node:assert/strict'),{chromium}=require('playwright'),{readFileSync,writeFileSync,mkdirSync}=require('node:fs');
-const origin='https://shiny-silence-d892.ngophuonghuy.workers.dev',baseline=false,candidate=true,before=false,folder='site',mode='hc-research-candidate',out='hc-research-package/qa/'+mode;
+const origin='https://shiny-silence-d892.ngophuonghuy.workers.dev',baseline=false,candidate=!process.argv.includes('--production'),before=false,folder='site',mode=candidate?'candidate':'production',out='hc-research-package/qa/'+mode;
 (async()=>{
  mkdirSync(out,{recursive:true});const browser=await chromium.launch({channel:'chrome'}),results=[];
  try{for(const width of before?[390]:[320,375,390,1280]){
@@ -29,7 +29,7 @@ const origin='https://shiny-silence-d892.ngophuonghuy.workers.dev',baseline=fals
    };
   });
   const page=await ctx.newPage();page.on('pageerror',e=>errors.push(e.message));page.on('response',r=>{if(r.status()>=400&&/\/(?:ht-candidate|ui-tabs|ft-ai-v2)\//.test(r.url()))badAssets.push(r.url()+' '+r.status());});
-  await page.goto(origin+'/?hcResearch=1#fe-tabs/ht',{waitUntil:'networkidle',timeout:45000});
+  await page.goto(origin+'/#fe-tabs/ht',{waitUntil:'networkidle',timeout:45000});
   await page.waitForFunction(()=>window.FEHCResearchPreview);
   await page.waitForFunction(()=>window.FEHTPricingView&&window.FETabsIntegrated?.mode().current==='ht');
   await page.waitForFunction(()=>window.FEHTPricingView.read().length===2);
@@ -145,7 +145,7 @@ const origin='https://shiny-silence-d892.ngophuonghuy.workers.dev',baseline=fals
   assert.deepEqual(errors,[]);assert.deepEqual(badAssets,[]);
   results.push({width,status:'PASS',HC_real_shell_readonly_bridge:true,HC_source_rule_wait_and_cooldown:true,HC_selected_fixture_and_quote_updates:true,HC_five_minute_original_current_and_historical_expiry:true,HT_real_module_auto_mount:true,selected_fixture_preserved:true,pricing_session_and_goal_chart:'PASS',quote_update_original_deadline_and_goal_invalidation:'PASS',other_five_tabs_and_ftv2_stable_root:'PASS',metrics,blocked_requests:blocked});await ctx.close();
  }
- const off=await browser.newContext({serviceWorkers:'block'});await off.route('**/*',route=>{const u=new URL(route.request().url());if(u.origin!==origin||u.pathname.startsWith('/api/')||route.request().method()!=='GET')return route.abort();const p=u.pathname==='/'?'index.html':u.pathname.slice(1);try{return route.fulfill({status:200,body:readFileSync('hc-research-package/site/'+p),contentType:p.endsWith('.css')?'text/css':/\.(?:m?js)$/.test(p)?'application/javascript':'text/html'});}catch{return route.fulfill({status:404,body:''});}});const offPage=await off.newPage();await offPage.goto(origin+'/#fe-tabs/hc',{waitUntil:'networkidle'});assert.equal(await offPage.locator('[data-hc-research-panel]').count(),0,'PREVIEW_NOT_OPT_IN');assert.equal(await offPage.evaluate(()=>typeof FEHCResearchPreview),'undefined');await off.close();
+ const off=await browser.newContext({serviceWorkers:'block'});await off.route('**/*',route=>{const u=new URL(route.request().url());if(u.origin!==origin||u.pathname.startsWith('/api/')||route.request().method()!=='GET')return route.abort();if(!candidate)return route.continue();const p=u.pathname==='/'?'index.html':u.pathname.slice(1);try{return route.fulfill({status:200,body:readFileSync('hc-research-package/site/'+p),contentType:p.endsWith('.css')?'text/css':/\.(?:m?js)$/.test(p)?'application/javascript':'text/html'});}catch{return route.fulfill({status:404,body:''});}});const offPage=await off.newPage();await offPage.goto(origin+'/?hcResearch=0#fe-tabs/hc',{waitUntil:'networkidle'});assert.equal(await offPage.locator('[data-hc-research-panel]').count(),0,'PREVIEW_NOT_OPT_IN');assert.equal(await offPage.evaluate(()=>typeof FEHCResearchPreview),'undefined');await off.close();
  }finally{await browser.close();}
  writeFileSync(out+'/report.json',JSON.stringify({status:'PASS',mode,synthetic_readonly_bridge_inputs:true,physical_phone_and_real_live:'NOT_VERIFIED',results},null,2));console.log('HC_CONTRACT_BROWSER '+JSON.stringify({status:'PASS',mode,results}));
 })().catch(e=>{console.error(e);process.exitCode=1;});

@@ -1,4 +1,4 @@
-// Opt-in candidate integration. Does not change the legacy tab renderer or engines.
+// Shared experimental integration. Does not change the legacy tab renderer or engines.
 import {readHCPricing} from './valuation-adapter.mjs';
 import {renderHCResearch} from './view.mjs';
 import {auditHCContract} from './contract-audit.mjs';
@@ -39,7 +39,7 @@ export function attachHCResearch({win=window,doc=document,verifiedRules=[]}={}){
  const api={readiness:()=>rows.map(hcReadiness),sessions:()=>sessions.list(Date.now()),read:()=>structuredClone(rows),contracts:()=>rows.flatMap(row=>row.valuations.map(v=>({fixtureId:row.id,...auditHCContract(v.quote,{verifiedRules})}))),stats:()=>({reads,renders}),refresh:sync,destroy(){destroyed=true;observer.disconnect();workspace.removeEventListener('click',routeClick);win.clearInterval(timer);for(const event of ['fe-notify-sync-updated','hashchange'])win.removeEventListener(event,sync);doc.removeEventListener('visibilitychange',sync);panel.remove();}};
  sync();return Object.freeze(api);
 }
-if(typeof window!=='undefined'&&new URLSearchParams(window.location.search).get('hcResearch')==='1'){
+if(typeof window!=='undefined'&&new URLSearchParams(window.location.search).get('hcResearch')!=='0'){
  const boot=()=>{if(!window.FEHCResearchPreview)window.FEHCResearchPreview=attachHCResearch();};
  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
 }

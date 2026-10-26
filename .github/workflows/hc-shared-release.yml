@@ -1,0 +1,77 @@
+name: Publish HC to the shared experimental Mobile app
+on:
+  push:
+    branches: [release/hc-shared-experiment-20261026]
+    paths: ['hc-shared-release/**', 'hc-model/**', '.github/workflows/hc-shared-release.yml']
+permissions: {contents: read, actions: read}
+concurrency:
+  group: fe-football-edge-mobile-production
+  cancel-in-progress: false
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    environment: football-edge-production
+    env: {WRANGLER_SEND_METRICS: 'false'}
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - uses: actions/download-artifact@v4
+        with:
+          name: hc-exact-quote-release-proof
+          run-id: 40266648827
+          github-token: ${{ github.token }}
+          path: hc-baseline
+      - name: HC research, exact settlement, session and LIVE evidence regression
+        run: |
+          node hc-model/test.mjs
+          node hc-model/test-valuation.mjs
+          node hc-model/test-view.mjs
+          node hc-model/test-integration.mjs
+          node hc-model/test-session.mjs
+          node hc-model/test-live-evidence.mjs
+          node --check hc-shared-release/release.mjs
+      - run: npm install --no-save --no-package-lock wrangler@4 playwright@1.58.2
+      - name: Verify current app, preserve rollback and back up every public asset
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node hc-shared-release/release.mjs prepare
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pre-hc-shared-mobile-backup
+          path: |
+            hc-research-package/backup/
+            hc-research-package/backup-version.json
+            hc-research-package/manifest.json
+          retention-days: 90
+      - name: Candidate default HC mount, original HC, HT and FT V2 at four widths
+        run: node hc-model/test-app-browser.cjs
+      - run: npx --no-install wrangler deploy --dry-run --config hc-research-package/wrangler.json
+      - name: Publish complete 47-asset shared experimental app
+        id: publish
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node hc-shared-release/release.mjs deploy
+      - name: Published default HC, original HT and FT V2 real navigation regression
+        run: node hc-model/test-app-browser.cjs --production
+      - name: Verify all public assets, backend, Desktop and scanner control
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node hc-shared-release/release.mjs verify
+      - name: Restore prior Mobile if post-publish acceptance fails
+        if: failure() && steps.publish.outcome == 'success'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node hc-shared-release/release.mjs rollback
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: hc-shared-experiment-release-proof
+          path: hc-research-package/
+          retention-days: 90
