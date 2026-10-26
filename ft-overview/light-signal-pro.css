@@ -68,3 +68,11 @@
 #ftAIV2ReadOnly .fe-lsp-ft-bar:nth-of-type(2) i{background:#109c72}
 #ftAIV2ReadOnly .fe-lsp-ft-bar>b{text-align:right;font-variant-numeric:tabular-nums}
 #ftAIV2ReadOnly .fe-lsp-ft-settlement{margin-top:12px}
+
+
+/* FT V2 state-conditioned valuation: compare retained original and current. */
+#ftAIV2ReadOnly .fe-lsp-ft-change{margin-top:10px}
+#ftAIV2ReadOnly .fe-lsp-ft-change-grid{display:grid;grid-template-columns:minmax(64px,1.2fr) repeat(3,minmax(42px,1fr));gap:8px 5px;margin:11px 0;align-items:center;font-size:10px}
+#ftAIV2ReadOnly .fe-lsp-ft-change-grid small{font-size:9px;color:#7086a0}
+#ftAIV2ReadOnly .fe-lsp-ft-change-grid b{font-variant-numeric:tabular-nums;font-size:11px}
+#ftAIV2ReadOnly .fe-lsp-ft-change>small{font-size:10px;color:#7086a0}
