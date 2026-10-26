@@ -21,7 +21,7 @@ export function createHCResearchSessions(){
    let reason=null;
    if(c.score&&o.score&&(c.score.home!==o.score.home||c.score.away!==o.score.away))reason='SCORE_CHANGED';
    else if(c.status&&phase(c.status)!==phase(o.status))reason='PHASE_CHANGED';
-   else if(Number.isFinite(c.red)&&Number.isFinite(o.red)&&c.red!==o.red)reason='RED_CHANGED';
+   else if(['red','redHome','redAway'].some(k=>Number.isFinite(c[k])&&Number.isFinite(o[k])&&c[k]!==o[k]))reason='RED_CHANGED';
    else if(c.resetAt>(o.resetAt||0))reason='RESET_REQUIRED';
    else if(v?.quote&&v.quote.quoteAt>=s.current.quote.quoteAt&&key(v.quote)!==key(s.original.quote))reason='CONTRACT_CHANGED';
    else if(v?.result?.rule?.basis&&v.result.rule.basis!==s.original.result.rule?.basis)reason='SETTLEMENT_CHANGED';

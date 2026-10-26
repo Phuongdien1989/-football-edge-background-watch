@@ -3,6 +3,7 @@ import {readHCPricing} from './valuation-adapter.mjs';
 import {renderHCResearch} from './view.mjs';
 import {auditHCContract} from './contract-audit.mjs';
 import {createHCResearchSessions} from './session.mjs';
+import {hcReadiness} from './live-evidence.mjs';
 export function attachHCResearch({win=window,doc=document,verifiedRules=[]}={}){
  const sessions=createHCResearchSessions();
  const workspace=doc.getElementById('feTabsWorkspace');if(!workspace)return null;
@@ -35,7 +36,7 @@ export function attachHCResearch({win=window,doc=document,verifiedRules=[]}={}){
  doc.addEventListener('visibilitychange',sync);
  // UI-only expiry refresh, only reads while HC tab is visible. No scanner tick.
  const timer=win.setInterval(()=>{if(!active())return;const now=Date.now();for(const clock of panel.querySelectorAll('[data-hc-session-clock]')){const seconds=Math.max(0,Math.ceil((Number(clock.dataset.hcSessionClock)-now)/1000));clock.textContent=Math.floor(seconds/60)+':'+String(seconds%60).padStart(2,'0');}if(now>=nextRefresh)sync();},1000);
- const api={sessions:()=>sessions.list(Date.now()),read:()=>structuredClone(rows),contracts:()=>rows.flatMap(row=>row.valuations.map(v=>({fixtureId:row.id,...auditHCContract(v.quote,{verifiedRules})}))),stats:()=>({reads,renders}),refresh:sync,destroy(){destroyed=true;observer.disconnect();workspace.removeEventListener('click',routeClick);win.clearInterval(timer);for(const event of ['fe-notify-sync-updated','hashchange'])win.removeEventListener(event,sync);doc.removeEventListener('visibilitychange',sync);panel.remove();}};
+ const api={readiness:()=>rows.map(hcReadiness),sessions:()=>sessions.list(Date.now()),read:()=>structuredClone(rows),contracts:()=>rows.flatMap(row=>row.valuations.map(v=>({fixtureId:row.id,...auditHCContract(v.quote,{verifiedRules})}))),stats:()=>({reads,renders}),refresh:sync,destroy(){destroyed=true;observer.disconnect();workspace.removeEventListener('click',routeClick);win.clearInterval(timer);for(const event of ['fe-notify-sync-updated','hashchange'])win.removeEventListener(event,sync);doc.removeEventListener('visibilitychange',sync);panel.remove();}};
  sync();return Object.freeze(api);
 }
 if(typeof window!=='undefined'&&new URLSearchParams(window.location.search).get('hcResearch')==='1'){

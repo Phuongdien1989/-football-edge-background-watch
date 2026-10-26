@@ -18,7 +18,7 @@ const origin='https://shiny-silence-d892.ngophuonghuy.workers.dev',baseline=fals
    const recent=Array.from({length:8},(_,i)=>({date:new Date(now-(i+1)*86400000).toISOString(),status:'FT',home_id:1,away_id:2,goals:{home:3,away:2}}));
    window.__ftQA={items:[ftItem(910001),ftItem(910002)]};
    window.__ftBundles=__ftQA.items.map(it=>({observed_at:now,meta:{fixture_id:it.id,teams:{home:{id:1},away:{id:2}},fixture:{timestamp:Math.floor((now-55*60000)/1000),status:{short:'2H'}}},normalized:{home_recent:recent,away_recent:recent}}));
-   const hcItem=id=>({id,home:'HC Home '+id,away:'HC Away '+id,league:'HC Integration League',eval:{state:'STRONG_HOME',gap:26,states:{liveGap:26}},latest:{captured_at:now,status:'2H',minute:55,goals:{home:0,away:1},market:{quotes:[{book:'QA',sourceId:'live:book:qa',marketId:33,line:-.25,homeOdd:2.1,awayOdd:1.8,sourceQuote:true,period:'FT',quoteAt:now,timestampBasis:'HUB_RECEIPT',observedScore:{home:0,away:1}}]}}});
+   const hcItem=id=>({id,home:'HC Home '+id,away:'HC Away '+id,league:'HC Integration League',eval:{state:'STRONG_HOME',gap:26,states:{liveGap:26}},latest:{captured_at:now,fresh_at:now,status:'2H',minute:55,goals:{home:0,away:1},metrics:{home:{shots:10,sot:4,xg:1.2,red:0},away:{shots:4,sot:1,xg:.3,red:0},dataTier:'FULL'},market:{quotes:[{book:'QA',sourceId:'live:book:qa',marketId:33,line:-.25,homeOdd:2.1,awayOdd:1.8,sourceQuote:true,period:'FT',quoteAt:now,timestampBasis:'HUB_RECEIPT',observedScore:{home:0,away:1}}]}}});
    window.__hcQA={items:[hcItem(920002),hcItem(920001)],controls:[],bundles:[920001,920002].map(id=>({meta:{fixture_id:id,teams:{home:{id:1},away:{id:2}},fixture:{timestamp:(now-55*60000)/1000}},normalized:{home_recent:recent,away_recent:recent}}))};
    const original=Object.defineProperty;
    Object.defineProperty=function(target,key,descriptor){
@@ -97,7 +97,7 @@ const origin='https://shiny-silence-d892.ngophuonghuy.workers.dev',baseline=fals
     const panel=page.locator('[data-hc-research-panel]'),contract=panel.locator('.hc-contract');assert.equal(await panel.locator('.hc-research-card').count(),1);
     assert.equal(await panel.locator('[data-fixture="920002"]').count(),1,'DISPLAY_ORDER_CHANGED');
     assert.equal(await page.locator('.fe-lsp-mechanism .fe-lsp-panel').count(),2,'LEGACY_HC_REPLACED');
-    const exact=await page.evaluate(()=>FEHCResearchPreview.contracts());assert.equal(exact[0].sourceId,'live:book:qa');assert.equal(exact[0].settlementVerified,false);assert.equal(exact[0].timestampBasis,'HUB_RECEIPT');
+    const exact=await page.evaluate(()=>FEHCResearchPreview.contracts());assert.equal(exact[0].sourceId,'live:book:qa');assert.equal(exact[0].settlementVerified,false);assert.equal(exact[0].timestampBasis,'HUB_RECEIPT');assert((await panel.innerText()).includes('LIVE · Dữ liệu và thị trường'));const readiness=await page.evaluate(()=>FEHCResearchPreview.readiness());assert.equal(readiness[0].tradeReady,false);assert(readiness[0].blockers.includes('LIVE_PROBABILITY_UNCALIBRATED'));assert(readiness[0].blockers.includes('SOURCE_SETTLEMENT_OR_QUOTE_NOT_VERIFIED'));
     await page.locator('.fe-lsp-item[href="#fe-tabs/hc/920001"]').click();await panel.locator('[data-fixture="920001"]').waitFor();
     await panel.locator('.hc-scenarios>summary').click();assert.equal(await panel.locator('.hc-scenarios[open]').count(),1);
     const firstFair=await contract.locator('.hc-numbers strong').nth(1).innerText();

@@ -1,6 +1,7 @@
 // Reads existing detached bridges only. No new provider request or legacy mutation.
 import {readHCResearch} from './adapter.mjs';
 import {reviewHCQuote} from './valuation.mjs';
+import {readHCLiveEvidence} from './live-evidence.mjs';
 export function readHCPricing(legacyBridge,bundleBridge,{now,verifiedRules=[],fixtureIds=null}={}){
  const state=legacyBridge?.read?.()||{},bundles=bundleBridge?.read?.()||[];
  // The production list bridge strips cooldown/reset fields. Read the existing
@@ -14,6 +15,7 @@ export function readHCPricing(legacyBridge,bundleBridge,{now,verifiedRules=[],fi
   const valuations=pairs.slice(0,50).map(q=>{const quote={...q,fixtureId:row.id,mode:q.sourceId?.startsWith('pre:')?'PRE':'LIVE'},cooldownUntil=Math.max(control.cooldownUntil||0,item.cooldownUntil||0),resetAt=Math.max(control.resetAt||0,item.resetAt||0);
    const result=controlsFailed||resetAt>quote.quoteAt?{status:'DATA_WAIT',reason:controlsFailed?'Không đọc được trạng thái khóa HC hiện có':'Báo giá có trước thời điểm HC yêu cầu lập mốc lại',experimental:true,tradeReady:false,recommendation:null,prices:null,scenarios:null}:reviewHCQuote({model:row.model,quote,now,verifiedRules,cooldownUntil});
    return {sourceId:quote.sourceId,line:quote.line,quote,result};});
-  return {...row,context:{minute:item?.latest?.minute,status:item?.latest?.status,score:structuredClone(item?.latest?.goals||{}),red:item?.latest?.stats_presence?.red===true?item?.latest?.metrics?.total?.red:null,resetAt:Math.max(control.resetAt||0,item.resetAt||0)},valuations};
+  const liveEvidence=readHCLiveEvidence(item,now);
+  return {...row,liveEvidence,context:{minute:item?.latest?.minute,status:item?.latest?.status,score:structuredClone(item?.latest?.goals||{}),red:liveEvidence.home.red!==null&&liveEvidence.away.red!==null?liveEvidence.home.red+liveEvidence.away.red:null,redHome:liveEvidence.home.red,redAway:liveEvidence.away.red,resetAt:Math.max(control.resetAt||0,item.resetAt||0)},valuations};
  });
 }

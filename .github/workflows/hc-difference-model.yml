@@ -24,6 +24,7 @@ jobs:
           node hc-model/test-view.mjs | tee hc-model-view-report.txt
           node hc-model/test-integration.mjs | tee hc-model-integration-report.txt
           node hc-model/test-session.mjs | tee hc-model-session-report.txt
+          node hc-model/test-live-evidence.mjs | tee hc-model-live-evidence-report.txt
       - name: Browser preview at four widths
         run: |
           npm install --no-save --no-package-lock playwright@1.58.2
@@ -52,6 +53,7 @@ jobs:
             hc-model-browser-report.txt
             hc-model-integration-report.txt
             hc-model-session-report.txt
+            hc-model-live-evidence-report.txt
             hc-model-app-browser-report.txt
             hc-research-package/
             hc-preview-*.png
@@ -60,4 +62,5 @@ jobs:
             audits/2026-10-26/HC_STEP5_CARD_PREVIEW.md
             audits/2026-10-26/HC_STEP6_BRIDGE_CANDIDATE.md
             audits/2026-10-26/HC_STEP7_FIVE_MINUTE_REFERENCE.md
+            audits/2026-10-26/HC_STEP8_LIVE_READINESS.md
           retention-days: 90
