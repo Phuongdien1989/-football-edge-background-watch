@@ -105,7 +105,8 @@ const origin='https://shiny-silence-d892.ngophuonghuy.workers.dev',baseline=fals
     await page.waitForFunction(()=>document.querySelector('[data-hc-research-panel] .hc-numbers strong')?.textContent==='2.70');
     assert.equal(await panel.locator('.hc-numbers strong').nth(1).innerText(),firstFair,'ODDS_CHANGED_MODEL_PROBABILITY');assert.equal(await panel.locator('.hc-scenarios[open]').count(),1,'DETAIL_STATE_LOST');
     await panel.locator('.hc-source-audit>summary').click();assert((await panel.innerText()).includes('Market ID: 33'));assert((await panel.innerText()).includes('Chủ nhà chấp'));
-    assert.equal(await panel.evaluate(e=>e.scrollWidth>e.clientWidth+1),false,'HC_OVERFLOW');await page.screenshot({path:out+'/hc-linked-'+width+'.png',fullPage:true});
+    await page.screenshot({path:out+'/hc-linked-'+width+'.png',fullPage:true});
+    const overflow=await panel.evaluate(e=>({bad:e.scrollWidth>e.clientWidth+1,items:[...e.querySelectorAll('*')].filter(x=>x.scrollWidth>x.clientWidth+2).slice(0,8).map(x=>({tag:x.tagName,cls:x.className,w:x.clientWidth,sw:x.scrollWidth}))}));if(overflow.bad)console.log('HC_OVERFLOW_DETAIL '+JSON.stringify(overflow));assert.equal(overflow.bad,false,'HC_OVERFLOW');
     const reads=await page.evaluate(()=>FEHCResearchPreview.stats().reads);await page.evaluate(()=>{for(let i=0;i<100;i++)dispatchEvent(new Event('fe-notify-sync-updated'));});
     await page.waitForTimeout(250);assert((await page.evaluate(()=>FEHCResearchPreview.stats().reads))-reads<=3,'HC_EVENT_STORM_REPEATED_READS');
     await page.evaluate(()=>{__hcQA.controls=[{id:920001,cooldownUntil:Date.now()+100000}];dispatchEvent(new Event('fe-notify-sync-updated'));});
