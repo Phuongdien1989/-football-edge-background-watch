@@ -19,6 +19,10 @@ Production source checkpoint c8182745b3b01f678cac92cf62720f4bda007ec9, released 
 
 No backend, D1 schema, original HC/HT/FT logic, Push, ON/OFF, scan interval or production rollback changes. Legacy HC ranking is not recalculated. The visible list is used as-is; no claim that the pool ordering is the separately sorted native `hcTopItems()` order.
 
+## Integration defect caught and corrected
+
+The legacy root has `<base href="/">`; plain fragment anchor navigation dropped `?hcResearch=1` and reloaded the page, disabling the candidate panel. The opt-in controller now preserves same-document mechanism hash routing for workspace fragment links only, respects modifier clicks, and unregisters its handler at destroy. This does not modify the original production router. Browser tests require the opt-in API before navigating and verify the flag survives real HT/FT/HC links.
+
 ## Tests and limits
 
 Source tests cover controls/reset, missing context, quote provenance, fixture order, read failure, rule boundaries and no network/persistence/setter code.

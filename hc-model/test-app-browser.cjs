@@ -30,6 +30,7 @@ const origin='https://shiny-silence-d892.ngophuonghuy.workers.dev',baseline=fals
   });
   const page=await ctx.newPage();page.on('pageerror',e=>errors.push(e.message));page.on('response',r=>{if(r.status()>=400&&/\/(?:ht-candidate|ui-tabs|ft-ai-v2)\//.test(r.url()))badAssets.push(r.url()+' '+r.status());});
   await page.goto(origin+'/?hcResearch=1#fe-tabs/ht',{waitUntil:'networkidle',timeout:45000});
+  await page.waitForFunction(()=>window.FEHCResearchPreview);
   await page.waitForFunction(()=>window.FEHTPricingView&&window.FETabsIntegrated?.mode().current==='ht');
   await page.waitForFunction(()=>window.FEHTPricingView.read().length===2);
   assert.equal(await page.locator('[data-ftabs-tab]').count(),6);assert.equal(badAssets.length,0);

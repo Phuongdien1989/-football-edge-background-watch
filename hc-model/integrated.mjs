@@ -20,13 +20,18 @@ export function attachHCResearch({win=window,doc=document,verifiedRules=[]}={}){
   }catch{rows=[];panel.textContent='HC Research: chưa đọc được dữ liệu; công cụ HC gốc vẫn giữ nguyên.';last='';}
  }
  function sync(){if(destroyed||queued)return;queued=true;win.requestAnimationFrame(()=>{queued=false;render();});}
+ // The legacy document has <base href="/">. Plain fragment anchors would
+ // navigate to '/' and silently drop the opt-in query flag/reload the document.
+ // Only opt-in workspace mechanism links use the existing same-document hash route.
+ const routeClick=event=>{const a=event.target.closest?.('a[href^="#fe-tabs/"]');if(!a||!workspace.contains(a)||event.defaultPrevented||event.button!==0||event.metaKey||event.ctrlKey||event.shiftKey||event.altKey)return;event.preventDefault();win.location.hash=a.getAttribute('href');};
+ workspace.addEventListener('click',routeClick);
  const observer=new win.MutationObserver(records=>{if(records.some(r=>!panel.contains(r.target)))sync();});
  observer.observe(workspace,{childList:true,subtree:true,attributes:true,attributeFilter:['data-current','data-fixture']});
  for(const event of ['fe-notify-sync-updated','hashchange'])win.addEventListener(event,sync);
  doc.addEventListener('visibilitychange',sync);
  // UI-only expiry refresh, only reads while HC tab is visible. No scanner tick.
  const timer=win.setInterval(()=>{if(active()&&Date.now()>=nextRefresh)sync();},1000);
- const api={read:()=>structuredClone(rows),contracts:()=>rows.flatMap(row=>row.valuations.map(v=>({fixtureId:row.id,...auditHCContract(v.quote,{verifiedRules})}))),stats:()=>({reads,renders}),refresh:sync,destroy(){destroyed=true;observer.disconnect();win.clearInterval(timer);for(const event of ['fe-notify-sync-updated','hashchange'])win.removeEventListener(event,sync);doc.removeEventListener('visibilitychange',sync);panel.remove();}};
+ const api={read:()=>structuredClone(rows),contracts:()=>rows.flatMap(row=>row.valuations.map(v=>({fixtureId:row.id,...auditHCContract(v.quote,{verifiedRules})}))),stats:()=>({reads,renders}),refresh:sync,destroy(){destroyed=true;observer.disconnect();workspace.removeEventListener('click',routeClick);win.clearInterval(timer);for(const event of ['fe-notify-sync-updated','hashchange'])win.removeEventListener(event,sync);doc.removeEventListener('visibilitychange',sync);panel.remove();}};
  sync();return Object.freeze(api);
 }
 if(typeof window!=='undefined'&&new URLSearchParams(window.location.search).get('hcResearch')==='1'){
