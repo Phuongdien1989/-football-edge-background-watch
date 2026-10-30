@@ -23,19 +23,20 @@ function htChip(x,rows,now){
 }
 function ftChip(x,displayAction,now){
  const s=x.signals.valuation;if(s&&fresh(s,now)&&s.modelOK&&s.marketFresh&&!s.blocked&&String(displayAction(s,now,'BRIDGE')).startsWith('Cân nhắc Tài FT ')&&finite(s.ev)&&finite(s.fairOdds))return {label:'Cân nhắc',tone:'good',source:'FT Overview',pick:{period:'FT',line:s.line,odds:s.odds,fair:s.fairOdds,ev:s.ev,source:'FT Overview'}};
- const native=nativeChip(x.signals.ft,'ft',now);if(s&&fresh(s,now)&&!s.blocked)return {...native,label:translated[s.state]||(!s.marketFresh?'Chờ giá':!s.modelOK?'Chờ dữ liệu nền':native.label),tone:'wait'};
+ const native=nativeChip(x.signals.ft,'ft',now);if(s&&fresh(s,now)&&!s.blocked)return {...native,label:translated[s.state]||(!s.marketFresh?'Chờ giá':!s.modelOK?'Chờ dữ liệu nền':native.label),tone:'wait',source:'FT Overview'};
  return native;
 }
 export function overviewCards({rows=[],displayAction,display={},now=Date.now()}={}){
  const seen=new Set();return rows.filter(x=>Number.isSafeInteger(x.id)&&!seen.has(x.id)&&seen.add(x.id)).slice(0,5).map(x=>{
   const primary=sourceSignal(x),o=x.observation||primary?.observation||{},chips={ht:htChip(x,display.ht||[],now),ft:ftChip(x,displayAction,now),hc:nativeChip(x.signals.hc,'hc',now)},priority=x.masterPrimary==='ht'?'ht':x.masterPrimary==='ft'||x.masterPrimary==='valuation'?'ft':null;
   if(phaseDone({observation:o}))chips.ht={label:'Đã kết thúc',tone:'neutral',source:'HT'};
-  for(const key of ['ht','ft'])if(chips[key].pick){const z=key==='ht'?x.signals.ht:x.signals.valuation;const a=z?.observation;if(!a||a.status!==o.status||a.minute!==o.minute||a.goals?.home!==o.goals?.home||a.goals?.away!==o.goals?.away)chips[key]={label:'Chờ khớp nguồn',tone:'wait',source:chips[key].source};}
+  const aligned=s=>{const a=s?.observation;return !!a&&a.status===o.status&&a.minute===o.minute&&a.goals?.home===o.goals?.home&&a.goals?.away===o.goals?.away;};
+  for(const key of ['ht','ft','hc']){if(key==='ht'&&phaseDone({observation:o}))continue;const z=key==='ft'&&chips.ft.source==='FT Overview'?x.signals.valuation:x.signals[key];if(z&&!aligned(z))chips[key]={label:'Chờ khớp nguồn',tone:'wait',source:chips[key].source};} 
   const pick=(priority&&chips[priority].pick)||chips.ht.pick||chips.ft.pick||null;
   const v=display.ft?.find(r=>r.id===x.id&&r.snapshot?.at===x.signals.valuation?.observation.at),p=v?.binary?.over;
-  const market=finite(p)&&fresh(x.signals.valuation,now)&&x.signals.valuation.marketFresh?(p>.5?'Nghiêng Tài':p<.5?'Nghiêng Xỉu':'Cân bằng'):pick?'Tài '+pick.period+' '+pick.line+' @ '+odd(pick.odds):'Chờ giá nguồn';
-  const current=fresh({observation:o},now),outlook=fresh(primary,now)?(translated[primary.state]||'Đang theo dõi'):current?'Chờ kết luận nguồn':'Chờ dữ liệu mới';
-  const history=fresh(primary,now)?(primary.history||[]).filter(h=>finite(h.at)&&h.at<=o.at&&finite(h.value)&&h.value>=0).slice(-12):[];
+  const market=finite(p)&&fresh(x.signals.valuation,now)&&x.signals.valuation.marketFresh&&!x.signals.valuation.blocked&&aligned(x.signals.valuation)?(p>.5?'Nghiêng Tài':p<.5?'Nghiêng Xỉu':'Cân bằng'):pick?'Tài '+pick.period+' '+pick.line+' @ '+odd(pick.odds):'Chờ giá nguồn';
+  const current=fresh({observation:o},now),outlook=fresh(primary,now)&&aligned(primary)?(translated[primary.state]||'Đang theo dõi'):current?'Chờ kết luận nguồn':'Chờ dữ liệu mới';
+  const history=fresh(primary,now)&&aligned(primary)?(primary.history||[]).filter(h=>finite(h.at)&&h.at<=o.at&&finite(h.value)&&h.value>=0).slice(-12):[];
   return {id:x.id,rank:x.masterRank,observation:o,current,outlook,market,history,chips,pick,signals:x.signals,primary:x.masterPrimary};
  });
 }
