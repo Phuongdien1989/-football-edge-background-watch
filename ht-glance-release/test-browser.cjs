@@ -40,7 +40,7 @@ const origin='https://shiny-silence-d892.ngophuonghuy.workers.dev',baseline=fals
   await page.locator('[data-ftabs-fixture="990091"]').click();
   const card=page.locator('.ftabs-detail [data-ht-pricing] .htp-card');await card.waitFor({state:'visible'});
   assert.equal(await card.getAttribute('data-htp-id'),'990091');assert.equal(await card.getAttribute('data-state'),'ACTIVE');
-  assert.equal(await card.locator('.htp-league').innerText(),'Regression League · QA');assert((await card.innerText()).includes('@ 2.70'));assert((await card.locator('[data-ht-recorded]').innerText()).includes('@ 2.70'));
+  assert.equal(await card.locator('.htp-league').innerText(),'Regression League · QA');assert((await card.innerText()).includes('@ 2.70'));assert((await card.locator('[data-ht-recorded]').textContent()).includes('@ 2.70'));assert((await card.locator('.htx-record-line').innerText()).includes('@ 2.70'));
   await card.locator('[data-ht-glance-prob=AVAILABLE]').waitFor();
   assert((await card.locator('.htx-outlook').innerText()).includes('NHỊP H1 ĐANG TĂNG'));
   assert.equal(await card.locator('.htx-metrics b').nth(0).innerText(),'2');assert.equal(await card.locator('.htx-metrics b').nth(1).innerText(),'+0.38');
