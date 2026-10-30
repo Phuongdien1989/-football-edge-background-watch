@@ -1,0 +1,26 @@
+import assert from 'node:assert/strict';
+import {observeFTRedEvents,observeFTCatalog} from './ft-events.mjs';
+import {buildFTObservation,buildFTOutcome} from './observation.mjs';
+const fixture={fixture:{id:42,status:{short:'2H',elapsed:75}},goals:{home:1,away:0}};
+const item=()=>({history:[1],h1History:[2],hcHistory:[3],cooldown:9,ui:{fixture,engines:{FT:{score:85},H1:{score:70}},goal_estimates:{d:{prob:80}}}});
+const red={type:'Card',detail:'Red Card',team:{id:1},player:{id:10},time:{elapsed:74}};
+let n=0;function test(name,fn){fn();n++;console.log('PASS '+name);}
+test('event dedup and order',()=>{const x=item();observeFTRedEvents(x,[red,red],'OK',1000);const until=x.ftCooldownUntil;assert(!observeFTRedEvents(x,[red],'OK',2000));assert.equal(x.ftCooldownUntil,until);});
+test('empty is not zero reds',()=>{const x=item();observeFTRedEvents(x,[red],'OK',1000);observeFTRedEvents(x,[],'EMPTY',2000);assert.equal(x.ftRedEvents.keys.length,1);assert(x.ftRedEvents.unconfirmedAbsence);assert(!observeFTRedEvents(x,[],'EMPTY',3000));});
+test('provider error does not change red evidence',()=>{const x=item();observeFTRedEvents(x,[red],'OK',1000);const before=JSON.stringify(x);observeFTRedEvents(x,[],'ERROR',2000);assert.equal(JSON.stringify(x),before);});
+test('second yellow invalidates',()=>{const x=item();assert(observeFTRedEvents(x,[{...red,detail:'Second Yellow card'}],'OK',1000));});
+test('ordinary yellow does not invalidate',()=>assert(!observeFTRedEvents(item(),[{...red,detail:'Yellow Card'}],'OK',1000)));
+test('old events ignored',()=>{const x=item();observeFTRedEvents(x,[red],'OK',2000);assert(!observeFTRedEvents(x,[],'EMPTY',1000));});
+test('catalog missing not terminal, idempotent',()=>{const x=item();assert(observeFTCatalog(x,false,1000));assert.equal(x.ftInvalidation.ended,false);assert(!observeFTCatalog(x,false,2000));assert.equal(x.cooldown,9);assert.deepEqual(x.hcHistory,[3]);});
+test('catalog return needs fresh baseline',()=>{const x=item();observeFTCatalog(x,false,1000);assert(observeFTCatalog(x,true,2000));assert.equal(x.ui.engines.FT.score,null);assert.equal(x.history.length,0);});
+test('first half untouched by disappearance',()=>{const x=item();x.ui.fixture=structuredClone(fixture);x.ui.fixture.fixture.status.short='1H';assert(!observeFTCatalog(x,false,1000));assert.equal(x.ui.engines.FT.score,85);});
+const input={id:'42:1000:1',fixture_id:42,decision_at:1000,fixture,sources:{statistics:{status:'OK',received_at:950,source_at:null,data:[{team:{id:1},statistics:[{type:'Total Shots',value:null}]}]}}};
+test('preserve missing values and unknown source time',()=>{const r=buildFTObservation(input);assert.equal(r.sources.statistics.data[0].statistics[0].value,null);assert.equal(r.sources.statistics.source_at,null);assert.equal(r.sources.odds.status,'MISSING');});
+test('immutable input snapshot',()=>{const a=structuredClone(input),r=buildFTObservation(a);a.fixture.goals.home=8;assert.equal(r.fixture.goals.home,1);});
+test('future received data rejected',()=>assert.throws(()=>buildFTObservation({...input,decision_at:900})));
+test('future source timestamp rejected',()=>assert.throws(()=>buildFTObservation({...input,sources:{statistics:{...input.sources.statistics,source_at:999}}})));
+test('fixture identity validated',()=>assert.throws(()=>buildFTObservation({...input,fixture_id:43})));
+test('outcome excluded from observation',()=>assert.equal(buildFTObservation({...input,outcome:{home:5,away:4}}).outcome,undefined));
+test('valid final outcome separate',()=>assert.equal(buildFTOutcome({observation_id:input.id,fixture_id:42,observed_at:2000,resolved_at:2000,status:'FT',score:{home:2,away:0}}).score.home,2));
+test('non-final outcome rejected',()=>assert.throws(()=>buildFTOutcome({observation_id:input.id,fixture_id:42,observed_at:2000,resolved_at:2000,status:'2H',score:{home:2,away:0}})));
+console.log('EVIDENCE_PASS '+n);

@@ -1,0 +1,78 @@
+name: Overview LIVE controls with native scanner and one-shot guard
+on:
+  push:
+    branches: [feat/overview-live-controls-20261030]
+    paths: ['overview-scan-release/**', 'ui-tabs/**', 'ft-overview/light-signal-pro.css', '.github/workflows/overview-scan-release.yml']
+permissions: {contents: read, actions: read}
+concurrency:
+  group: fe-football-edge-mobile-production
+  cancel-in-progress: false
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    environment: football-edge-production
+    env: {WRANGLER_SEND_METRICS: 'false'}
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - uses: actions/download-artifact@v4
+        with:
+          name: overview-top-release-proof
+          run-id: 41004131846
+          github-token: ${{ github.token }}
+          path: overview-scan-baseline
+      - name: Native bridge, start-stop, one-shot, failure and concurrency checks
+        run: |
+          node overview-scan-release/test-runtime.mjs
+          node overview-scan-release/test-host.mjs
+          node --check ui-tabs/scan-control.mjs
+          node --check overview-scan-release/release.mjs
+      - run: npm install --no-save --no-package-lock wrangler@4 playwright@1.58.2
+      - name: Verify current app and preserve all 52 assets and rollback
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node overview-scan-release/release.mjs prepare
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pre-overview-scan-mobile-backup
+          path: |
+            overview-scan-package/backup/
+            overview-scan-package/backup-version.json
+            overview-scan-package/manifest.json
+          retention-days: 90
+      - name: Candidate all six tabs and existing HT retention at four widths
+        run: |
+          node overview-scan-release/test-browser.cjs
+          node overview-scan-release/test-controls.cjs
+      - run: npx --no-install wrangler deploy --dry-run --config overview-scan-package/wrangler.json
+      - name: Publish complete Mobile bundle with Overview LIVE controls
+        id: publish
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node overview-scan-release/release.mjs deploy
+      - name: Verify published HT percentages, price independence, HT retention, FT and HC
+        run: |
+          node overview-scan-release/test-browser.cjs --production
+          node overview-scan-release/test-controls.cjs --production
+      - name: Verify all 54 hashes, backend, Desktop and scanner state
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node overview-scan-release/release.mjs verify
+      - name: Restore Mobile if post-publish checks fail
+        if: failure() && steps.publish.outcome == 'success'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node overview-scan-release/release.mjs rollback
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: overview-scan-release-proof
+          path: overview-scan-package/
+          retention-days: 90

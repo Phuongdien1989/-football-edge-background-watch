@@ -1,0 +1,79 @@
+name: FT V2 valuation and five-minute recommendation window
+on:
+  push:
+    branches: [fix/ft-valuation-session-20261025]
+    paths: ['ft-valuation-release/**', 'ft-overview/**', '.github/workflows/ft-valuation-session-release.yml']
+permissions: {contents: read, actions: read}
+concurrency:
+  group: fe-football-edge-mobile-production
+  cancel-in-progress: false
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    environment: football-edge-production
+    env: {WRANGLER_SEND_METRICS: 'false'}
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - uses: actions/download-artifact@v4
+        with:
+          name: ht-card-refinement-proof
+          run-id: 40099895856
+          github-token: ${{ github.token }}
+          path: previous-mobile
+      - name: Regression and exact settlement, independent price, session state tests
+        run: |
+          node ft-overview/test.mjs
+          node ft-overview/test-experimental-decision.mjs
+          node ft-overview/test-light-signal-pro-view.mjs
+          node ft-overview/test-live-probability.mjs
+          node ft-overview/test-valuation-session.mjs
+          node ft-overview/test-tab-performance.mjs
+          node --check ft-overview/ft-ai-v2-integrated.mjs
+          node --check ft-valuation-release/release.mjs
+          node --check ft-valuation-release/test-browser.cjs
+      - run: npm install --no-save --no-package-lock wrangler@4 playwright@1.58.2
+      - name: Verify current versions and back up all 36 public assets
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node ft-valuation-release/release.mjs prepare
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pre-ft-valuation-session-mobile-backup
+          path: |
+            ft-valuation-package/backup/
+            ft-valuation-package/backup-version.json
+            ft-valuation-package/manifest.json
+          retention-days: 90
+      - name: Candidate actual navigation and HT isolation at four widths
+        run: node ft-valuation-release/test-browser.cjs --candidate
+      - run: npx wrangler deploy --dry-run --config ft-valuation-package/wrangler.json
+      - name: Deploy only four FT assets in complete static bundle
+        id: publish
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node ft-valuation-release/release.mjs deploy
+      - name: Published app navigation, FT session, goal invalidation and HT isolation
+        run: node ft-valuation-release/test-browser.cjs
+      - name: Verify public hashes, backend, Desktop and scanner unchanged
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node ft-valuation-release/release.mjs verify
+      - name: Roll back Mobile if post-deploy acceptance fails
+        if: failure() && steps.publish.outcome == 'success'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node ft-valuation-release/release.mjs rollback
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ft-valuation-session-release-proof
+          path: ft-valuation-package/
+          retention-days: 90

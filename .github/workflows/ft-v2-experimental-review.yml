@@ -1,0 +1,36 @@
+name: FT V2 Experimental decision reviewer — NO deploy
+on:
+  push:
+    branches: [fix/ft-foundation-20261021]
+    paths:
+      - 'ft-overview/**'
+      - '.github/workflows/ft-v2-experimental-review.yml'
+permissions: {contents: read}
+jobs:
+  decision_review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - run: node ft-overview/test-light-signal-mechanisms.mjs
+      - run: node --check ft-overview/light-signal-mechanisms.mjs
+      - run: node --check ft-overview/patch-mechanism-tabs.mjs
+      - run: node ft-overview/test-light-signal-pro-view.mjs
+      - run: node --check ft-overview/light-signal-pro-view.mjs
+      - run: node --check ft-overview/current-shell-injection.mjs
+      - run: node --check ft-overview/release-current-main-app.mjs
+      - run: node ft-overview/test-same-app-integration.mjs
+      - run: node --check ft-overview/ft-ai-v2-integrated.mjs
+      - run: node ft-overview/test-main-app-assets.mjs
+      - run: node ft-overview/test-experimental-decision.mjs
+      - run: node ft-overview/test-pilot-e2e.mjs
+      - run: node ft-overview/test-validation-dashboard.mjs
+      - run: node ft-overview/test-cohort-report.mjs
+      - run: node ft-overview/test-pilot-evidence-join.mjs
+      - run: node ft-overview/test-calibration-audit.mjs
+      - run: node ft-overview/test-live-probability.mjs
+      - run: node ft-overview/test.mjs
+      - run: node --check ft-overview/ui.mjs

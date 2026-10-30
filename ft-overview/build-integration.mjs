@@ -1,5 +1,6 @@
 import {readFileSync,writeFileSync,mkdirSync,copyFileSync} from 'node:fs';
 import {createHash} from 'node:crypto';
+import {patchHCContracts} from '../hc-contracts/patch.mjs';
 const baselinePath=process.argv[2];
 if(!baselinePath)throw Error('Pass the pinned original Mobile HTML path');
 let html=readFileSync(baselinePath,'utf8');
@@ -32,9 +33,10 @@ html=html.replace(marker,target+'\n'+marker);
 html=html.replace('</head>','<link rel="stylesheet" href="./ft-overview/style.css">\n</head>');
 html=html.replace('</body>','<script type="module" src="./ft-overview/ui.mjs"></script>\n</body>');
 mkdirSync('ft-overview/build/ft-overview',{recursive:true});
-writeFileSync('ft-overview/build/index.html',html);
-for(const p of ['core.mjs','adapter.mjs','charts.mjs','demo.mjs','ui.mjs','style.css'])copyFileSync('ft-overview/'+p,'ft-overview/build/ft-overview/'+p);
+writeFileSync('ft-overview/build/index.html',patchHCContracts(html).html);
+for(const p of ['core.mjs','adapter.mjs','charts.mjs','demo.mjs','ui.mjs','style.css','experimental-decision.mjs','live-probability.mjs'])copyFileSync('ft-overview/'+p,'ft-overview/build/ft-overview/'+p);
 // Verify exact reconstruction of the baseline after removing only additions.
 let reconstructed=html.replace(bridge,'').replaceAll(observed,assignment).replace(target+'\n','').replace('<link rel="stylesheet" href="./ft-overview/style.css">\n','').replace('<script type="module" src="./ft-overview/ui.mjs"></script>\n','');
 if(reconstructed!==readFileSync(baselinePath,'utf8'))throw Error('UNEXPECTED_BASELINE_MUTATION');
-console.log(JSON.stringify({baseline_sha256:sha,reconstruction:'PASS',new_assets:6,backend_changes:0,production_deploy:false}));
+console.log(JSON.stringify({baseline_sha256:sha,reconstruction:'PASS',new_assets:8,backend_changes:0,production_deploy:false}));
+

@@ -1,0 +1,24 @@
+name: FT Mobile public HTML baseline read-only
+on:
+  push:
+    branches: [fix/ft-foundation-20261021]
+    paths: ['ft-audit-fix/mobile-public-baseline.mjs','.github/workflows/ft-mobile-public-baseline.yml']
+permissions: {contents: read}
+concurrency: {group: ft-mobile-public-readonly-once, cancel-in-progress: false}
+jobs:
+  inspect:
+    if: contains(github.event.head_commit.message,'[fe-mobile-public-once]') && github.run_attempt == 1
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: GET public Mobile HTML, read markers, record SHA only
+        env:
+          FT_MOBILE_PUBLIC_READONLY_ONCE: CONFIRM
+        run: node ft-audit-fix/mobile-public-baseline.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: {name: mobile-public-baseline-inspection, path: ft-audit-output/mobile-public-baseline-inspection.json, retention-days: 30}

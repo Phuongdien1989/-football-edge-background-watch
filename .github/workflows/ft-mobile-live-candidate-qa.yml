@@ -1,0 +1,95 @@
+name: FT current Mobile outbox offline candidate QA (NO DEPLOY)
+on:
+  push:
+    branches: [fix/ft-foundation-20261021]
+    paths:
+      - 'mobile-outbox-candidate/build_live_mobile_20261022.mjs'
+      - 'ft-audit-fix/test-mobile-live-diff-scope.mjs'
+      - 'ft-audit-fix/test-mobile-shared-ack-qa.mjs'
+      - '.github/workflows/ft-mobile-live-candidate-qa.yml'
+permissions: {contents: read}
+concurrency: {group: ft-mobile-live-20261022-offline-candidate, cancel-in-progress: false}
+jobs:
+  offline:
+    if: contains(github.event.head_commit.message,'[fe-mobile-live-qa-once]') && github.run_attempt == 1
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Download PUBLIC Mobile HTML and verify exact deployment fingerprint
+        run: |
+          node --input-type=module <<'JS'
+          import {createHash} from 'node:crypto';
+          import {mkdirSync,writeFileSync} from 'node:fs';
+          const url='https://shiny-silence-d892.ngophuonghuy.workers.dev/';
+          const response=await fetch(url,{headers:{Accept:'text/html','Cache-Control':'no-cache'},signal:AbortSignal.timeout(28000),redirect:'error'});
+          if(response.status!==200)throw Error('MOBILE_READ_HTTP_'+response.status);
+          if(!(response.headers.get('content-type')||'').includes('text/html'))throw Error('MOBILE_NOT_HTML');
+          const body=Buffer.from(await response.arrayBuffer());
+          const sha=createHash('sha256').update(body).digest('hex');
+          if(sha!=='005a74b4768a00f92ac462592b3de63106b2a4db35732103f6095cfed9fdb46d')throw Error('MOBILE_LIVE_DRIFT_STOP');
+          mkdirSync('mobile-outbox-candidate',{recursive:true});
+          writeFileSync('mobile-outbox-candidate/baseline.html',body);
+          console.log('FE_MOBILE_LIVE_BASELINE_LOCKED '+JSON.stringify({bytes:body.length,sha256:sha,mode:'GET_ONLY',deployed:false}));
+          JS
+      - name: Build isolated Mobile patch from exact baseline (no publish)
+        run: |
+          node --check mobile-outbox-candidate/build_live_mobile_20261022.mjs
+          node mobile-outbox-candidate/build_live_mobile_20261022.mjs mobile-outbox-candidate/baseline.html mobile-outbox-candidate/candidate_mobile.html
+          test -s mobile-outbox-candidate/candidate_mobile.html
+      - name: Test fingerprints and real IndexedDB ACK atomicity
+        run: |
+          npm install --no-save --no-package-lock fake-indexeddb@6
+          node tests/test-mobile-outbox-candidate.mjs
+      - name: Verify exact HTML delta and canonical baseline/candidate SHA
+        run: node ft-audit-fix/test-mobile-live-diff-scope.mjs
+      - name: Verify shared outbox ACK remains safe for QSIG and LIVE events
+        run: node ft-audit-fix/test-mobile-shared-ack-qa.mjs
+      - name: Assert no frontend sections outside intended functions altered
+        run: |
+          node --input-type=module <<'JS'
+          import {readFileSync,writeFileSync,mkdirSync} from 'node:fs';
+          import assert from 'node:assert/strict';
+          import {createHash} from 'node:crypto';
+          const orig=readFileSync('mobile-outbox-candidate/baseline.html','utf8'),patched=readFileSync('mobile-outbox-candidate/candidate_mobile.html','utf8');
+          for(const x of ['feDbEntryFingerprint','feDbAckBatch','await feDbAckBatch(rows)'])assert(patched.includes(x),'missing '+x);
+          assert(!patched.includes('await feDbSyncStateMark(rows);await feDbOutboxDelete(rows)'));
+          assert(orig.includes('await feDbSyncStateMark(rows);await feDbOutboxDelete(rows)'));
+          const unchangedTail='  async function feDbQueueLiveSnapshot(r,{schedule=true}={}){';
+          assert.equal(orig.split(unchangedTail).length,2);assert.equal(patched.split(unchangedTail).length,2);
+          const anchor='  async function feDbSyncStateGet(id){';
+          assert(orig.includes(anchor)&&patched.includes(anchor));
+          const qa={status:'PASS',mode:'OFFLINE_ONLY',baseSha256:createHash('sha256').update(orig).digest('hex'),candidateSha256:createHash('sha256').update(patched).digest('hex'),baseBytes:Buffer.byteLength(orig),candidateBytes:Buffer.byteLength(patched),backend_changed:false,production_deploy:false,D1_writes:0,scanner_changed:false};
+          mkdirSync('ft-audit-output',{recursive:true});writeFileSync('ft-audit-output/mobile-live-candidate-qa.json',JSON.stringify(qa,null,2));
+          console.log('FE_MOBILE_CANDIDATE_QA '+JSON.stringify(qa));
+          JS
+      - name: Package paired source and candidate ZIP — release review only, NOT deployed
+        run: |
+          mkdir -p ft-audit-output/mobile-review
+          cp mobile-outbox-candidate/baseline.html ft-audit-output/mobile-review/rollback-original.html
+          cp mobile-outbox-candidate/candidate_mobile.html ft-audit-output/mobile-review/mobile-candidate.html
+          cat > ft-audit-output/mobile-review/README.txt <<'TXT'
+          Football Edge Mobile Outbox candidate, 2026-10-22.
+          CANDIDATE: mobile-candidate.html (tested, NOT DEPLOYED).
+          ROLLBACK: rollback-original.html (current public Mobile HTML at audit time).
+          No backend D1, scanner, HT/HC/TOP/Push production changes authorized.
+          Release only after owner approval and live version/SHA revalidation.
+          TXT
+          cd ft-audit-output/mobile-review
+          sha256sum mobile-candidate.html rollback-original.html > SHA256SUMS.txt
+          zip -q ../football-edge-mobile-outbox-review-20261022.zip mobile-candidate.html rollback-original.html README.txt SHA256SUMS.txt
+          test -s ../football-edge-mobile-outbox-review-20261022.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ft-mobile-outbox-20261022-candidate-and-rollback
+          path: ft-audit-output/football-edge-mobile-outbox-review-20261022.zip
+          retention-days: 90
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ft-mobile-live-candidate-qa-report
+          path: ft-audit-output/mobile-live-candidate-qa.json
+          retention-days: 45

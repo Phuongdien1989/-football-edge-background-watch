@@ -1,0 +1,46 @@
+name: FT Pilot review package — NO deploy
+on:
+  push:
+    branches: [fix/ft-foundation-20261021]
+    paths:
+      - 'ft-pilot/**'
+      - '.github/workflows/ft-pilot-review.yml'
+permissions:
+  contents: read
+concurrency:
+  group: ft-pilot-review-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Verify current HT and HC asset isolation
+        run: node ft-audit-fix/test-mobile-asset-isolation.mjs
+      - name: Verify immutable D1 pilot schema against SQLite and restart
+        run: node ft-pilot/test.mjs
+      - name: Create review-only scanner/Outcome source copies
+        run: node ft-pilot/build-review-patch.mjs
+      - name: Verify safe after-Push integration and failure isolation
+        run: node ft-pilot/test-integration.mjs
+      - name: Compare real H1/FT/HC evaluator before and after FT Pilot at equal provider inputs
+        run: node ft-pilot/test-dual-replay.mjs
+      - name: Parse both reviewed Worker candidates, never execute them
+        run: |
+          node --check ft-audit-output/ft-pilot-candidate/worker_notify_v130.js
+          node --check ft-audit-output/ft-pilot-candidate/worker.js
+      - name: Upload candidate code/schema, source SHA manifest and approval instructions
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ft-pilot-approval-package-NO-DEPLOY
+          path: |
+            ft-pilot/
+            ft-audit-output/ft-pilot-candidate/
+            ft-audit-output/ft-pilot-parity/dual-replay-report.json
+          retention-days: 90
+          if-no-files-found: error

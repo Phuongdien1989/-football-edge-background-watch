@@ -1,0 +1,189 @@
+import {reserveScanAttempt} from './shared-api-budget.mjs';
+import {runPendingFT,PAGE_SQL} from './pending-discovery.mjs';
+import {runFTOutcomePass,OUTCOME_BUDGET_KEY} from './outcome-pass.mjs';
+import {recordFTDecision} from './decision-trace.mjs';
+import {recordFTScan} from './worker-recorder.mjs';
+import {PAIR_INSERT_SQL,PAIR_READ_SQL} from './ft-pair-collector.mjs';
+import {PAIR_PAGE_SQL} from './pair-outcome-replay.mjs';
+import {beginFTReplaySqlInvocation,ftReplaySqlRemaining} from './replay-sql-budget.mjs';
+import {planFTCaptureBatch} from './capture-plan.mjs';
+import assert from 'node:assert/strict';import {readFileSync,writeFileSync} from 'node:fs';
+import {observeFT,observeFTStats,observeFTRedEvents,observeFTCatalog} from './ft-events.mjs';
+const baseline=process.argv[2]||'baseline',out=process.argv[3]||'ft-audit-output';
+const {createEngine}=await import('data:text/javascript;base64,'+Buffer.from(readFileSync(out+'/candidate/notify-core.js','utf8')).toString('base64'));
+function load(path){let source=readFileSync(path,'utf8').replace(/^import .*;\s*$/gm,'').replace('export class BackgroundWatcher','class BackgroundWatcher').replace('export default base;','return BackgroundWatcher;');
+ return new Function('DeepLinkWatcher','base','createHTCollection','readHTContext','createHTHistoryCache','assessHTItem','createEngine','crossing','observeFT','observeFTStats','observeFTRedEvents','observeFTCatalog','recordFTScan','recordFTDecision','runFTOutcomePass','runPendingFT','reserveScanAttempt','beginFTReplaySqlInvocation','ftReplaySqlRemaining','planFTCaptureBatch',source)(class{}, {},()=>({eligible:()=>false}),async()=>({}),()=>({beginCycle(){}}),()=>null,createEngine,()=>({state:{},send:false}),observeFT,observeFTStats,observeFTRedEvents,observeFTCatalog,recordFTScan,recordFTDecision,runFTOutcomePass,runPendingFT,reserveScanAttempt,beginFTReplaySqlInvocation,ftReplaySqlRemaining,planFTCaptureBatch);}
+const before=load(out+'/candidate/worker_notify_v130.js'),after=load(out+'/recorder-trial/worker_notify_v130.js');
+const f=(goals,phase='2H')=>({fixture:{id:42,status:{short:phase,elapsed:phase==='1H'?35:75}},goals,teams:{home:{id:1,name:'A'},away:{id:2,name:'B'}}});
+async function run(C,fixture,stats=[],events=[],options={}){
+ const w=new C(),now=Date.now(),rows=new Map(),storage=options.storage||new Map(),calls=[];let writes=0,bytes=0,storageReads=0,storagePuts=0,transactionTail=Promise.resolve();
+ const old={id:42,lastAt:now-1000,history:[{captured_at:now-1000}],hcHistory:[{hc:1}],h1History:[{h1:1}],oddsHistory:[],alerts:{},red:0,ui:{fixture:f({home:1,away:0}),captured_at:now-1000,snapshot:{fresh_at:now-1000},engines:{FT:{score:85},H1:{score:72}},goal_estimates:{d:{prob:80}}}};
+ rows.set(42,structuredClone(old));w.env=options.env||{};w.ctx={storage:{get:async k=>{storageReads++;return storage.get(k);},put:async(k,v)=>{storagePuts++;return storage.set(k,v);},transaction:fn=>{const task=transactionTail.then(()=>fn(w.ctx.storage));transactionTail=task.catch(()=>{});return task;}}};w.scanControl=async()=>({enabled:true});w.devices=async()=>[{id:'d',prefs:{enabled:true,goal:true,h1:false,gap:false,...(options.devicePrefs||{})}}];w.listNotifyMatches=async()=>[...rows.values()].map(x=>structuredClone(x));w.putNotifyMatch=async(id,x)=>{writes++;bytes+=Buffer.byteLength(JSON.stringify(x));rows.set(id,structuredClone(x));};w.deleteNotifyMatch=async id=>rows.delete(id);w.api=async(path,params)=>{calls.push(path);if(path==='/fixtures'&&params?.id&&options.finalFixture)return [options.finalFixture];if(options.failEvents&&path==='/fixtures/events')throw Error('PROVIDER_TEST_ERROR');return path==='/fixtures'?(fixture?[fixture]:[]):path==='/fixtures/statistics'?stats:path==='/fixtures/events'?events:[]};w.send=async()=>{throw Error('UNEXPECTED_PUSH')};await w.notifyTick();return {storageOps:{reads:storageReads,puts:storagePuts},worker:w,row:rows.get(42),old,calls,writes,bytes,replay:w.ftReplayLast,decision:w.ftReplayDecisionLast,discovery:w.ftReplayDiscoveryLast,storage};
+}
+
+const fixture=f({home:1,away:0}),rows=new Map();let sql=0,reservations=0,deny=false;
+const db={prepare(q){return {bind(...a){return {async all(){sql++;assert([PAGE_SQL,PAIR_PAGE_SQL].includes(q));if(q===PAIR_PAGE_SQL){return {results:[...rows.entries()].filter(([id])=>id.startsWith('PAIR:')&&id.slice(5)>a[0]).sort(([a],[b])=>a.localeCompare(b)).slice(0,a[1]).map(([,r])=>({observation_id:r.payload.id,fixture_id:r.payload.fixture_id,observed_at:r.payload.decision_at,decision_at:r.decision.decision_at,content_hash:r.content_hash,observation_json:JSON.stringify(r.payload),decision_json:JSON.stringify(r.decision),has_outcome:[...rows.values()].some(x=>x.payload?.schema==='FT_OUTCOME_V2_DRAFT'&&x.payload.observation_id===r.payload.id)?1:0}))};}return {results:[...rows.entries()].filter(([id])=>id.startsWith('OBS:')&&id>a[0]).sort(([a],[b])=>a.localeCompare(b)).slice(0,a[1]).map(([record_id,r])=>({record_id,observation_id:r.payload.id,fixture_id:r.payload.fixture_id,payload_json:JSON.stringify(r.payload),has_decision:[...rows.values()].some(x=>x.payload.schema==='FT_DECISION_V1_DRAFT'&&x.payload.observation_id===r.payload.id)?1:0,has_outcome:[...rows.values()].some(x=>x.payload.schema==='FT_OUTCOME_V2_DRAFT'&&x.payload.observation_id===r.payload.id)?1:0}))};},async first(){sql++;if(q.startsWith('UPDATE ft_replay_budget_v1')){reservations++;return deny?null:{used_records:reservations};}return rows.get(q===PAIR_READ_SQL?'PAIR:'+a[0]:a[0])||null;},async run(){sql++;if(q===PAIR_INSERT_SQL){const key='PAIR:'+a[0],prior=rows.get(key);if(!prior)rows.set(key,{content_hash:a[4],payload:JSON.parse(a[5]),decision:JSON.parse(a[6])});return {meta:{changes:prior?0:1,rows_written:prior?0:1}};}rows.set(a[0],{content_hash:a[5],payload:JSON.parse(a[6])});return {meta:{changes:1}};}};}};}};
+const env={FT_REPLAY_TRIAL_ENABLED:'true',FT_REPLAY_TRIAL_EPOCH:'integration-1',FT_REPLAY_TRIAL_MAX_RECORD_BYTES:'20000',FT_REPLAY_DB:db};
+let baselineCost;let checks=0;async function test(name,fn){await fn();checks++;console.log('PASS '+name);}
+await test('disabled trial Worker preserves scan API and logical writes',async()=>{const a=await run(before,fixture),b=await run(after,fixture);assert.deepEqual(a.calls,b.calls);assert.equal(a.writes,b.writes);assert.equal(b.replay.status,'DISABLED');assert.equal(sql,0);baselineCost={api_calls:a.calls.length,storage_ops:a.storageOps,logical_match_puts:a.writes};});
+// Explicit HT/HC non-regression: compare user-facing evaluations/alerts and
+// normal scan API/write footprint when the FT replay sidecar remains OFF.
+await test('FT trial disabled preserves HT/H1 and HC snapshots in live first half',async()=>{
+ const first=f({home:1,away:0},'1H');
+ const stats=[1,2].map(id=>({team:{id},statistics:[
+  {type:'Red Cards',value:0},{type:'Total Shots',value:id===1?11:8},
+  {type:'Shots on Goal',value:4},{type:'Shots insidebox',value:5},
+  {type:'Corner Kicks',value:3},{type:'Ball Possession',value:id===1?'55%':'45%'}]}));
+ const opts={devicePrefs:{h1:true,gap:true,goal:true}};
+ const a=await run(before,first,stats,[],opts),b=await run(after,first,stats,[],opts);
+ assert.deepEqual(b.calls,a.calls,'FT sidecar must not add provider calls');
+ assert.equal(b.writes,a.writes,'FT sidecar OFF must not add match writes');
+ assert.equal(b.storageOps.puts,a.storageOps.puts,'FT sidecar OFF must not add DO writes');
+ assert.equal(b.row.ui?.engines?.H1?.score,a.row.ui?.engines?.H1?.score);
+ assert.equal(b.row.ui?.engines?.H1?.scoreMode,a.row.ui?.engines?.H1?.scoreMode);
+ assert.deepEqual(b.row.ui?.h1_snapshot?.metrics,a.row.ui?.h1_snapshot?.metrics);
+ assert.deepEqual(b.row.ui?.hc_snapshot?.metrics,a.row.ui?.hc_snapshot?.metrics);
+ assert.deepEqual(b.row.h1History.map(x=>x.metrics),a.row.h1History.map(x=>x.metrics));
+ assert.deepEqual(b.row.hcHistory.map(x=>x.metrics),a.row.hcHistory.map(x=>x.metrics));
+ assert.deepEqual(b.row.alerts,a.row.alerts);
+ assert.equal(b.row.last?.gap,a.row.last?.gap);
+ assert.equal(b.replay.status,'DISABLED');
+});
+await test('FT trial disabled preserves HC and Goal Radar FT in second half',async()=>{
+ const second=f({home:1,away:1},'2H');
+ const stats=[1,2].map(id=>({team:{id},statistics:[
+  {type:'Red Cards',value:0},{type:'Total Shots',value:10},
+  {type:'Shots on Goal',value:4},{type:'Shots insidebox',value:6},
+  {type:'Corner Kicks',value:3},{type:'Ball Possession',value:'50%'}]}));
+ const opts={devicePrefs:{h1:true,gap:true,goal:true}};
+ const a=await run(before,second,stats,[],opts),b=await run(after,second,stats,[],opts);
+ assert.deepEqual(b.calls,a.calls);
+ assert.equal(b.writes,a.writes);
+ assert.equal(b.storageOps.puts,a.storageOps.puts);
+ assert.deepEqual(b.row.ui?.hc_snapshot?.metrics,a.row.ui?.hc_snapshot?.metrics);
+ assert.deepEqual(b.row.hcHistory.map(x=>x.metrics),a.row.hcHistory.map(x=>x.metrics));
+ assert.equal(b.row.last?.gap,a.row.last?.gap);
+ assert.equal(b.row.ui?.engines?.FT?.score,a.row.ui?.engines?.FT?.score);
+ assert.equal(b.row.ui?.engines?.FT?.scoreMode,a.row.ui?.engines?.FT?.scoreMode);
+ assert.deepEqual(b.row.ui?.goal_estimates,a.row.ui?.goal_estimates);
+ assert.deepEqual(b.row.alerts,a.row.alerts);
+ assert.equal(b.replay.status,'DISABLED');
+});
+await test('FT replay recording ON still leaves HC outputs and device alerts unchanged',async()=>{
+ deny=false;
+ const second=f({home:1,away:0},'2H');
+ const stats=[1,2].map(id=>({team:{id},statistics:[
+  {type:'Red Cards',value:0},{type:'Total Shots',value:id===1?11:8},
+  {type:'Shots on Goal',value:4},{type:'Shots insidebox',value:5},
+  {type:'Corner Kicks',value:3}]}));
+ const options={devicePrefs:{h1:true,gap:true,goal:true}};
+ const a=await run(before,second,stats,[],options);
+ const b=await run(after,second,stats,[],{...options,env});
+ assert.equal(b.replay.status,'STORED');
+ assert.deepEqual(b.calls,a.calls,'Trial capture must not steal HT/HC provider calls');
+ assert.equal(b.writes,a.writes,'Trial capture must not trigger extra shared fixture writes');
+ assert.deepEqual(b.row.ui?.hc_snapshot?.metrics,a.row.ui?.hc_snapshot?.metrics);
+ assert.deepEqual(b.row.hcHistory.map(x=>x.metrics),a.row.hcHistory.map(x=>x.metrics));
+ assert.equal(b.row.last?.gap,a.row.last?.gap);
+ assert.deepEqual(b.row.ui?.goal_estimates,a.row.ui?.goal_estimates);
+ assert.deepEqual(b.row.alerts,a.row.alerts);
+ assert.equal(b.row.ui?.engines?.FT?.score,a.row.ui?.engines?.FT?.score);
+ // This test uses the shared in-memory fake D1; isolate its records from
+ // following legacy assertions that intentionally start with an empty fake DB.
+ rows.clear();
+});
+await test('actual Worker records missing stats without extra provider requests',async()=>{const b=await run(after,fixture,[],[],{env});assert.equal(b.replay.status,'STORED');assert.equal(b.calls.length,5);assert.equal(rows.size,2);assert.equal(b.decision.status,'STORED');const p=[...rows.values()][0].payload;assert.equal(p.sources.statistics.status,'EMPTY');assert.equal(p.sources.odds.status,'EMPTY');assert.equal(p.sources.fixture.received_at<=p.decision_at,true);assert.equal(p.fixture.fixture.status.short,'2H');});
+await test('provider failure receipt is retained as error not empty',async()=>{const b=await run(after,fixture,[],[],{env,failEvents:true});assert.equal(b.replay.status,'STORED');const p=[...rows.values()].filter(x=>x.payload.schema==='FT_OBSERVATION_V1_DRAFT').at(-1).payload;assert.equal(p.sources.events.status,'ERROR');assert.equal(p.sources.events.data,null);assert(p.sources.events.received_at>0);});
+await test('pause survives a new Worker instance while normal scan continues',async()=>{deny=true;const beforeSql=sql,a=await run(after,fixture,[],[],{env}),b=await run(after,fixture,[],[],{env,storage:a.storage});assert.equal(a.replay.status,'BUDGET_DENIED');assert.equal(b.replay.status,'PAUSED');assert.equal(sql-beforeSql,1);assert.equal(a.calls.length,5);assert.equal(b.calls.length,5);});
+await test('missing-stats decision linked without reusing old UI score',async()=>{const decision=[...rows.values()].filter(x=>x.payload.schema==='FT_DECISION_V1_DRAFT')[0].payload;assert.equal(decision.state,'NOT_EVALUATED');assert.equal(decision.evaluation,null);assert.equal(decision.reason,'STATS_UNAVAILABLE');assert(rows.has('OBS:'+decision.observation_id));});
+await test('evaluated Worker snapshot matches backend FT output',async()=>{
+ deny=false;
+ const stats=[1,2].map(id=>({team:{id},statistics:[{type:'Red Cards',value:0},{type:'Total Shots',value:10},{type:'Shots on Goal',value:4},{type:'Shots insidebox',value:6},{type:'Corner Kicks',value:3}]}));
+ const r=await run(after,fixture,stats,[],{env});
+ assert.equal(r.decision.status,'STORED');
+ const d=[...rows.values()].filter(x=>x.payload.schema==='FT_DECISION_V1_DRAFT').at(-1).payload;
+ assert.equal(d.state,'EVALUATED');assert.deepEqual(d.evaluation,r.row.ui.engines.FT);assert.equal(d.devices.length,1);assert.deepEqual(d.devices[0].goal_estimate,r.row.ui.goal_estimates.d);assert.equal(d.top_rank,null);assert.match(d.source_hash,/^[a-f0-9]{64}$/);
+});
+await test('trial Worker explicit outcome entrypoint fetches and links supplied observation',async()=>{
+ deny=false;const r=await run(after,fixture,[],[],{env:{...env}});
+ const o=r.worker;
+ const observation=[...rows.values()].filter(x=>x.payload.schema==='FT_OBSERVATION_V1_DRAFT').at(-1).payload;
+ Object.assign(o.env,{FT_OUTCOME_TRIAL_ENABLED:'true',FT_OUTCOME_TRIAL_MAX_OBSERVATIONS:'2',FT_OUTCOME_TRIAL_MAX_FIXTURES:'1',FT_OUTCOME_TRIAL_MAX_WRITES:'2',FT_OUTCOME_TRIAL_RETRY_MS:'1000',FT_OUTCOME_TRIAL_MAX_ATTEMPTS:'3'});
+ o.ctx.storage.transaction=fn=>fn(o.ctx.storage);
+ const t=Date.now();await o.ctx.storage.put(OUTCOME_BUDGET_KEY,{start:t-1000,end:t+10000,max_calls:1,used:0});
+ let requests=0;o.api=async(path,args,strict)=>{requests++;assert.equal(path,'/fixtures');assert.equal(args.id,42);assert.equal(strict,true);return [{...f({home:2,away:0},'FT'),score:{fulltime:{home:2,away:0}}}];};
+ const result=await o.ftReplayOutcomePass([observation]);assert.equal(result.api_calls,1);assert.equal(result.results[0].status,'STORED');assert.equal(requests,1);
+ const outcome=[...rows.values()].filter(x=>x.payload.schema==='FT_OUTCOME_V2_DRAFT').at(-1).payload;
+ assert.equal(outcome.observation_id,observation.id);assert.equal(outcome.score.home,2);
+});
+await test('opt-in notifyTick discovers and resolves without supplied observation list',async()=>{
+ rows.clear();deny=false;
+ const t=Date.now(),storage=new Map([[OUTCOME_BUDGET_KEY,{start:t-1000,end:t+100000,max_calls:2,used:0}]]);
+ const options={env:{...env,FT_OUTCOME_DISCOVERY_ENABLED:'true',FT_OUTCOME_TRIAL_ENABLED:'true',FT_OUTCOME_TRIAL_PAGE_SIZE:'1',FT_OUTCOME_TRIAL_DISCOVERY_INTERVAL_MS:'1000',FT_OUTCOME_TRIAL_DISCOVERY_LEASE_MS:'5000',FT_OUTCOME_TRIAL_MAX_OBSERVATIONS:'2',FT_OUTCOME_TRIAL_MAX_FIXTURES:'1',FT_OUTCOME_TRIAL_MAX_WRITES:'2',FT_OUTCOME_TRIAL_RETRY_MS:'1000',FT_OUTCOME_TRIAL_MAX_ATTEMPTS:'3'},storage,finalFixture:{...f({home:2,away:0},'FT'),score:{fulltime:{home:2,away:0}}}};
+ const beforeSQL=sql;const r=await run(after,fixture,[],[],options);
+ assert.equal(r.discovery.status,'PAGE_PROCESSED');assert.equal(r.discovery.result.results[0].status,'STORED');assert.equal(r.calls.length,6);assert.equal(r.storage.get('notify:budget').used,6);assert.equal(r.storage.get('notify:status').apiToday,6);assert.equal(sql-beforeSQL,13);
+ const cost={scope:'TRANSFORMED_NOTIFY_TICK_WITH_MOCKED_PROVIDER_AND_STORES',baseline:baselineCost,trial:{api_calls:r.calls.length,sql_statements:sql-beforeSQL,storage_ops:r.storageOps,logical_match_puts:r.writes},excluded:['real D1 billed rows/index writes','inherited Worker I/O','actual match-store backend','other watcher objects'],production_validated:false};writeFileSync(out+'/trial-total-cost.json',JSON.stringify(cost,null,2));console.log('TRIAL_COST '+JSON.stringify(cost));
+ assert.equal([...rows.values()].filter(x=>x.payload.schema==='FT_OUTCOME_V2_DRAFT').length,1);
+});
+await test('sidecar SQL cap defers replay without dropping normal Notify scan',async()=>{
+ rows.clear();deny=false;const start=sql;
+ const r=await run(after,fixture,[],[],{env:{...env,FT_REPLAY_TRIAL_SQL_BUDGET_PER_INVOCATION:'3'}});
+ assert.equal(r.replay.status,'DEFERRED_CAPTURE_BUDGET');
+ assert.equal(r.calls.length,5);
+ assert.equal(r.decision,null);
+ assert.equal(sql-start,0);
+ assert.equal(r.writes,1);
+});
+await test('sidecar SQL cap covers observation and decision in a single scan',async()=>{
+ rows.clear();deny=false;const start=sql;
+ const r=await run(after,fixture,[],[],{env:{...env,FT_REPLAY_TRIAL_SQL_BUDGET_PER_INVOCATION:'4'}});
+ assert.equal(r.replay.status,'DEFERRED_CAPTURE_BUDGET');
+ assert.equal(r.decision,null);
+ assert.equal(sql-start,0);
+ assert.equal(r.calls.length,5);
+ assert.equal(r.writes,1);
+});
+await test('atomic pair trial stores Observation and Decision together in one row',async()=>{
+ rows.clear();deny=false;const beforeSql=sql;
+ const r=await run(after,fixture,[],[],{env:{...env,FT_REPLAY_PAIR_TRIAL_ENABLED:'true'}});
+ assert.equal(r.replay.status,'PAIR_STAGED');
+ assert.equal(r.decision.status,'PAIR_STORED');
+ assert.equal(sql-beforeSql,3);
+ assert.equal(r.calls.length,5);
+ assert.equal(r.writes,1);
+ const pairs=[...rows.entries()].filter(([id])=>id.startsWith('PAIR:'));
+ assert.equal(pairs.length,1);
+ assert.equal(pairs[0][1].payload.id,pairs[0][1].decision.observation_id);
+ const manifest=r.storage.get('ft:replay:capture-plan:v1')?.history?.at(-1);
+ assert.equal(manifest?.attempts?.[0]?.fixture_id,42);
+ assert.equal(manifest?.attempts?.[0]?.capture_status,'PAIR_STAGED');
+ assert.equal(manifest?.attempts?.[0]?.decision_status,'PAIR_STORED');
+ assert.equal(manifest?.attempts?.[0]?.storage_confirmed,true);
+ assert.equal([...rows.keys()].filter(k=>k.startsWith('OBS:')||k.startsWith('DEC:')).length,0);
+});
+await test('atomic pair trial defers on SQL cap but never stores half a pair',async()=>{
+ rows.clear();deny=false;const beforeSql=sql;
+ const r=await run(after,fixture,[],[],{env:{...env,FT_REPLAY_PAIR_TRIAL_ENABLED:'true',FT_REPLAY_TRIAL_SQL_BUDGET_PER_INVOCATION:'2'}});
+ assert.equal(r.replay.status,'DEFERRED_CAPTURE_BUDGET');
+ assert.equal(r.decision,null);
+ assert.equal(sql-beforeSql,0);
+ const manifest=r.storage.get('ft:replay:capture-plan:v1')?.history?.at(-1);
+ assert.equal(manifest?.attempts?.[0]?.storage_confirmed,false);
+ assert.equal(manifest?.attempts?.[0]?.capture_status,'DEFERRED_CAPTURE_BUDGET');
+ assert.equal(r.calls.length,5);
+ assert.equal(rows.size,0);
+});
+await test('atomic pair plus outcome discovery joins result without a second forecast',async()=>{
+ rows.clear();deny=false;const t=Date.now();
+ const storage=new Map([[OUTCOME_BUDGET_KEY,{start:t-1000,end:t+100000,max_calls:2,used:0}]]);
+ const opts={env:{...env,FT_REPLAY_PAIR_TRIAL_ENABLED:'true',FT_OUTCOME_DISCOVERY_ENABLED:'true',FT_OUTCOME_TRIAL_ENABLED:'true',FT_OUTCOME_TRIAL_PAGE_SIZE:'1',FT_OUTCOME_TRIAL_DISCOVERY_INTERVAL_MS:'1000',FT_OUTCOME_TRIAL_DISCOVERY_LEASE_MS:'5000',FT_OUTCOME_TRIAL_MAX_OBSERVATIONS:'2',FT_OUTCOME_TRIAL_MAX_FIXTURES:'1',FT_OUTCOME_TRIAL_MAX_WRITES:'2',FT_OUTCOME_TRIAL_RETRY_MS:'1000',FT_OUTCOME_TRIAL_MAX_ATTEMPTS:'3'},storage,finalFixture:{...f({home:2,away:0},'FT'),score:{fulltime:{home:2,away:0}}}};
+ const startSql=sql,r=await run(after,fixture,[],[],opts);
+ assert.equal(r.replay.status,'PAIR_STAGED');assert.equal(r.decision.status,'PAIR_STORED');
+ assert.equal(r.discovery.ledger,'PAIR');assert.equal(r.discovery.result.results[0].status,'STORED');
+ assert.equal(r.calls.length,6);assert.equal(sql-startSql,8);
+ assert.equal([...rows.keys()].filter(k=>k.startsWith('PAIR:')).length,1);
+ assert.equal([...rows.keys()].filter(k=>k.startsWith('OUT:')).length,1);
+ assert.equal([...rows.keys()].filter(k=>k.startsWith('OBS:')||k.startsWith('DEC:')).length,0);
+ assert.equal(r.storage.get('notify:budget').used,6);
+});
+writeFileSync(out+'/recorder-integration-tests.json'   ,JSON.stringify({status:'PASS',checks,worker:'transformed baseline Worker',provider:'mock',D1:'mock',production_validated:false},null,2));

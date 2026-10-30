@@ -1,0 +1,92 @@
+name: FT foundation candidate and read-only inventory
+on:
+  push:
+    branches: [fix/ft-foundation-20261021]
+    paths: ['ft-audit-fix/**', 'ft-v2-mobile/**', 'ft-pilot/**', 'mobile-outbox-candidate/production-preflight.mjs', 'mobile-outbox-candidate/production-release.mjs', '.github/workflows/ft-audit-foundation.yml']
+permissions: {contents: read, actions: read}
+jobs:
+  candidate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - uses: actions/download-artifact@v4
+        with:
+          name: scan-status-recovery-evidence
+          run-id: 39567549512
+          github-token: ${{ github.token }}
+          path: baseline
+      - run: node ft-audit-fix/build.mjs
+      - run: node ft-audit-fix/build-recorder-trial.mjs
+      - run: node ft-audit-fix/test-mobile-asset-isolation.mjs
+      - run: node ft-v2-mobile/test.mjs
+      - run: node ft-v2-mobile/test-legacy-bridge.mjs
+      - run: node ft-v2-mobile/test-pair-export-bridge.mjs
+      - run: node ft-audit-fix/test.mjs
+      - run: node ft-audit-fix/test-events.mjs
+      - run: node ft-audit-fix/test-evidence.mjs
+      - run: node ft-audit-fix/test-integration.mjs
+      - run: node ft-audit-fix/test-ledger.mjs
+      - run: node ft-audit-fix/test-trial-collector.mjs
+      - run: node ft-audit-fix/test-persistent-collector.mjs
+      - run: node ft-audit-fix/test-pair-outcome-replay.mjs
+      - run: node ft-audit-fix/test-ft-total-settlement.mjs
+      - run: node ft-audit-fix/test-ft-pricing-evidence-bridge.mjs
+      - run: node ft-audit-fix/test-ft-total-experimental-model.mjs
+      - run: node ft-audit-fix/test-ft-pair-collector.mjs
+      - run: python3 ft-audit-fix/test-ft-pair-sqlite.py
+      - run: node ft-audit-fix/test-replay-integrity.mjs
+      - run: node ft-audit-fix/test-capture-plan.mjs
+      - run: node ft-audit-fix/test-replay-validation-report.mjs
+      - run: node ft-audit-fix/test-prod-backend-d1-guard.mjs
+      - run: node ft-audit-fix/test-d1-capacity-analysis.mjs
+      - run: node ft-audit-fix/test-legacy-ft-source-plan.mjs
+      - run: node ft-audit-fix/test-legacy-ft-payload-shape.mjs
+      - run: node ft-audit-fix/test-legacy-ft-background-shape.mjs
+      - run: node ft-audit-fix/test-replay-sql-budget.mjs
+      - run: node ft-audit-fix/test-worker-recorder.mjs
+      - run: node ft-pilot/test.mjs
+      - run: node ft-pilot/test-integration.mjs
+      - run: node ft-pilot/test-dual-replay.mjs
+      - run: node --check ft-audit-output/ft-pilot-candidate/worker_notify_v130.js
+      - run: node --check ft-audit-output/ft-pilot-candidate/worker.js
+      - run: node ft-audit-fix/test-decision-trace.mjs
+      - run: node ft-audit-fix/test-outcome-pass.mjs
+      - run: node ft-audit-fix/test-shared-api-budget.mjs
+      - run: node ft-audit-fix/test-pending-discovery.mjs
+      - run: python3 ft-audit-fix/test-pending-sql.py
+      - run: node ft-audit-fix/test-recorder-integration.mjs
+      - run: node --check ft-audit-output/recorder-trial/worker_notify_v130.js
+      - run: python3 ft-audit-fix/test-ledger-sql.py
+      - run: node --check ft-audit-output/candidate/worker_notify_v130.js
+      - run: node --check ft-audit-output/candidate/notify-core.js
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ft-foundation-candidate
+          path: ft-audit-output/
+          retention-days: 90
+  inventory:
+    if: false # Completed read-only inventory retained in checkpoint; event-only changes need no new D1 reads.
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    environment: football-edge-production
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Read deployment metadata and bounded D1 samples only
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node ft-audit-fix/inventory.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ft-foundation-inventory
+          path: ft-audit-output/inventory.json
+          retention-days: 90

@@ -1,0 +1,96 @@
+name: FT Pilot Phase 3 exact-date candidate — NO deploy
+on:
+  push:
+    branches: [fix/ft-foundation-20261021]
+    paths:
+      - 'ft-pilot/**'
+      - '.github/workflows/ft-pilot-phase3-exact-date.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: ft-phase3-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  v138_inherited_ab:
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Actual v138 through v130 inherited notifyTick A/B, local stubs only
+        run: node ft-pilot/test-v138-chain-replay.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ft-phase3-v138-inherited-ab-NO-DEPLOY
+          path: ft-audit-output/ft-pilot-v138-parity/
+          retention-days: 60
+  concurrent_d1_do_stress:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install exact-date local Workerd, no credentials
+        run: npm install --no-save --no-package-lock miniflare@4.20260730.0 workerd@1.20261015.1
+      - name: 30 concurrent pair attempts, 9 outcome callbacks and restart
+        run: |
+          export MINIFLARE_WORKERD_PATH="$PWD/node_modules/workerd/bin/workerd"
+          node ft-pilot/test-phase3-stress-workerd.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ft-phase3-concurrent-d1-do-NO-DEPLOY
+          path: ft-audit-output/ft-pilot-stress/
+          retention-days: 60
+  static_v138_lineage:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node ft-pilot/test-phase3-source-guard.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: phase3-static-v138-NO-DEPLOY
+          path: ft-audit-output/ft-pilot-phase3/
+  exact_date_local_shadow:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Pin stable Miniflare 4 and recent Workerd binary (local only)
+        run: npm install --no-save --no-package-lock miniflare@4.20260730.0 workerd@1.20261015.1
+      - name: Run 36 local D1/DO assertions on exact 2026-09-11 with external Workerd
+        env:
+          FT_PILOT_SHADOW_COMPAT_DATE: '2026-09-11'
+          FT_PILOT_REQUIRE_EXACT_COMPAT: 'true'
+        run: |
+          test -x node_modules/workerd/bin/workerd
+          export MINIFLARE_WORKERD_PATH="$PWD/node_modules/workerd/bin/workerd"
+          node -p '"Miniflare="+require("./node_modules/miniflare/package.json").version+" Workerd="+require("./node_modules/workerd/package.json").version'
+          node ft-pilot/test-shadow-workerd.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: phase3-exact-date-workerd-NO-DEPLOY
+          path: ft-audit-output/ft-pilot-shadow/

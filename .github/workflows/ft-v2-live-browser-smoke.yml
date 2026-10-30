@@ -1,0 +1,20 @@
+name: FT V2 integrated Mobile browser smoke (READ ONLY)
+on:
+  push:
+    branches: [fix/ft-foundation-20261021]
+    paths:
+      - 'ft-overview/test-live-tab-smoke.cjs'
+      - '.github/workflows/ft-v2-live-browser-smoke.yml'
+permissions: {contents: read}
+jobs:
+  browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - run: npm install --no-save playwright@1.58.2
+      - run: npx playwright install --with-deps chromium
+      - run: node ft-overview/test-live-tab-smoke.cjs

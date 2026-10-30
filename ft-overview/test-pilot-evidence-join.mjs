@@ -1,0 +1,11 @@
+import assert from 'node:assert/strict';
+import {joinPilotEvidence,auditPilotEvidence} from './pilot-evidence-join.mjs';
+assert.equal(joinPilotEvidence().matched,0);
+assert.equal(auditPilotEvidence({}).calibration.status,'INSUFFICIENT_OBSERVED_OUTCOMES');
+assert.throws(()=>joinPilotEvidence({pairs:null}),/INVALID_INPUT/);
+const result=joinPilotEvidence({pairs:[{fixture_id:101,observation_json:'{}',decision_json:'{}'}]});
+assert.equal(result.matched,0);
+assert.equal(result.excluded[0].reason,'PAIR_IDENTITY_OR_DUPLICATE');
+assert.equal(joinPilotEvidence({pairs:[{fixture_id:102,observation_json:'bad',decision_json:'{}'}]}).excluded[0].reason,'INVALID_PAIR_JSON');
+assert.equal(joinPilotEvidence({outcomes:[{fixture_id:101,score:{home:2,away:1}}]}).matched,0);
+console.log('FT_V2_PILOT_JOIN_PASS; zero invented forecasts');

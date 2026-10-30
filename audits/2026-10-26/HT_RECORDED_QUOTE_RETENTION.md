@@ -1,0 +1,9 @@
+# HT recorded recommendation display retention
+
+Base: 817fbcbade26f1e638706a0344d52af38a8d9d5f. Mobile before: 2e5532c0-1a32-4358-866a-5fb926efcf43.
+
+The original HT session already retains its first quote for five minutes, but the prominent current qualification can switch to WAIT_PRICE/WAIT_DATA immediately, and a selected fixture can disappear from TOP. This display-only change retains the recorded recommendation (line, odds, fair, EV and minute) for ten minutes from the session start in a separate labeled block. Current recommendation/qualification, model, TOP order, and the five-minute session duration remain unchanged.
+
+A separate recent-recorded list (not TOP) links to retained quotes. If the source fixture disappears, only a historical card is shown, explicitly stating that the fixture is not currently in the source; it is never restored as LIVE/ACTIVE. Goal/phase/red-card/session invalidation remains authoritative. Recorded display expires after ten minutes without extension on repeated updates, bounded to ten local records and five visible links. Local browser storage only; no API/D1/Push or scanner changes. New qualified sessions can create a new recorded anchor. No historical quote is a promise of current price validity.
+
+Release changes only ht-candidate/ui.mjs and style.css; the other 34 public files (including all FT V2 modules) remain identical. Production preflight verifies current Mobile/backend/Desktop versions and rollback; candidate and published four-width browser QA cover waiting-price retention, original HT session behavior, leaving TOP, retained display at six minutes, expiration after ten minutes, FT V2 behavior and six-tab navigation. Synthetic QA does not prove provider odds or physical Push receipt. Workflow artifacts are the deployment evidence; this source note alone is not a deploy certificate.

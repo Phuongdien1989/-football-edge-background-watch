@@ -1,0 +1,13 @@
+import assert from 'node:assert/strict';
+import {buildValidationDashboard,DASHBOARD_VERSION} from './validation-dashboard.mjs';
+const d=buildValidationDashboard();
+assert.equal(d.schema,DASHBOARD_VERSION);
+assert.equal(d.status,'INSUFFICIENT_OBSERVED_OUTCOMES');
+assert.equal(d.metrics.matched,0);
+assert.equal(d.groups.length,13);
+assert.ok(d.groups.every(x=>x.sample===0&&x.observedWinRate===null&&x.validForInference===false));
+assert.equal(d.releaseReady,false);
+assert.throws(()=>buildValidationDashboard({pairs:{},outcomes:[],forecasts:[]}),/INVALID_EVIDENCE_PACKET/);
+const a=buildValidationDashboard({pairs:[{fixture_id:9,observation_json:'bad',decision_json:'bad'}],outcomes:[],forecasts:[]});
+assert.equal(a.exclusionReasons.INVALID_PAIR_JSON,1);assert.equal(a.metrics.unmatched,1);
+console.log('FT_V2_DASHBOARD_EMPTY_AND_INVALID_DATA_PASS');
