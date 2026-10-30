@@ -103,7 +103,7 @@ const origin='https://shiny-silence-d892.ngophuonghuy.workers.dev',baseline=fals
     await ft.locator('.fe-lsp-ft-change summary').click();
 
     await ft.scrollIntoViewIfNeeded();await page.screenshot({path:out+'/ft-valuation-'+width+'.png',fullPage:true});
-    assert.equal(await ft.evaluate(e=>e.scrollWidth>e.clientWidth+1),false,'FT_OVERFLOW');
+    const ftOver=await ft.evaluate(e=>({bad:e.scrollWidth>e.clientWidth+1,root:[e.clientWidth,e.scrollWidth],children:[...e.querySelectorAll('*')].filter(x=>x.scrollWidth>x.clientWidth+2).slice(0,15).map(x=>({c:x.className,w:x.clientWidth,sw:x.scrollWidth}))}));if(ftOver.bad)console.log('FT_OVERFLOW_DIAGNOSTIC '+JSON.stringify(ftOver));assert.equal(ftOver.bad,false,'FT_OVERFLOW');
     await page.evaluate(()=>{const s=__ftQA.items[0].latest;s.captured_at=Date.now();s.market_rows[0].update=new Date(s.captured_at).toISOString();s.market_rows[0].values[0].odd=1.05;window.dispatchEvent(new Event('fe-notify-sync-updated'));});
     await page.waitForSelector('#ftAIV2ReadOnly [data-ft-session="PAUSED"]');assert.equal(await ft.locator('.fe-lsp-ft-change').evaluate(e=>e.open),false,'DETAILS_REOPENED_ON_UPDATE');
     assert((await ft.innerText()).includes('Mốc đầu: Tài 2.5 @ 2.70'));

@@ -20,7 +20,7 @@ export function renderSignalMechanism({tab,rows=[],chosen=null,fixture=null,pack
  // independent probability exposed by this display bridge, so do not invent it.
  h+=probabilityRail(value?'Xác suất thắng đúng line FT':'Xác suất độc lập',null);
  h+=directions(fresh?focus.state||'Đang theo dõi':'Chờ nguồn mới',value&&market?'Tài FT '+focus.line+' · '+odd(focus.odds):'Xem hợp đồng / giá gốc');
- h+=priceDecision({title:label,pick:value&&finite(focus.line)?'Tài FT '+focus.line:null,odds:market?focus.odds:null,fair:model?focus.fairOdds:null,ev:model&&market?focus.ev:null,positive:value&&String(label).startsWith('Cân nhắc'),note:value?'Fair và EV từ mô hình hiện hành':'Giữ nguyên quyết định nguồn; không tạo thêm kèo'});
+ h+=priceDecision({title:label,pick:value&&finite(focus.line)?'Tài FT '+focus.line:fresh?focus.recommendation||null:null,odds:market?focus.odds:null,fair:model?focus.fairOdds:null,ev:model&&market?focus.ev:null,positive:value&&String(label).startsWith('Cân nhắc'),note:value?'Fair và EV từ mô hình hiện hành':'Giữ nguyên quyết định nguồn; không tạo thêm kèo'});
  if(tab==='overview')h+='<section class="fe-mc-engine-grid">'+Object.entries(picked.signals).map(([k,s])=>'<a href="'+esc(route(k,picked.id))+'"><small>'+esc(titles[k]||k)+'</small><b>'+esc(displayAction(s,now,'BRIDGE'))+'</b></a>').join('')+'</section>';
  h+='<details class="fe-mc-details"><summary>Chi tiết phân tích <span>›</span></summary><p>'+esc(focus.reason||'Nguồn chưa cung cấp lý do')+'</p><p>Ghi nhận: '+esc(o.at?new Date(o.at).toLocaleString('vi-VN',{timeZone:'Asia/Ho_Chi_Minh'}):'—')+' · '+esc(focus.freshness)+' · '+esc(focus.source)+'</p><p>Thứ tự nguồn được giữ nguyên. Danh sách TOP không tự xếp lại theo điểm số.</p></details></div>';
  }

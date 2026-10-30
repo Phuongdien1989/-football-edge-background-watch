@@ -39,11 +39,12 @@ export function renderHCCard(row,{now=Date.now()}={}){
  let h='<article class="hc-research-card fe-mc" data-fixture="'+esc(row.id)+'" data-hc-recorded="'+(row.recordedOnly===true)+'">';
  h+=matchIdentity({home:row.home,away:row.away,league:row.league,at:row.at,goals:m?.condition.score,status:m?.condition.status,minute:m?.condition.minute,badge:row.recordedOnly?'HC · Mốc lịch sử':'HC · Thử nghiệm',now});
  h+=outlook(data==='Chờ dữ liệu mới'?'CHỜ DỮ LIỆU MỚI':'HƯỚNG TRẬN · '+data,'Tách hướng dữ liệu khỏi luật và giá kèo');
- const pair=(key)=>fresh&&e?.fresh?`${e.home[key]===null?'—':num(e.home[key])} / ${e.away[key]===null?'—':num(e.away[key])}`:'—';
+ const pair=(key)=>fresh&&e?.fresh?`${e.home?.[key]==null?'—':num(e.home[key])} / ${e.away?.[key]==null?'—':num(e.away[key])}`:'—';
  h+=factTiles([['SOT · H / A',pair('sot'),'target'],['xG · H / A',pair('xg'),'trend'],['LIVE GAP',fresh?signed(row.legacy?.gap):'—','data']]);
  h+='<section class="fe-mc-hda" data-prob-kind="match-result">'+[['Chủ thắng FT',summary?.homeWinFT],['Hòa FT',summary?.drawFT],['Khách thắng FT',summary?.awayWinFT]].map(([label,p])=>probabilityRail(label,validModel?p:null,{kind:'match-result',note:'Kết quả FT · không phải % thắng kèo HC'})).join('')+'</section>';
  h+='<small class="fe-mc-hda-note">Xác suất kết quả FT · không phải % thắng kèo HC</small>';
  h+=directions(data,market);
+ if(fresh&&e?.fresh&&r.status!=='DATA_WAIT')h+='<div class="fe-mc-native"><small>HC · KẾT LUẬN NGUỒN HIỆN CÓ</small><b>'+esc(e.legacyState||'Chờ kết luận')+'</b><span>'+esc(e.legacyRecommendation||'Chưa có khuyến nghị nguồn')+'</span></div>';
  h+=priceDecision({title:!fresh?'CHỜ DỮ LIỆU MỚI':labels[r.status]||'CHỜ BÁO GIÁ',pick:'Handicap · định giá nghiên cứu',note:r.status==='RULE_WAIT'?'Luật chưa xác minh: hai giả định nằm trong chi tiết. Chưa phát khuyến nghị.':'Chưa phát khuyến nghị vào kèo; xem hai phía trong chi tiết'});
  if(fresh&&r.status==='RESEARCH_PRICED'&&r.prices)h+='<div class="fe-mc-hc-prices">'+['HOME','AWAY'].map(side=>{const p=r.prices[side];return '<section><b>'+esc(side==='HOME'?row.home:row.away)+' '+signed(p.line)+'</b><small>Giá '+num(p.odds)+'</small><small>Fair '+num(p.fairOdds)+' · EV '+pct(p.ev)+'</small></section>';}).join('')+'</div>';
  if(row.session&&now<row.session.expiresAt){const t=Math.max(0,Math.ceil((row.session.expiresAt-now)/1000));h+='<div class="fe-mc-clock"><b>Mốc nghiên cứu · 5 phút</b><span data-hc-session-clock="'+row.session.expiresAt+'">'+Math.floor(t/60)+':'+String(t%60).padStart(2,'0')+'</span></div>';}
