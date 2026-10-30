@@ -283,3 +283,33 @@ body.fe-tabs-mode:not([data-fe-tabs-tab=ht]) .bottom-nav .center-plus::after{con
 #feTabsWorkspace .ov-recommendation em{font-size:7px}
 @media(max-width:350px){#feTabsWorkspace .ov-match b{font-size:9px}#feTabsWorkspace .ov-match>strong{font-size:12px}#feTabsWorkspace .ov-outlook>b{font-size:9px}#feTabsWorkspace .ov-mechanisms b{font-size:7px}#feTabsWorkspace .ov-recommendation[data-tone=good] strong{font-size:11px}#feTabsWorkspace .ov-perspectives>span{font-size:6.5px}}
 @media(min-width:900px){#feTabsWorkspace .ov-match>span,#feTabsWorkspace .ov-match>span:last-child{flex-direction:row}#feTabsWorkspace .ov-match>span:last-child{flex-direction:row-reverse}#feTabsWorkspace .ov-match b{font-size:14px}#feTabsWorkspace .ov-match>strong{font-size:18px}#feTabsWorkspace .ov-mechanisms b{font-size:11px}#feTabsWorkspace .ov-recommendation[data-tone=good] strong{font-size:15px}}
+/* Overview LIVE control strip; uses the existing scanner and its real state. */
+#feTabsWorkspace [data-overview-scan-controls]{padding:11px 12px;margin:7px 0 11px;border:1px solid #dce9f5;border-radius:14px;background:#fff;box-shadow:0 4px 15px #23588607;color:#183c62}
+#feTabsWorkspace [data-overview-scan-controls][hidden]{display:none!important}
+#feTabsWorkspace [data-overview-scan-controls]>header{display:flex;justify-content:space-between;gap:8px;align-items:center;margin-bottom:8px}
+#feTabsWorkspace [data-overview-scan-controls]>header>small{font-size:9px;color:#7a90a5;letter-spacing:.03em}
+#feTabsWorkspace .ov-scan-state{display:flex;align-items:center;gap:6px;font-size:10px;font-weight:650;color:#788a9c}
+#feTabsWorkspace .ov-scan-state>i{width:7px;height:7px;border-radius:50%;background:#a7b6c4;flex-shrink:0}
+#feTabsWorkspace .ov-scan-state[data-state=running]{color:#07845a}
+#feTabsWorkspace .ov-scan-state[data-state=running]>i{background:#0eae75;box-shadow:0 0 0 3px #e8f8ee}
+#feTabsWorkspace .ov-scan-state[data-state=quota],#feTabsWorkspace .ov-scan-state[data-state=unknown],#feTabsWorkspace .ov-scan-state[data-state=waiting]{color:#ac7b29}
+#feTabsWorkspace .ov-scan-state[data-state=quota]>i,#feTabsWorkspace .ov-scan-state[data-state=unknown]>i,#feTabsWorkspace .ov-scan-state[data-state=waiting]>i{background:#d6a04d}
+#feTabsWorkspace .ov-scan-state[data-state=busy]>i{width:10px;height:10px;background:transparent;border:2px solid #d7e8f6;border-top-color:#2189eb;animation:ovScanSpin .8s linear infinite}
+#feTabsWorkspace .ov-scan-buttons{display:grid;grid-template-columns:minmax(0,1fr) 95px;gap:8px}
+#feTabsWorkspace .ov-scan-buttons>button{display:flex;align-items:center;justify-content:center;gap:7px;width:100%;min-height:42px!important;padding:10px 9px!important;font-size:10px!important;line-height:1.3!important;font-weight:650!important;border-radius:10px!important;cursor:pointer;box-shadow:none!important;white-space:normal}
+#feTabsWorkspace .ov-scan-buttons>button:first-child{background:linear-gradient(110deg,#1688fb,#0873ed)!important;border:1px solid #137bf0!important;color:#fff!important;letter-spacing:.02em}
+#feTabsWorkspace .ov-scan-buttons>button:first-child[data-running=true]{background:#fff5e6!important;border-color:#ecd7b1!important;color:#aa7421!important}
+#feTabsWorkspace .ov-scan-buttons>button:last-child{border:1px solid #dbe7f2!important;background:#f6faff!important;color:#436a91!important}
+#feTabsWorkspace .ov-scan-buttons>button:last-child>span{font-size:18px;line-height:1}
+#feTabsWorkspace .ov-scan-buttons>button:disabled{opacity:.55;cursor:default}
+#feTabsWorkspace .ov-scan-buttons>button:focus-visible{outline:2px solid #1282ea;outline-offset:2px}
+#feTabsWorkspace .ov-scan-caption{display:flex;align-items:center;justify-content:space-between;gap:7px;flex-wrap:wrap;margin-top:7px;font-size:8px;line-height:1.4;color:#8598aa}
+#feTabsWorkspace .ov-scan-caption small{font-size:8px;color:#7b93a8}
+#feTabsWorkspace .ov-scan-error{margin:8px 0 0;font-size:10px;line-height:1.5;color:#ac7142;background:#fff8ee;border:1px solid #f0e0c8;border-radius:7px;padding:6px 8px}
+#feTabsWorkspace [data-overview-scan-controls]>a{display:inline-block;font-size:9px;color:#357bb7;margin-top:6px}
+@keyframes ovScanSpin{to{transform:rotate(360deg)}}
+@media(prefers-reduced-motion:reduce){#feTabsWorkspace .ov-scan-state[data-state=busy]>i{animation:none}}
+
+#feTabsWorkspace .ov-scan-state[data-state=warning]{color:#ac7b29}#feTabsWorkspace .ov-scan-state[data-state=warning]>i{background:#d6a04d}
+
+body:not(.fe-tabs-mode) [data-overview-scan-controls],body:not([data-fe-tabs-tab=overview]) [data-overview-scan-controls]{display:none!important}
