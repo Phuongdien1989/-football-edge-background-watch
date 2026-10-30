@@ -4,7 +4,7 @@ import {execFileSync} from 'node:child_process';
 import {createHash,randomBytes} from 'node:crypto';
 import {readPublicStatic} from '../ht-mechanism-recovery/public-read.mjs';
 const action=process.argv[2],account=process.env.CLOUDFLARE_ACCOUNT_ID,token=process.env.CLOUDFLARE_API_TOKEN,sha=process.env.GITHUB_SHA;
-assert(account&&token&&sha);assert(['prepare','baseline','backend','mobile','verify','probe','rollback'].includes(action));
+assert(account&&token&&sha);assert(['pause','prepare','baseline','backend','mobile','verify','probe','rollback'].includes(action));
 const backend='football-edge-background-watch',mobile='shiny-silence-d892',desktop='football-edge-desktop-b2-test',origin='https://'+mobile+'.ngophuonghuy.workers.dev',api='https://api.cloudflare.com/client/v4/accounts/'+encodeURIComponent(account),backendBefore='e7d2090c-d0e1-4f58-9f5a-4360acd2ced3',mobileBefore='c9b86303-7031-4068-a4fe-808de4a0093a',desktopBefore='a332ee39-abb2-422d-a021-db78ef19cc10',backendSource='3cd210d2d74aff547de4587ab4a3c96b982a728c';
 const recoveredBackend='438c2c72-09ed-499f-a47c-b8d6de09521b',recoveredSource=backendSource;
 const output='mechanism-release/deployment.json',hash=x=>createHash('sha256').update(x).digest('hex'),sleep=ms=>new Promise(r=>setTimeout(r,ms));
@@ -19,7 +19,7 @@ async function guardVersions(expectedBackend,expectedMobile){assert.equal(await 
 async function assets(which){const m=JSON.parse(readFileSync('mechanism-mobile/manifest.json'));for(const f of m[which]){
  let matched=false;for(let i=0;i<5;i++){const path=f.path==='index.html'?'/':f.path.endsWith('/index.html')?'/'+f.path.slice(0,-10):'/'+f.path;const r=await readPublicStatic(origin+path),bytes=Buffer.from(await r.arrayBuffer());if(r.ok&&hash(bytes)===f.sha256){matched=true;break;}if(i<4)await sleep((i+1)*1000);}assert(matched,'PUBLIC_ASSET_'+f.path);
 }}
-function run(args){try{return execFileSync('npx',['--no-install','wrangler',...args],{stdio:'pipe',encoding:'utf8',timeout:180000,env:{...process.env,WRANGLER_SEND_METRICS:'false'}});}catch{throw Error('WRANGLER_'+args[0]+'_FAILED');}}
+function run(args){try{return execFileSync('npx',['--no-install','wrangler',...args],{stdio:'pipe',encoding:'utf8',timeout:180000,env:{...process.env,WRANGLER_SEND_METRICS:'false'}});}catch(e){const text=String(e.stderr||'')+' '+String(e.stdout||'');const at=text.lastIndexOf('ERROR');throw Error('WRANGLER_'+args.slice(0,2).join('_')+'_FAILED:'+text.slice(at<0?0:at,(at<0?0:at)+650));}}
 async function uploadVersion(config,tag){
  const output=run(['versions','upload','--keep-vars','--config',config,'--tag',tag]);
  const ids=[...output.matchAll(/(?:Worker )?Version ID:\s*([0-9a-f-]{36})/ig)].map(x=>x[1]);assert.equal(ids.length,1,'UPLOADED_VERSION_ID_NOT_IDENTIFIED');
@@ -42,7 +42,16 @@ async function restore(){
  assert.equal(signature(await cf('/workers/scripts/'+backend+'/settings')),report.binding_signature);await assets('backup');report.status='ROLLED_BACK_CODE_VERIFIED';save();
 }
 try{
- if(action==='prepare'){
+ if(action==='pause'){
+  await guardVersions(recoveredBackend,mobileBefore);const before=await health();assert.equal(before.deploy_commit,backendSource);report.scanner_was_enabled_before_release=before.peak_status?.enabled===true;
+  if(before.peak_status?.enabled||before.peak_status?.manualEnabled||before.next_alarm!=null){
+   const name='fe-release-pause-'+process.env.GITHUB_RUN_ID,auth=randomBytes(32).toString('hex');let created=false;
+   const source="export default {async fetch(r,e){if(r.headers.get('authorization')!=='Bearer '+e.AUTH)return new Response('Unauthorized',{status:401});if(r.method==='GET')return Response.json({ready:true});if(r.method!=='POST')return new Response('Method not allowed',{status:405});const w=e.PRODUCTION_DO.get(e.PRODUCTION_DO.idFromName('football-edge-global'));return w.fetch(new Request('https://internal/api/notify/scan-control',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({enabled:false})}));}};";
+   try{const form=new FormData();form.append('metadata',new Blob([JSON.stringify({main_module:'pause.mjs',compatibility_date:'2026-10-01',bindings:[{type:'durable_object_namespace',name:'PRODUCTION_DO',namespace_id:'a401c5da72a54ec1ba485db1b46d89c9'},{type:'secret_text',name:'AUTH',text:auth}]})],{type:'application/json'}));form.append('pause.mjs',new Blob([source],{type:'application/javascript+module'}),'pause.mjs');await cf('/workers/scripts/'+name,{method:'PUT',body:form});created=true;await cf('/workers/scripts/'+name+'/subdomain',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({enabled:true})});const domain=await cf('/workers/subdomain'),url='https://'+name+'.'+domain.subdomain+'.workers.dev/';let ready=false;for(let i=0;i<10;i++){const r=await fetch(url,{headers:{Authorization:'Bearer '+auth},signal:AbortSignal.timeout(15000)});if(r.ok){ready=true;break;}await sleep(2000);}assert(ready);const r=await fetch(url,{method:'POST',headers:{Authorization:'Bearer '+auth},signal:AbortSignal.timeout(60000)});assert(r.ok);const result=await r.json();assert.equal(result.scan_control?.enabled,false);report.paused_for_release=true;
+   }finally{if(created){await cf('/workers/scripts/'+name,{method:'DELETE'});report.pause_helper_removed=true;}}
+  }
+  off(await health());save();
+ }else if(action==='prepare'){
   const before=await active(backend);assert([backendBefore,recoveredBackend].includes(before),'UNOWNED_BACKEND_BASELINE');await guardVersions(before,mobileBefore);const h=await health();off(h);assert.equal(h.deploy_commit,before===backendBefore?backendSource:recoveredSource);report.current_backend_before=before;report.scanner_before={enabled:h.peak_status.enabled,manualEnabled:h.peak_status.manualEnabled,next_alarm:h.next_alarm};
   const settings=await cf('/workers/scripts/'+backend+'/settings'),bs=settings.bindings||[];assert(bs.every(b=>['plain_text','secret_text','d1','durable_object_namespace'].includes(b.type)));assert.equal(bs.find(b=>b.name==='APISPORTS_KEY')?.type,'secret_text');assert.equal(bs.find(b=>b.name==='FOOTBALL_DB')?.id||bs.find(b=>b.name==='FOOTBALL_DB')?.database_id,'0d12a7cc-12a9-4c71-b55b-61dfd2dac4d4');assert.equal(bs.find(b=>b.name==='BACKGROUND_WATCHER')?.namespace_id,'a401c5da72a54ec1ba485db1b46d89c9');
   const schedules=await cf('/workers/scripts/'+backend+'/schedules');assert.deepEqual(Array.isArray(schedules)?schedules:schedules.schedules,[]);report.binding_signature=signature(settings);

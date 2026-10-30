@@ -47,6 +47,8 @@ jobs:
           node mechanism-notify/reuse-evidence.mjs
           node --check mechanism-notify/release.mjs
       - run: npm install --no-save --no-package-lock wrangler@4 playwright@1.58.2
+      - name: Pause background scanner for the guarded release, leave manual restart to user
+        run: node mechanism-notify/release.mjs pause
       - name: Preserve both rollback versions, bindings, all 54 assets and scanner OFF
         run: node mechanism-notify/release.mjs prepare
       - name: Dry run both complete packages
