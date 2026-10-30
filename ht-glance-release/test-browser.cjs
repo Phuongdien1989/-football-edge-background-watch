@@ -45,13 +45,14 @@ const origin='https://shiny-silence-d892.ngophuonghuy.workers.dev',baseline=fals
   assert((await card.locator('.htx-outlook').innerText()).includes('NHỊP H1 ĐANG TĂNG'));
   assert.equal(await card.locator('.htx-metrics b').nth(0).innerText(),'2');assert.equal(await card.locator('.htx-metrics b').nth(1).innerText(),'+0.38');
   assert.equal(await card.locator('.htx-details[open]').count(),0);assert.equal(await card.locator('[data-ht-top]').count(),2);
+  await card.evaluate(e=>window.__stableHTCard=e);await page.waitForTimeout(1100);assert(await card.evaluate(e=>e===window.__stableHTCard&&e.isConnected),'HT_CLOCK_REMOUNTED_CARD');
   const pBefore=await card.locator('.htx-prob strong').innerText();assert(pBefore.endsWith('%'));
 
   assert.equal(await card.locator('.htp-session').count(),1);const deadline=await page.evaluate(()=>FEHTPricingView.sessions().sessions.find(x=>x.fixtureId===990091).expiresAt);
-  await card.scrollIntoViewIfNeeded();const closedHeight=await card.evaluate(e=>e.getBoundingClientRect().height);await page.screenshot({path:out+'/ht-compact-'+width+'.png',clip:await card.boundingBox()});
+  await card.scrollIntoViewIfNeeded();const closedHeight=await card.evaluate(e=>e.getBoundingClientRect().height);await card.screenshot({path:out+'/ht-compact-'+width+'.png'});
   await card.locator('details summary').click();await card.locator('.htp-chart').waitFor({state:'visible'});assert.equal(await card.locator('.htp-chart>div').count(),5);assert.equal(await card.locator('[data-ht-settlement=BINARY]').count(),1);assert.equal(await card.locator('[data-ht-settlement] .htp-prob-row').count(),6);
   const metrics=await card.evaluate(e=>({values:[...e.querySelectorAll('.htp-values b')].map(x=>x.textContent),title:getComputedStyle(e.querySelector('h3')).fontSize,odds:getComputedStyle(e.querySelector('.htp-odds')).fontSize,overflow:e.scrollWidth>e.clientWidth+1}));metrics.closedHeight=closedHeight;assert.equal(metrics.title,baseline?'16px':'15px');assert.equal(metrics.odds,baseline?'24px':'22px');assert.equal(metrics.overflow,false);
-  await page.screenshot({path:out+'/ht-auto-route-'+width+'.png',clip:await card.boundingBox()});
+  await card.screenshot({path:out+'/ht-auto-route-'+width+'.png'});
   await page.evaluate(()=>{__htRecoveryQA.items[0].latest.market_rows[0].values[0].odd=2.8;__htRecoveryQA.items[0].latest.market_at=Date.now();window.dispatchEvent(new Event('fe-ht-context-updated'));});
   await page.waitForFunction(()=>document.querySelector('.htp-session-prices')?.textContent.includes('@2.80'));assert.equal(await card.locator('.htx-prob strong').innerText(),pBefore,'PRICE_CHANGED_GOAL_PROBABILITY');
   assert((await card.locator('.htp-session-prices').innerText()).includes('@2.70'));assert.equal(await page.evaluate(()=>FEHTPricingView.sessions().sessions.find(x=>x.fixtureId===990091).expiresAt),deadline);

@@ -50,9 +50,14 @@ export function renderHTPricing(root,items,context,now=Date.now(),{displayById=n
    '<p>'+esc(r.contextError||r.warnings.join(' · '))+'</p>'+(session?.closedAt?'<p>Mã kết thúc: '+esc(session.closeReason)+'</p>':'');
   return '<article class="htp-card" data-htp-id="'+esc(item.id)+'" data-state="'+state+'">'+renderHTGlance({item,row:r,native:displayById.get(item.id),leagueText,sourceItems,now,recordedHTML:recordedHTML(recorded.get(item.id),session,{now}),recorded:recorded.get(item.id),sessionHTML,valuesHTML:'<div class="htp-values"><div><small>Giá hợp lý ước tính</small><b>'+odd(q?.fairOdds)+'</b></div><div><small>EV mô hình</small><b>'+(q?.ev>0?'+':'')+pct(q?.ev)+'</b></div><div><small>Mẫu HT · H / A</small><b>'+esc(model?.sample.home??0)+' / '+esc(model?.sample.away??0)+'</b></div></div>',detailsHTML})+'</article>';
  }).join('');
- if(root.innerHTML!==html){const opened=new Set([...root.querySelectorAll('.htp-card')].filter(c=>c.querySelector('details')?.open).map(c=>c.dataset.htpId));root.innerHTML=html;for(const c of root.querySelectorAll('.htp-card'))if(opened.has(c.dataset.htpId))c.querySelector('details').open=true;}
+ const signature=JSON.stringify({rows:rows.map(({item,row})=>({item,row:{...row,session:row.session?{...row.session,remainingMs:0}:null},native:displayById.get(item.id),recorded:recorded.get(item.id)})),source:sourceItems.map(i=>[i.id,i.home,i.away])});
+ if(renderKeys.get(root)!==signature||!root.querySelector('[data-ht-glance]')){const opened=new Set([...root.querySelectorAll('.htp-card')].filter(c=>c.querySelector('details')?.open).map(c=>c.dataset.htpId));root.innerHTML=html;renderKeys.set(root,signature);for(const c of root.querySelectorAll('.htp-card'))if(opened.has(c.dataset.htpId))c.querySelector('details').open=true;}
+ // Clock-only ticks preserve the card node, open disclosure and scroll position.
+ for(const {item,row}of rows){const card=root.querySelector('[data-htp-id="'+item.id+'"]');if(!card)continue;const age=Number.isFinite(item.latest?.fresh_at)?Math.max(0,Math.floor((now-item.latest.fresh_at)/1000)):null;const fresh=card.querySelector('.htx-fresh');if(fresh&&age!==null&&age<=55)fresh.textContent='● Cập nhật '+age+'s trước';const seconds=Math.max(0,Math.ceil((row.session?.remainingMs??0)/1000)),clock=Math.floor(seconds/60)+':'+String(seconds%60).padStart(2,'0');for(const node of card.querySelectorAll('.htx-session-strip>span,.htp-session-head>b'))node.textContent=clock;for(const node of card.querySelectorAll('.htx-session-strip em,.htp-progress>i'))node.style.width=Math.min(100,seconds/3)+'%';const progress=card.querySelector('.htp-progress');if(progress)progress.setAttribute('aria-label','Còn '+seconds+' giây');}
+
  return rows.map(x=>x.row);
 }
+const renderKeys=new WeakMap();
 let queued=false,lastData=[],displaySnapshotKey='',displayById=new Map();
 function update() {
  const bridge=window.FEHTCandidateBridge,mode=window.FETabsIntegrated?.mode?.();

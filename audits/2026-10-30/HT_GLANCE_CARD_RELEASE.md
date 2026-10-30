@@ -10,6 +10,10 @@ Metric tiles display actual total SOT and xG delta from completed five-minute na
 
 Probability is the existing independent additional-goal probability; prices never manufacture LIVE pressure or a new probability. Exact-line five-state distribution, original recommendation, full five-minute session, samples and original warnings retained under one collapsed detail disclosure. A compact historical quote line keeps the ten-minute record visible, with full historical state in detail. No old reference becomes a current entry. Source fixture order retained in up to five links; no model re-ranking. Original single selected HT card/router remains; duplicate placeholder title/description hidden only where the new card exists.
 
+## Clock rendering
+
+Existing one-second assessment/expiry hook remains. A per-root signature excludes derived remainingMs so countdown/freshness ticks update text/progress only; preserve the card node, expanded details and scroll. Source/price/state changes still rerender. Four-width browser checks assert card identity across a clock tick. This fixes a screenshot/layout race caught after initial candidate validation; the failed published trial automatically restored prior Mobile before retry.
+
 ## Protected logic
 
 `assessWithSession`, storage keys, retained recommendation persistence, thresholds, model, valuation, events and timers preserved. Scope check compares pre-render UI prefix (excluding new view import) and schedule/event initialization byte-for-byte to deployed baseline. Public model, session and probability formatter assets untouched. Pure renderer tests mutation, escaping, zero/missing, stale/mismatched data and action mapping.
