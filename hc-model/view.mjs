@@ -1,3 +1,4 @@
+import {matchIdentity,outlook,factTiles,probabilityRail,directions,priceDecision} from '../ui-common/signal-visual.mjs';
 import {auditHCContract} from './contract-audit.mjs';
 // Explicit preview mount only. Does not poll, fetch, write storage or alter HC ranking.
 const esc=x=>String(x??'—').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -19,12 +20,36 @@ function sessionView(s,now){if(!s||now>=s.expiresAt)return '';const o=s.original
  const detail=x=>{const pair=x.result.prices;return pair?`Fair HOME ${num(pair.HOME.fairOdds)} / AWAY ${num(pair.AWAY.fairOdds)} · EV ${pct(pair.HOME.ev)} / ${pct(pair.AWAY.ev)}`:'Luật chưa xác minh · chỉ lưu hai giả định';};
  return `<section class="hc-session" data-hc-session="${esc(s.status)}"><header><b>Mốc nghiên cứu · 5 phút</b><span data-hc-session-clock="${s.expiresAt}">${Math.floor(seconds/60)}:${String(seconds%60).padStart(2,'0')}</span></header><p>${esc(label)} · ${esc(s.reason)}</p><div class="hc-session-pair"><div data-hc-original><small>MỐC ĐẦU · ${esc(o.minute)}′</small><b>${esc(describe(o))}</b><p>${esc(detail(o))}</p></div><div data-hc-current><small>MỚI NHẤT ĐÃ ĐỌC · ${esc(c.minute)}′</small><b>${esc(describe(c))}</b><p>${esc(detail(c))}</p></div></div><details><summary>Xem định giá đã ghi tại mốc đầu</summary>${o.result.prices?prices(o.result.prices,{home:o.home,away:o.away}):`<p>Hai giả định, chưa phải khuyến nghị.</p><h4>Nếu tính toàn trận</h4>${prices(o.result.scenarios.FULL_MATCH,{home:o.home,away:o.away})}<h4>Nếu chỉ tính phần còn lại</h4>${prices(o.result.scenarios.REMAINING_MATCH,{home:o.home,away:o.away})}`}</details><p>Mốc đầu được giữ để đối chiếu, không kéo dài hiệu lực giá hoặc cho phép vào kèo. Tải lại trang sẽ mất mốc thử nghiệm.</p></section>`;
 }
-export function renderHCCard(row,{now=Date.now()}={}){
+function renderHCLegacy(row,{now=Date.now()}={}){
  const m=row.model,s=row.summary,age=finite(row.at)?Math.max(0,Math.floor((now-row.at)/1000)):null;
  // Prevent a stored successful valuation from appearing current after quote/model expiry.
  const fresh=finite(now)&&finite(row.at)&&row.at<=now+5000&&now-row.at<=60000;
  const valuations=fresh?(row.valuations||[]):[{result:{status:'DATA_WAIT',reason:'Quan sát đã quá hạn hoặc thiếu thời điểm; ẩn định giá cũ, cần đọc lại dữ liệu hiện có.'}}];
  return `<article class="hc-research-card" data-fixture="${esc(row.id)}" data-hc-recorded="${row.recordedOnly===true}"><header class="hc-match"><div><small>${esc(row.league)}</small><h3>${esc(row.home)} <span>vs</span> ${esc(row.away)}</h3><small>Fixture #${esc(row.id)} · ${age===null?'Chưa có thời điểm':`${age}s trước`}</small></div><div class="hc-score"><strong>${m?`${esc(m.condition.score.home)} – ${esc(m.condition.score.away)}`:'—'}</strong><small>${m?`${esc(m.condition.status)} · ${esc(m.condition.minute)}′`:'Chờ dữ liệu'}</small></div></header><div class="hc-badge">${row.recordedOnly?'MỐC LỊCH SỬ · không còn trong nguồn hiện tại':'HC RESEARCH · chưa hiệu chỉnh'}</div><div class="hc-layers"><section><h4>01 · Góc nhìn dữ liệu</h4>${m&&s?`${bar('Chủ nhà thắng FT',s.homeWinFT)}${bar('Hòa FT',s.drawFT)}${bar('Khách thắng FT',s.awayWinFT)}<p>Mẫu ${esc(m.sample.home)} / ${esc(m.sample.away)} trận; ${esc(m.sample.unique)} trận duy nhất. ${fresh?'':'<b>Quan sát cũ.</b>'}</p><details><summary>Giới hạn mô hình</summary><p>Dựa trên lịch sử, tỷ số và phút. Chưa điều chỉnh sức mạnh đối thủ, áp lực LIVE, xG, thẻ đỏ hoặc bù giờ. Đây là xác suất kết quả trận, không phải xác suất thắng kèo HC.</p></details>`:`<p>Chưa đủ dữ liệu tạo phân phối độc lập: ${esc(row.reason)}</p>`}</section><section><h4>02 · Sức mạnh HC hiện có</h4><p>GAP <b>${signed(row.legacy?.gap)}</b> · chỉ số ưu thế, không phải % thắng kèo.</p><p>Giữ nguyên xếp hạng HC cũ. Card này không tác động TOP hoặc lựa chọn trận.</p></section></div>${liveView(row.liveEvidence)}${sessionView(row.session,now)}<h4>03 · Thị trường & định giá</h4>${valuations.length?valuations.map(v=>valuation(v,row)).join(''):'<p class="hc-notice">Chưa có cặp báo giá gốc. Không suy giá từ line trung bình.</p>'}<footer>Đọc cùng dữ liệu hiện có · không thêm API/D1 · không tự bật quét</footer></article>`;
+}
+// Compact main card; full existing evidence, settlement and session remain expandable.
+export function renderHCCard(row,{now=Date.now()}={}){
+ const m=row.model,summary=row.summary,e=row.liveEvidence,fresh=finite(row.at)&&row.at<=now+5000&&now-row.at<=60000;
+ const validModel=fresh&&m&&summary;
+ const v=fresh?(row.valuations||[])[0]:null,r=v?.result||{},q=v?.quote;
+ const names={HOME:'Chủ nhà',AWAY:'Khách',BALANCED:'Cân bằng',UNKNOWN:'Chưa rõ'};
+ const data=fresh&&e?.fresh?names[e.dataDirection]||'Chưa rõ':'Chờ dữ liệu mới';
+ const market=q?'HOME '+signed(q.line)+' @ '+num(q.homeOdd)+' · AWAY '+signed(-q.line)+' @ '+num(q.awayOdd):'Chờ cặp báo giá gốc';
+ const legacy=renderHCLegacy(row,{now}),inner=legacy.slice(legacy.indexOf('<div class="hc-badge">'),legacy.lastIndexOf('</article>'));
+ let h='<article class="hc-research-card fe-mc" data-fixture="'+esc(row.id)+'" data-hc-recorded="'+(row.recordedOnly===true)+'">';
+ h+=matchIdentity({home:row.home,away:row.away,league:row.league,at:row.at,goals:m?.condition.score??row.context?.score,status:m?.condition.status??row.context?.status,minute:m?.condition.minute??row.context?.minute,badge:row.recordedOnly?'HC · Mốc lịch sử':'HC · Thử nghiệm',now});
+ h+=outlook(data==='Chờ dữ liệu mới'?'CHỜ DỮ LIỆU MỚI':'HƯỚNG TRẬN · '+data,'Tách hướng dữ liệu khỏi luật và giá kèo');
+ const pair=(key)=>fresh&&e?.fresh?`${e.home?.[key]==null?'—':num(e.home[key])} / ${e.away?.[key]==null?'—':num(e.away[key])}`:'—';
+ h+=factTiles([['SOT · H / A',pair('sot'),'target'],['xG · H / A',pair('xg'),'trend'],['LIVE GAP',fresh?signed(row.legacy?.gap):'—','data']]);
+ h+='<section class="fe-mc-hda" data-prob-kind="match-result">'+[['Chủ thắng FT',summary?.homeWinFT],['Hòa FT',summary?.drawFT],['Khách thắng FT',summary?.awayWinFT]].map(([label,p])=>probabilityRail(label,validModel?p:null,{kind:'match-result',note:'Kết quả FT · không phải % thắng kèo HC'})).join('')+'</section>';
+ h+='<small class="fe-mc-hda-note">Xác suất kết quả FT · không phải % thắng kèo HC</small>';
+ h+=directions(data,market);
+ if(fresh&&e?.fresh&&r.status!=='DATA_WAIT')h+='<div class="fe-mc-native"><small>HC · KẾT LUẬN NGUỒN HIỆN CÓ</small><b>'+esc(e.legacyState||'Chờ kết luận')+'</b><span>'+esc(e.legacyRecommendation||'Chưa có khuyến nghị nguồn')+'</span></div>';
+ h+=priceDecision({title:!fresh?'CHỜ DỮ LIỆU MỚI':labels[r.status]||'CHỜ BÁO GIÁ',pick:'Handicap · định giá nghiên cứu',note:r.status==='RULE_WAIT'?'Luật chưa xác minh: hai giả định nằm trong chi tiết. Chưa phát khuyến nghị.':'Chưa phát khuyến nghị vào kèo; xem hai phía trong chi tiết'});
+ if(fresh&&r.status==='RESEARCH_PRICED'&&r.prices)h+='<div class="fe-mc-hc-prices">'+['HOME','AWAY'].map(side=>{const p=r.prices[side];return '<section><b>'+esc(side==='HOME'?row.home:row.away)+' '+signed(p.line)+'</b><small>Giá '+num(p.odds)+'</small><small>Fair '+num(p.fairOdds)+' · EV '+pct(p.ev)+'</small></section>';}).join('')+'</div>';
+ if(row.session&&now<row.session.expiresAt){const t=Math.max(0,Math.ceil((row.session.expiresAt-now)/1000));h+='<div class="fe-mc-clock"><b>Mốc nghiên cứu · 5 phút</b><span data-hc-session-clock="'+row.session.expiresAt+'">'+Math.floor(t/60)+':'+String(t%60).padStart(2,'0')+'</span></div>';}
+ h+='<details class="fe-mc-details" data-hc-full-details><summary>Chi tiết dữ liệu, hai phía & luật kèo <span>›</span></summary>'+inner+'</details></article>';
+ return h;
 }
 export function renderHCResearch(rows,options={}){
  const seen=new Set(),unique=rows.filter(r=>{if(seen.has(r.id))return false;seen.add(r.id);return true;}).slice(0,5);
