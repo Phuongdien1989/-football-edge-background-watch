@@ -96,3 +96,16 @@ release does not claim to fix that provider request failure or to demonstrate
 real fixture-to-phone delivery while LIVE source data is unavailable. Exact runtime
 outcome, deployment versions and Push acceptance are stored in the release artifact.
 Physical phone display still needs user observation.
+
+## Version deployment correction
+
+Subsequent release uploads immutable versions first (`wrangler versions upload`)
+then explicitly deploys those versions with immediate DO code update. Preserved
+backend and Mobile source packages receive compatible immutable rollback IDs.
+The old code-only source recovery was tested; the original legacy UUID must not
+be assumed deployable solely because its metadata can be fetched.
+
+Candidate runtime and all 54 assets are compared byte-for-byte to the PASS
+candidate reports from run 41025635463; only orchestration changes. Identical
+model and browser tests are reused rather than repeated. Published-app acceptance
+and actual runtime/phone checks still run after deployment.

@@ -33,28 +33,22 @@ jobs:
           run-id: 41014881913
           github-token: ${{ github.token }}
           path: previous-mobile
-      - name: Patch exact deployed packages and verify shared model inputs
+      - uses: actions/download-artifact@v4
+        with:
+          name: mechanism-notifications-evidence
+          run-id: 41025635463
+          github-token: ${{ github.token }}
+          path: passed-candidate
+      - name: Build exact packages and reuse byte-identical verified model and browser evidence
         run: |
           set -e
           node mechanism-notify/build.mjs
           node mechanism-notify/build-mobile.mjs
-          node mechanism-notify/test.mjs
-          node mechanism-notify/test-mobile.mjs
-          node ht-early-candidate/test-model.mjs
-          node ht-early-candidate/test-valuation.mjs
-          node ft-overview/test-ft-state-model.mjs
-          node hc-model/test-valuation.mjs
-          node --check mechanism-release/candidate/worker_notify_v130.js
-          node --check mechanism-release/candidate/worker_notify_v138_peak_window.js
+          node mechanism-notify/reuse-evidence.mjs
+          node --check mechanism-notify/release.mjs
       - run: npm install --no-save --no-package-lock wrangler@4 playwright@1.58.2
       - name: Preserve both rollback versions, bindings, all 54 assets and scanner OFF
         run: node mechanism-notify/release.mjs prepare
-      - name: Candidate six-tab, shared scan controls and independent preferences acceptance
-        run: |
-          set -e
-          node mechanism-mobile/test-browser.cjs
-          node mechanism-mobile/test-controls.cjs
-          node mechanism-notify/test-preferences.cjs
       - name: Dry run both complete packages
         run: |
           npx --no-install wrangler deploy --dry-run --config mechanism-release/candidate/.release.json
