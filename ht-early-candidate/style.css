@@ -99,7 +99,7 @@ body.fe-tabs-mode[data-fe-tabs-tab="ht"]:has([data-ht-glance]) .app{padding-left
 #feTabsWorkspace .htx-outlook small{font-size:10px;line-height:1.45}
 #feTabsWorkspace .htx-spark{position:relative;display:block;height:78px;min-height:78px;padding:6px 8px 18px;border:1px solid #c9e5d7;border-radius:5px;background:repeating-linear-gradient(90deg,#e5f5eb 0,#e5f5eb 18px,#d9efe3 18px,#d9efe3 36px);overflow:hidden}
 #feTabsWorkspace .htx-pitch{position:absolute;inset:3px 3px 16px;width:calc(100% - 6px);height:calc(100% - 19px);stroke:#fff;stroke-width:1.5}
-#feTabsWorkspace .htx-spark-bars{position:relative;height:46px;display:flex;align-items:flex-end;justify-content:center;gap:9px}
+#feTabsWorkspace .htx-spark>.htx-spark-bars{position:relative;height:46px;display:flex;flex-direction:row;align-items:flex-end;justify-content:center;gap:9px}
 #feTabsWorkspace .htx-spark-bars>div{display:flex;flex-direction:column;align-items:center;width:19px}
 #feTabsWorkspace .htx-spark-bars i{width:100%;background:#0a9a68b8;border-radius:3px 3px 0 0}
 #feTabsWorkspace .htx-spark-bars small{display:none}
@@ -144,3 +144,12 @@ body.fe-tabs-mode[data-fe-tabs-tab="ht"]:has([data-ht-glance]) .app{padding-left
 #feTabsWorkspace .htx-ladder>small em{font-size:8px;font-weight:400;font-style:normal;display:block;color:#778ca1;margin-top:2px}
 #feTabsWorkspace .htx-ladder>a{width:29px;height:29px;font-size:11px;background:#edf4fb}
 @media(max-width:350px){#feTabsWorkspace .htp-card:has(.htx){padding:12px 10px}#feTabsWorkspace .htx-outlook{grid-template-columns:minmax(0,1fr) 104px;gap:8px}#feTabsWorkspace .htx-outlook strong{font-size:13px}#feTabsWorkspace .htx-metrics>div{grid-template-columns:17px minmax(0,1fr);padding:8px 4px;gap:2px 3px;text-align:left}#feTabsWorkspace .htx-metrics svg{display:block;width:17px;padding:1px}#feTabsWorkspace .htx-metrics b{font-size:11px}#feTabsWorkspace .htx-verdict-grid{grid-template-columns:minmax(0,1fr) 43px 51px;gap:5px}#feTabsWorkspace .htx-verdict-grid>div:first-child>strong{font-size:12px}#feTabsWorkspace .htx-fair b{font-size:11px}#feTabsWorkspace .htx-streams{gap:7px}#feTabsWorkspace .htx-streams svg{width:22px;height:25px;padding:3px}#feTabsWorkspace .htx-streams b{font-size:10px}}
+/* Tighten the existing HT frame without changing any navigation target. */
+body.fe-tabs-mode[data-fe-tabs-tab="ht"]:has([data-ht-glance]) .app>.topbar{min-height:44px!important;padding-top:5px!important;padding-bottom:5px!important;margin-bottom:2px!important}
+#feTabsWorkspace:has([data-ht-glance]) .ftabs-nav{padding-top:5px;padding-bottom:7px}
+#feTabsWorkspace:has([data-ht-glance]) .ftabs-note{display:none}
+#feTabsWorkspace .htx h3.htx-teams{margin-top:10px}
+#feTabsWorkspace .htx-outlook{padding-top:11px;padding-bottom:11px}
+#feTabsWorkspace .htx-ladder{padding-bottom:2px}
+body.fe-tabs-mode[data-fe-tabs-tab="ht"]:has([data-ht-glance]) .bottom-nav .center-plus{font-size:0!important}
+body.fe-tabs-mode[data-fe-tabs-tab="ht"]:has([data-ht-glance]) .bottom-nav .center-plus::after{content:'+';font:300 34px/1 Arial,sans-serif;color:#fff;display:block}

@@ -20,8 +20,8 @@ jobs:
         with: {node-version: '22'}
       - uses: actions/download-artifact@v4
         with:
-          name: ht-glance-release-proof
-          run-id: 40986309287
+          name: ht-visual-release-proof
+          run-id: 40990043537
           github-token: ${{ github.token }}
           path: ht-visual-baseline
       - name: Probability meaning, HT model, settlement and session regression

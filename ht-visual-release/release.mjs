@@ -6,7 +6,7 @@ import {createHash} from 'node:crypto';
 import {execFileSync} from 'node:child_process';
 import {assertAssetClosure,assertStaticContent} from '../ht-mechanism-recovery/asset-graph.mjs';
 const action=process.argv[2],dir='ht-visual-package',origin='https://shiny-silence-d892.ngophuonghuy.workers.dev',name='shiny-silence-d892';
-const before='0e2b2330-4f0e-42b7-8dd7-071e0253a938',backend='e7d2090c-d0e1-4f58-9f5a-4360acd2ced3';
+const before='d677fe4f-2256-4152-b91d-4e7cb8f0296b',backend='e7d2090c-d0e1-4f58-9f5a-4360acd2ced3';
 const sha=process.env.GITHUB_SHA,token=process.env.CLOUDFLARE_API_TOKEN,account=process.env.CLOUDFLARE_ACCOUNT_ID;
 assert(sha&&token&&account);assert(['prepare','deploy','verify','rollback'].includes(action));
 const hash=x=>createHash('sha256').update(x).digest('hex'),base='https://api.cloudflare.com/client/v4/accounts/'+encodeURIComponent(account)+'/workers/scripts/';
@@ -32,7 +32,7 @@ try{
   assert(Array.isArray(meta.resources?.bindings)&&meta.resources.bindings.every(b=>b.type==='assets'),'ASSET_ONLY_BINDING_REQUIRED');
   save(dir+'/backup-version.json',JSON.stringify(meta,null,2));
   const previous=JSON.parse(readFileSync('ht-visual-baseline/manifest.json'));
-  assert.equal(previous.source_commit,'155ca28b18a2818f4bd8b91630e5d2c58ee2db58');assert.equal(previous.candidate.length,49);
+  assert.equal(previous.source_commit,'6ff86f1bf51e4a6695cfda6b05988ac9a1c44e83');assert.equal(previous.candidate.length,49);
   const backup=[];
   for(const file of previous.candidate){
    assert(!file.path.includes('..'));assert.equal(hash(readFileSync('ht-visual-baseline/site/'+file.path)),file.sha256,'HISTORIC_PACKAGE_HASH');
@@ -45,12 +45,12 @@ try{
   // Existing controller/model/storage/timer and every non-presentation byte stay identical.
   assert.equal(hash(readFileSync(dir+'/site/ht-candidate/ui.mjs')),hash(readFileSync(dir+'/backup/ht-candidate/ui.mjs')),'HT_CONTROLLER_DRIFT');
   const candidate=backup.map(f=>({...f,sha256:hash(readFileSync(dir+'/site/'+f.path))}));
-  const changed=backup.filter(f=>candidate.find(x=>x.path===f.path).sha256!==f.sha256).map(f=>f.path).sort();assert.deepEqual(changed,['ht-candidate/glance-view.mjs','ht-candidate/style.css']);
+  const changed=backup.filter(f=>candidate.find(x=>x.path===f.path).sha256!==f.sha256).map(f=>f.path).sort();assert.deepEqual(changed,['ht-candidate/style.css']);
   const closure=assertAssetClosure(dir+'/site');assert.equal(closure.files,49);assert.equal(candidate.length,49);
   assert.equal(await active(name),before,'VERSION_CHANGED_DURING_PREP');const settings=await cf(name+'/settings');
   save(dir+'/wrangler.json',JSON.stringify({name,compatibility_date:settings.compatibility_date||'2026-10-01',...(settings.compatibility_flags?.length?{compatibility_flags:settings.compatibility_flags}:{}),keep_vars:true,assets:{directory:'./site'}}));
   save(dir+'/manifest.json',JSON.stringify({source_commit:sha,before_version:before,backup,candidate,modified_existing_files:changed,baseline_index_sha256:hash(readFileSync(dir+'/backup/index.html')),index_sha256:hash(readFileSync(dir+'/site/index.html')),closure},null,2));
-  report.status='PREPARED';report.changed_assets=2;report.existing_assets_unchanged=47;report.ht_visual_proportions_corrected=true;report.ht_model_session_and_ranking_unchanged=true;report.hc_ft_assets_unchanged=true;saveReport();
+  report.status='PREPARED';report.changed_assets=1;report.existing_assets_unchanged=48;report.ht_visual_proportions_corrected=true;report.ht_model_session_and_ranking_unchanged=true;report.hc_ft_assets_unchanged=true;saveReport();
  }else if(action==='deploy'){
   assert.equal(report.status,'PREPARED');assert.equal(manifest().source_commit,sha);await others();assert.equal(await active(name),before,'MOBILE_VERSION_DRIFT');await check(manifest().backup);
   for(const f of manifest().candidate)assert.equal(hash(readFileSync(dir+'/site/'+f.path)),f.sha256,'LOCAL_PACKAGE_DRIFT');assertAssetClosure(dir+'/site');
