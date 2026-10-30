@@ -311,3 +311,5 @@ body.fe-tabs-mode:not([data-fe-tabs-tab=ht]) .bottom-nav .center-plus::after{con
 @media(prefers-reduced-motion:reduce){#feTabsWorkspace .ov-scan-state[data-state=busy]>i{animation:none}}
 
 #feTabsWorkspace .ov-scan-state[data-state=warning]{color:#ac7b29}#feTabsWorkspace .ov-scan-state[data-state=warning]>i{background:#d6a04d}
+
+body:not(.fe-tabs-mode) [data-overview-scan-controls],body:not([data-fe-tabs-tab=overview]) [data-overview-scan-controls]{display:none!important}

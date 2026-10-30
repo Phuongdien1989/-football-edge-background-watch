@@ -2,7 +2,7 @@
 export function createOverviewScanRuntime(d){
  let pending=null,error='';
  const publish=()=>d.changed?.();
- const read=()=>{const local=d.local(),remote=d.remote(),known=!!remote&&Number.isFinite(remote.observedAt)&&Date.now()-remote.observedAt<=45000;
+ const read=()=>{const local=d.local(),remote=d.remote(),known=!!remote&&Number.isFinite(remote.observedAt)&&Date.now()-remote.observedAt>=0&&Date.now()-remote.observedAt<=45000;
   const localOn=Object.values(local.engines||{}).some(x=>x.active&&x.auto),remoteOn=known&&remote.enabled===true,remoteRequested=known&&(remote.manualEnabled??remote.enabled)===true;
   return {pending,error,local,remote,known,localOn,remoteOn,remoteRequested,on:localOn||remoteRequested,busy:!!pending||!!local.busy};};
  async function refresh(){if(pending)return {ok:false,busy:true};const l=d.local();if(!l.backgroundConfigured){publish();return {ok:true};}pending='status';error='';publish();try{await d.refreshRemote();return {ok:true};}catch(e){error='Không đọc được trạng thái quét nền. Hãy thử lại.';return {ok:false,error};}finally{pending=null;publish();}}
