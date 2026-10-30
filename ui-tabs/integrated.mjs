@@ -1,3 +1,4 @@
+import './scan-control.mjs';
 import {renderOverview} from './overview-view.mjs';
 import {overviewHTInputs} from './overview-input.mjs';
 import {renderSignalMechanism} from '../ft-ai-v2/light-signal-mechanisms.mjs';
