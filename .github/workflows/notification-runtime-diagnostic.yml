@@ -1,0 +1,26 @@
+name: Notification runtime owner and fresh-instance diagnostic
+on:
+  push:
+    branches: [feat/mechanism-notifications-20261030]
+    paths: ['notification-recovery/runtime.mjs', '.github/workflows/notification-runtime-diagnostic.yml']
+permissions: {contents: read}
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    environment: football-edge-production
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - run: node notification-recovery/runtime.mjs
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: notification-runtime-diagnostic
+          path: runtime-diagnostic.json
+          retention-days: 90
