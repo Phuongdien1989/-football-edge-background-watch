@@ -17,7 +17,11 @@ package with current bindings/secrets, records its new compatible version, then
 deploys the candidate. It never forces secret rollback. A failed candidate can
 restore the exact original source through the already exercised upload path.
 Durable Object acceptance verifies the runtime source as well as edge source,
-with a bounded three-minute propagation window.
+with a bounded three-minute propagation window. Backend deployment explicitly
+uses immediate Durable Object code update while the scanner is OFF; repeated
+health reads alone are not accepted as evidence of runtime code convergence.
+The preserved-source recovery was exercised successfully (compatible version
+ca45e4cd-059b-493d-b5f7-3612df85a1ab) before completing the candidate release.
 
 ## Delivery policies
 
