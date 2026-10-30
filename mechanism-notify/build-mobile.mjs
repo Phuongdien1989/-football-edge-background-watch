@@ -23,7 +23,9 @@ writeFileSync(dir+'/wrangler.json',JSON.stringify({name:'shiny-silence-d892',com
 for(const name of ['test-browser.cjs','test-controls.cjs']){
  let s=readFileSync('overview-scan-release/'+name,'utf8').replaceAll('overview-scan-package','mechanism-mobile');
  if(name==='test-browser.cjs')s=s.replace("await ft.locator('[data-mechanism=ftv2]').screenshot",`await page.evaluate(()=>{location.hash='#fe-tabs/ftv2/910002';});
-    await page.waitForSelector('[data-ft-v2-select="910002"][data-active="true"]');
+    await page.waitForSelector('[data-ft-v2-select="910002"][data-active="true"]',{timeout:3000});
+    await page.evaluate(()=>{location.hash='#fe-tabs/ftv2/910001';});
+    await page.waitForSelector('[data-ft-v2-select="910001"][data-active="true"]',{timeout:3000});
     await ft.locator('[data-mechanism=ftv2]').screenshot`);
  writeFileSync(dir+'/'+name,s);
 }

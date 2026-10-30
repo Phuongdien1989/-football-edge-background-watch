@@ -32,6 +32,8 @@ export function patchFTSelection(s){
  const old='if(!rows.some(x=>x.id===selected))selected=rows.find(x=>x.rank)?.id??rows[0]?.id??null;';
  assert.equal(s.split(old).length,2);
  return s.replace("let selected=null,last='',lastSelected=null,currentSession=null;","let selected=null,last='',lastSelected=null,currentSession=null,lastRouteFixture=null;")
+  .replace("window.addEventListener('fe-notify-sync-updated',sync);","window.addEventListener('fe-notify-sync-updated',sync);window.addEventListener('hashchange',sync);")
+  .replace("window.removeEventListener('fe-notify-sync-updated',sync);","window.removeEventListener('fe-notify-sync-updated',sync);window.removeEventListener('hashchange',sync);")
   .replace(old,`const requested=window.FETabsIntegrated?.mode?.().fixture??null;
   if(requested!==lastRouteFixture){if(rows.some(x=>x.id===requested))selected=requested;lastRouteFixture=requested;}
   ${old}`);
