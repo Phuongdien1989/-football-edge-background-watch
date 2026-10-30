@@ -22,12 +22,11 @@ await ctx.route('**/*',route=>{const r=route.request(),u=new URL(r.url());if(u.o
     if(target===window&&key==='FEHTCandidateBridge')descriptor={...descriptor,value:Object.freeze({...descriptor.value,read:()=>structuredClone(window.__htRecoveryQA)})};
     return original(target,key,descriptor);
    };
-  });
 
-await ctx.addInitScript(()=>{
- const now=Date.now(),clone=x=>structuredClone(x),a=__htRecoveryQA.items[0],v=clone(__htRecoveryQA.items[1]),l=clone(v),d=__ftQA.items[0],m=__hcQA.items[1];
+
+ { const now=Date.now(),clone=x=>structuredClone(x),a=__htRecoveryQA.items[0],v=clone(__htRecoveryQA.items[1]),l=clone(v),d=__ftQA.items[0],m=__hcQA.items[1];
  a.home='Arsenal';a.away='Chelsea';a.league='Premier League';a.latest.minute=28;a.latest.fixture.league={name:a.league,country:'England'};a.latest.market_rows[0].values[0].odd=1.9;
- v.id=990092;v.home='Valencia';v.away='Villarreal';v.league='La Liga';v.latest.minute=32;v.latest.fixture.fixture.id=v.id;v.latest.fixture.league={name:v.league,country:'Spain'};v.eval.dataIncomplete=true;v.eval.scoreMode='DATA_INCOMPLETE';
+ v.id=990092;v.home='Valencia';v.away='Villarreal';v.league='La Liga';v.latest.minute=32;v.latest.fixture.fixture.id=v.id;v.latest.fixture.league={name:v.league,country:'Spain'};v.eval.dataIncomplete=true;v.eval.scoreMode='DATA_INCOMPLETE';v.latest.data_health={level:'NO_STATS'};
  l.id=990093;l.home='Lyon';l.away='Lille';l.league='Ligue 1';l.latest.minute=19;l.latest.fixture.fixture.id=l.id;l.latest.fixture.league={name:l.league,country:'France'};l.latest.market_rows=[];l.state='CANDIDATE';
  __htRecoveryQA.items=[a,v,l];for(const r of __htRecoveryQA.context.rows){r.halftime_home=2;r.halftime_away=1;}
  d.home='Dortmund';d.away='Leipzig';d.league='Bundesliga';d.latest.minute=63;__ftQA.items=[d];
@@ -35,11 +34,12 @@ await ctx.addInitScript(()=>{
  __valuationQA=[{...__valuationQA[0],id:d.id,snapshot:{...__valuationQA[0].snapshot,home:d.home,away:d.away,league:d.league,minute:63},quote:{fairOdds:1.90,ev:.079},binary:{over:.48,under:.52},recommendation:{action:'TRIAL_OVER'}}];__valuationQA[0].snapshot.market.over=2.05;
  const history=it=>{const s=it.latest;it.history=[0,1,2,3,4].map((n,i)=>({captured_at:now-(5-i)*30000,goals:clone(s.goals),metrics:{total:{sot:n,shots:n+2}},stats_presence:{sot:true,shots:true}}));};for(const it of [a,v,l,d])history(it);
  __ovSources=[a,d,v,m,l];__ovMasters=__ovSources.map((it,i)=>({id:it.id,[it===m?'hc':it===d?'ft':'h1']:it,__rank:{top:i+1,primary:{engine:it===m?'HC':it===d?'FT':'H1'}}}));
+ }
 });
 const page=await ctx.newPage();page.on('pageerror',e=>errors.push(e.message));
-await page.goto(origin+'/#fe-tabs/ht',{waitUntil:'networkidle'});await page.waitForFunction(()=>FEHTPricingView.read().length===3);
+await page.goto(origin+'/#fe-tabs/overview',{waitUntil:'networkidle'});await page.waitForFunction(()=>window.FEHTPricingView&&document.querySelectorAll('[data-overview-id]').length===5);await page.evaluate(()=>FETabsIntegrated.refresh());
 const book=await page.evaluate(()=>JSON.stringify(FEHTPricingView.sessions()));
-await page.locator('[data-ftabs-tab=overview]').click();const dash=page.locator('[data-overview-dashboard]');await dash.waitFor();
+const dash=page.locator('[data-overview-dashboard]');await dash.waitFor();
 await page.waitForFunction(()=>document.querySelectorAll('[data-overview-id]').length===5);
 assert.deepEqual(await dash.locator('[data-overview-id]').evaluateAll(es=>es.map(e=>Number(e.dataset.overviewId))),[990091,910001,990092,920001,990093]);
 assert.equal(await dash.locator('[data-ready=true]').count(),2,'ASSESSED_RECOMMENDATION_COUNT');

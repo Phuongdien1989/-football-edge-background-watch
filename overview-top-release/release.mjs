@@ -40,14 +40,15 @@ try{
    save(dir+'/backup/'+file.path,current.bytes);save(dir+'/site/'+file.path,current.bytes);backup.push(file);
   }
   // Overview-only entry wiring, stylesheet additions and pure dashboard view.
-  const targets=[['ui-tabs/integrated.mjs','ui-tabs/integrated.mjs'],['ft-overview/light-signal-pro.css','ft-ai-v2/light-signal-pro.css'],['ui-tabs/overview-view.mjs','ui-tabs/overview-view.mjs']];
-  for(const [source,path]of targets)save(dir+'/site/'+path,readFileSync(source));
+  const targets=[['ui-tabs/integrated.mjs','ui-tabs/integrated.mjs'],['ft-overview/light-signal-pro.css','ft-ai-v2/light-signal-pro.css'],['ui-tabs/overview-view.mjs','ui-tabs/overview-view.mjs'],['ui-tabs/overview-input.mjs','ui-tabs/overview-input.mjs']];
+  for(const [source,path]of targets){const value=readFileSync(source);save(dir+'/site/'+path,path==='ui-tabs/overview-input.mjs'?value.toString().replaceAll('../ht-early-candidate/','../ht-candidate/'):value);}
   // Existing controller/model/storage/timer and every non-presentation byte stay identical.
   assert.equal(hash(readFileSync(dir+'/site/ht-candidate/ui.mjs')),hash(readFileSync(dir+'/backup/ht-candidate/ui.mjs')),'HT_CONTROLLER_DRIFT');
   const candidate=backup.map(f=>({...f,sha256:hash(readFileSync(dir+'/site/'+f.path))}));
   candidate.push({path:'ui-tabs/overview-view.mjs',sha256:hash(readFileSync(dir+'/site/ui-tabs/overview-view.mjs'))});
+  candidate.push({path:'ui-tabs/overview-input.mjs',sha256:hash(readFileSync(dir+'/site/ui-tabs/overview-input.mjs'))});
   const changed=backup.filter(f=>candidate.find(x=>x.path===f.path).sha256!==f.sha256).map(f=>f.path).sort();assert.deepEqual(changed,['ft-ai-v2/light-signal-pro.css','ui-tabs/integrated.mjs']);
-  const closure=assertAssetClosure(dir+'/site');assert.equal(closure.files,51);assert.equal(candidate.length,51);
+  const closure=assertAssetClosure(dir+'/site');assert.equal(closure.files,52);assert.equal(candidate.length,52);
   assert.equal(await active(name),before,'VERSION_CHANGED_DURING_PREP');const settings=await cf(name+'/settings');
   save(dir+'/wrangler.json',JSON.stringify({name,compatibility_date:settings.compatibility_date||'2026-10-01',...(settings.compatibility_flags?.length?{compatibility_flags:settings.compatibility_flags}:{}),keep_vars:true,assets:{directory:'./site'}}));
   save(dir+'/manifest.json',JSON.stringify({source_commit:sha,before_version:before,backup,candidate,modified_existing_files:changed,baseline_index_sha256:hash(readFileSync(dir+'/backup/index.html')),index_sha256:hash(readFileSync(dir+'/site/index.html')),closure},null,2));
@@ -58,7 +59,7 @@ try{
   try{execFileSync('npx',['--no-install','wrangler','deploy','--config',dir+'/wrangler.json'],{stdio:'pipe',timeout:180000});}catch{throw Error('MOBILE_ASSET_UPLOAD_FAILED');}
   report.version=await active(name);assert.notEqual(report.version,before);saveReport();await others();report.status='DEPLOYED';saveReport();await check(manifest().candidate);report.public_assets_ready=true;saveReport();
  }else if(action==='verify'){
-  assert.equal(await active(name),report.version);await check(manifest().candidate);await others();report.scanner_after=await health();report.status='VERIFIED';report.public_hashes_verified=51;report.actual_live_and_physical_push='NOT_VERIFIED; browser synthetic rendering only';report.presentation_only=true;assert.equal(report.scanner_after.enabled,report.scanner_before.enabled,'SCANNER_ENABLED_DRIFT');assert.equal(report.scanner_after.manualEnabled,report.scanner_before.manualEnabled,'SCANNER_MANUAL_DRIFT');if(report.scanner_before.enabled===false)assert.equal(report.scanner_after.next_alarm,null,'OFF_SCANNER_ALARM');saveReport();
+  assert.equal(await active(name),report.version);await check(manifest().candidate);await others();report.scanner_after=await health();report.status='VERIFIED';report.public_hashes_verified=52;report.actual_live_and_physical_push='NOT_VERIFIED; browser synthetic rendering only';report.presentation_only=true;assert.equal(report.scanner_after.enabled,report.scanner_before.enabled,'SCANNER_ENABLED_DRIFT');assert.equal(report.scanner_after.manualEnabled,report.scanner_before.manualEnabled,'SCANNER_MANUAL_DRIFT');if(report.scanner_before.enabled===false)assert.equal(report.scanner_after.next_alarm,null,'OFF_SCANNER_ALARM');saveReport();
  }else await restore();
 }catch(e){report.status='FAIL';report.error=String(e.message||e).slice(0,240);saveReport();
  if((action==='deploy'||action==='verify')&&report.version)try{await restore();}catch(error){report.rollback_error=String(error.message).slice(0,240);saveReport();}

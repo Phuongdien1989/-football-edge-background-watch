@@ -27,6 +27,7 @@ jobs:
       - name: Overview source alignment, ranking and read-only view tests
         run: |
           node overview-top-release/test-view.mjs
+          node overview-top-release/test-input.mjs
           node --check ui-tabs/integrated.mjs
           node --check overview-top-release/release.mjs
       - run: npm install --no-save --no-package-lock wrangler@4 playwright@1.58.2
@@ -58,7 +59,7 @@ jobs:
         run: |
           node overview-top-release/test-browser.cjs --production
           node overview-top-release/test-overview.cjs --production
-      - name: Verify all 51 hashes, backend, Desktop and scanner state
+      - name: Verify all 52 hashes, backend, Desktop and scanner state
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}

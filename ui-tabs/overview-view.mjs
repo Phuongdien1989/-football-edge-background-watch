@@ -13,7 +13,7 @@ function nativeChip(s,key,now){
  const label=({HOME_STRONG:'Có tín hiệu',STRONG_HOME:'Có tín hiệu',AWAY_STRONG:'Có tín hiệu',STRONG_AWAY:'Có tín hiệu',HOME_LEAN:'Theo dõi',AWAY_LEAN:'Theo dõi',HOME_BIAS:'Theo dõi',AWAY_BIAS:'Theo dõi'})[s.state]||translated[s.state]||'Theo dõi';return {label,tone:/Chờ|Đang chờ|tích lũy|Đánh giá/.test(label)?'wait':'neutral',source:key.toUpperCase()};
 }
 function htChip(x,rows,now){
- const s=x.signals.ht,native=nativeChip(s,'ht',now);if(!s||phaseDone(s)||!fresh(s,now))return native;
+ const s=x.signals.ht,native=nativeChip(s,'ht',now);if(!s||phaseDone(s)||!fresh(s,now)||now-s.observation.at>55000)return native;
  const r=rows.find(r=>r.id===x.id&&r.at===s.observation.at),g=r?.model?.condition?.goals,o=s.observation;
  // A cached HT assessment must match the current source time, score and minute.
  if(!r||!g||g.home!==o.goals.home||g.away!==o.goals.away||r.model.condition.minute!==o.minute)return native;

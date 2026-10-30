@@ -1,4 +1,5 @@
 import {renderOverview} from './overview-view.mjs';
+import {overviewHTInputs} from './overview-input.mjs';
 import {renderSignalMechanism} from '../ft-ai-v2/light-signal-mechanisms.mjs';
 import {fromBridges,displayAction} from './read-model.mjs';
 const root=document.querySelector('#feTabsWorkspace');
@@ -11,7 +12,7 @@ const route=(tab,n)=>'#fe-tabs/'+tab+(n?'/'+n:'');
 function read(){
  let assessed=null;try{assessed=window.FTOverviewPreview?.readDisplay?.()||null;}catch{}
  const p=fromBridges({legacy:window.FEUIReadBridge,master:window.FEAddonBridge,overviewRows:assessed?()=>assessed:null});
- if(current==='overview'){let ht=[];try{ht=window.FEHTPricingView?.read?.()||[];}catch{}p.overviewDisplay={ht:ht.slice(0,5),ft:(assessed||[]).slice(0,100)};}
+ if(current==='overview')p.overviewDisplay={ht:overviewHTInputs(window,p),ft:(assessed||[]).slice(0,100)};
  return p;
 }
 const selectedSignal=(x,tab)=>tab==='ftv2'?null:tab==='overview'?(x.signals[x.masterPrimary]||Object.values(x.signals)[0]):x.signals[tab];
