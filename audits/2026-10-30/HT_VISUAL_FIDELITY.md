@@ -1,0 +1,7 @@
+# Correct the approved HT visual, rather than claiming the first card matched it
+
+The user found the live UI unlike the approved concept. Review confirmed nested detail/card padding squeezed the 390px mobile card to 332px, legacy large headings and multi-row tabs persisted around it, and the compact recommendation wrapped awkwardly. The earlier screenshots cropped away the shell, hiding these differences.
+
+This release changes only the existing HT formatter and stylesheet. HT detail now has a full-width single card, compact horizontally scrollable mechanism tabs (all six retained), illustrated mini pitch with actual aggregate SOT/window bars (not positional tracking), probability rail labels, data/market icons, and proportioned recommendation/Fair/EV. Source order is labeled as list position, not a newly computed TOP. Team initials are fallback symbols, not invented official logos. No team dominance is fabricated.
+
+All other 47 public assets remain identical, including index, HT controller/model/session/probability, FT, HC and backend. Keep the prior 49-asset package and exact active Mobile version as rollback. Candidate and public browser QA at 320/375/390/1280 now include full-screen screenshots and assert the removed nesting, plus all previous retained-quote, price, source and session checks. Synthetic read-only fixtures cannot certify actual phone Push or betting performance.
