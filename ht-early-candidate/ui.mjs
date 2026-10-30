@@ -1,3 +1,4 @@
+import {renderHTGlance} from './glance-view.mjs';
 import {renderHTProbability,renderHTContractProbability} from './probability-view.mjs';
 import {assessHTItem} from './assess-item.mjs';
 import {createHTSessionBook} from './recommendation-session.mjs';
@@ -29,7 +30,7 @@ function assessWithSession(item,context,now){
 const esc=x=>String(x??'—').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const pct=x=>typeof x==='number'?(x*100).toFixed(1)+'%':'—';
 const odd=x=>typeof x==='number'?x.toFixed(2):'—';
-export function renderHTPricing(root,items,context,now=Date.now()) {
+export function renderHTPricing(root,items,context,now=Date.now(),{displayById=new Map(),sourceItems=items}={}) {
  const rows=(items||[]).slice(0,5).map(item=>({item,row:assessWithSession(item,context,now)}));
  const html=rows.map(({item,row:r})=>{
   const q=r.quote,model=r.model,pmf=model?.pmf||[],bins=[...pmf.slice(0,4),pmf.slice(4).reduce((a,b)=>a+b,0)],session=r.session;
@@ -44,25 +45,26 @@ export function renderHTPricing(root,items,context,now=Date.now()) {
   const note=session?.closedAt?'Phiên cũ đã kết thúc. Chờ đánh giá mới từ dữ liệu hợp lệ.':q?(q.ev>0?'Giá có lợi theo mô hình nền; cần đối chiếu diễn biến trận.':'Giá hiện tại chưa có lợi theo mô hình nền.'):r.state==='MODEL_WAIT'?'Chờ lịch sử HT của hai đội để định giá độc lập.':'Chờ dữ liệu và giá cùng tỷ số, cùng thời điểm.';
   const league=item.latest?.fixture?.league,name=league?.name||(typeof item.league==='string'?item.league:item.league?.name),country=league?.country||item.country;
   const leagueText=name?[name,country].filter(x=>typeof x==='string'&&x.trim()).join(' · '):'Giải đấu chưa xác định';
-  return '<article class="htp-card" data-htp-id="'+esc(item.id)+'" data-state="'+state+'"><header><span class="htp-eyebrow">HT INTELLIGENCE</span><span class="htp-trial">Thử nghiệm</span></header><h3>'+esc(item.home)+' – '+esc(item.away)+'</h3>'+
-   '<p class="htp-league">'+esc(leagueText)+'</p>'+
-   '<div class="htp-game"><span>'+esc(item.latest?.status==='LIVE'?'1H':item.latest?.status)+' · '+esc(item.latest?.minute)+'′</span><b>'+esc(item.latest?.goals?.home)+' – '+esc(item.latest?.goals?.away)+'</b></div>'+
-   recordedHTML(recorded.get(item.id),session,{now})+'<div class="htp-decision"><div><h4>'+(r.marketOK?'TÀI HIỆP 1 · '+esc(r.recommendation.line):'TÀI HIỆP 1')+'</h4><strong class="htp-odds">'+(r.marketOK?'@ '+odd(r.recommendation.odds):'Chờ giá HT')+'</strong></div><span class="htp-state">'+labels[state]+'</span><p>'+note+'</p></div>'+
-   renderHTProbability(r)+'<div class="htp-values"><div><small>Giá hợp lý ước tính</small><b>'+odd(q?.fairOdds)+'</b></div><div><small>EV mô hình</small><b class="'+(q?.ev>0?'htp-positive':'')+'">'+(q?.ev>0?'+':'')+pct(q?.ev)+'</b></div><div><small>Mẫu HT · H / A</small><b>'+esc(model?.sample.home??0)+' / '+esc(model?.sample.away??0)+'</b></div></div>'+
-   sessionHTML+'<details><summary>Chi tiết dữ liệu & định giá</summary>'+chart+renderHTContractProbability(r)+'<p>Ước tính thử nghiệm, chưa được kiểm chứng hiệu quả dự báo. Mô hình dùng tỷ số HT lịch sử và số bàn đã ghi; chưa điều chỉnh theo sức mạnh đối thủ, sức ép hay thẻ đỏ. Bù giờ chưa được ước lượng.</p><p>Mẫu mỗi đội tối đa 8 trận. Giá hợp lý và EV phụ thuộc mô hình; không bảo đảm kết quả. Hòa vốn là nghịch đảo giá của kèo nửa bàn, không phải xác suất thị trường đã loại biên. Kèo nguyên và phần tư bàn dùng định giá theo quy tắc hoàn tiền/thắng thua từng phần, không quy thành xác suất nhị phân.</p>'+
+  const detailsHTML=chart+renderHTContractProbability(r)+'<p>Ước tính thử nghiệm, chưa được kiểm chứng hiệu quả dự báo. Mô hình dùng tỷ số HT lịch sử và số bàn đã ghi; chưa điều chỉnh theo sức mạnh đối thủ, sức ép hay thẻ đỏ. Bù giờ chưa được ước lượng.</p><p>Mẫu mỗi đội tối đa 8 trận. Giá hợp lý và EV phụ thuộc mô hình; không bảo đảm kết quả. Hòa vốn là nghịch đảo giá của kèo nửa bàn, không phải xác suất thị trường đã loại biên. Kèo nguyên và phần tư bàn dùng định giá theo quy tắc hoàn tiền/thắng thua từng phần, không quy thành xác suất nhị phân.</p>'+
    '<p>Số trận lịch sử riêng biệt: '+esc(model?.sample.unique??0)+'. Thống kê quan sát tại '+esc(item.latest?.fresh_at?new Date(item.latest.fresh_at).toLocaleTimeString('vi-VN'):'—')+'.</p>'+
-   '<p>'+esc(r.contextError||r.warnings.join(' · '))+'</p>'+(session?.closedAt?'<p>Mã kết thúc: '+esc(session.closeReason)+'</p>':'')+'</details><p class="htp-disclaimer">Ước tính thử nghiệm · chưa kiểm chứng hiệu quả dự báo.</p></article>';
+   '<p>'+esc(r.contextError||r.warnings.join(' · '))+'</p>'+(session?.closedAt?'<p>Mã kết thúc: '+esc(session.closeReason)+'</p>':'');
+  return '<article class="htp-card" data-htp-id="'+esc(item.id)+'" data-state="'+state+'">'+renderHTGlance({item,row:r,native:displayById.get(item.id),leagueText,sourceItems,now,recordedHTML:recordedHTML(recorded.get(item.id),session,{now}),recorded:recorded.get(item.id),sessionHTML,valuesHTML:'<div class="htp-values"><div><small>Giá hợp lý ước tính</small><b>'+odd(q?.fairOdds)+'</b></div><div><small>EV mô hình</small><b>'+(q?.ev>0?'+':'')+pct(q?.ev)+'</b></div><div><small>Mẫu HT · H / A</small><b>'+esc(model?.sample.home??0)+' / '+esc(model?.sample.away??0)+'</b></div></div>',detailsHTML})+'</article>';
  }).join('');
- if(root.innerHTML!==html){const opened=new Set([...root.querySelectorAll('.htp-card')].filter(c=>c.querySelector('details')?.open).map(c=>c.dataset.htpId));root.innerHTML=html;for(const c of root.querySelectorAll('.htp-card'))if(opened.has(c.dataset.htpId))c.querySelector('details').open=true;}
+ const signature=JSON.stringify({rows:rows.map(({item,row})=>({item,row:{...row,session:row.session?{...row.session,remainingMs:0}:null},native:displayById.get(item.id),recorded:recorded.get(item.id)})),source:sourceItems.map(i=>[i.id,i.home,i.away])});
+ if(renderKeys.get(root)!==signature||!root.querySelector('[data-ht-glance]')){const opened=new Set([...root.querySelectorAll('.htp-card')].filter(c=>c.querySelector('details')?.open).map(c=>c.dataset.htpId));root.innerHTML=html;renderKeys.set(root,signature);for(const c of root.querySelectorAll('.htp-card'))if(opened.has(c.dataset.htpId))c.querySelector('details').open=true;}
+ // Clock-only ticks preserve the card node, open disclosure and scroll position.
+ for(const {item,row}of rows){const card=root.querySelector('[data-htp-id="'+item.id+'"]');if(!card)continue;const age=Number.isFinite(item.latest?.fresh_at)?Math.max(0,Math.floor((now-item.latest.fresh_at)/1000)):null;const fresh=card.querySelector('.htx-fresh');if(fresh&&age!==null&&age<=55)fresh.textContent='● Cập nhật '+age+'s trước';const seconds=Math.max(0,Math.ceil((row.session?.remainingMs??0)/1000)),clock=Math.floor(seconds/60)+':'+String(seconds%60).padStart(2,'0');for(const node of card.querySelectorAll('.htx-session-strip>span,.htp-session-head>b'))node.textContent=clock;for(const node of card.querySelectorAll('.htx-session-strip em,.htp-progress>i'))node.style.width=Math.min(100,seconds/3)+'%';const progress=card.querySelector('.htp-progress');if(progress)progress.setAttribute('aria-label','Còn '+seconds+' giây');}
+
  return rows.map(x=>x.row);
 }
-let queued=false,lastData=[];
+const renderKeys=new WeakMap();
+let queued=false,lastData=[],displaySnapshotKey='',displayById=new Map();
 function update() {
  const bridge=window.FEHTCandidateBridge,mode=window.FETabsIntegrated?.mode?.();
  if(!bridge||!mode?.enabled||mode.current!=='ht')return;
  const data=bridge.read(),body=document.querySelector('#feTabsWorkspace .ftabs-content');
  if(!body)return;
- const items=(data.items||[]).slice(0,5),rows=items.map(item=>({item,row:assessWithSession(item,data.context,Date.now())}));lastData=rows.map(x=>x.row);
+ const items=(data.items||[]).slice(0,5);const key=items.map(i=>i.id+':'+i.latest?.captured_at).join('|');if(key!==displaySnapshotKey){displaySnapshotKey=key;try{displayById=new Map((window.FEUIReadBridge?.read()?.h1WatchState?.items||[]).map(i=>[i.id,i]));}catch{displayById=new Map();}}const rows=items.map(item=>({item,row:assessWithSession(item,data.context,Date.now())}));lastData=rows.map(x=>x.row);
  for(const link of body.querySelectorAll('[data-ftabs-fixture]')) {
    const found=rows.find(x=>x.item.id===Number(link.dataset.ftabsFixture));if(!found)continue;
    const target=link.querySelector('.ftabs-signal');if(!target)continue;
@@ -79,7 +81,7 @@ function update() {
  if(retained.innerHTML!==retainedHTML)retained.innerHTML=retainedHTML;
  if(mode.fixture) {
    const item=items.find(x=>x.id===mode.fixture),detail=body.querySelector('.ftabs-detail');
-   if(item&&detail){let root=detail.querySelector('[data-ht-pricing]');if(!root){root=document.createElement('section');root.dataset.htPricing='true';detail.append(root);}renderHTPricing(root,[item],data.context);}
+   if(item&&detail){let root=detail.querySelector('[data-ht-pricing]');if(!root){root=document.createElement('section');root.dataset.htPricing='true';detail.append(root);}renderHTPricing(root,[item],data.context,Date.now(),{displayById,sourceItems:items});}
    else if(recorded.has(Number(mode.fixture))){let root=body.querySelector('[data-ht-recorded-detail]');if(!root){root=document.createElement('section');root.dataset.htRecordedDetail='true';body.append(root);}const r=recorded.get(Number(mode.fixture));const html='<article class="htp-card" data-state="RECORDED" data-htp-id="'+esc(r.id)+'"><h3>'+esc(r.home)+' – '+esc(r.away)+'</h3><p class="htp-league">'+esc(r.league)+'</p>'+recordedHTML(r,book.read(r.id),{absent:true})+'<p class="htp-disclaimer">Chỉ lưu mốc đã khuyến nghị. Không phục hồi trận cũ thành LIVE hoặc tiếp tục khuyến nghị khi thiếu nguồn hiện tại.</p></article>';if(root.innerHTML!==html)root.innerHTML=html;}
 
  }
