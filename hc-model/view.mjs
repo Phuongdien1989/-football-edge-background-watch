@@ -37,7 +37,7 @@ export function renderHCCard(row,{now=Date.now()}={}){
  const market=q?'HOME '+signed(q.line)+' @ '+num(q.homeOdd)+' · AWAY '+signed(-q.line)+' @ '+num(q.awayOdd):'Chờ cặp báo giá gốc';
  const legacy=renderHCLegacy(row,{now}),inner=legacy.slice(legacy.indexOf('<div class="hc-badge">'),legacy.lastIndexOf('</article>'));
  let h='<article class="hc-research-card fe-mc" data-fixture="'+esc(row.id)+'" data-hc-recorded="'+(row.recordedOnly===true)+'">';
- h+=matchIdentity({home:row.home,away:row.away,league:row.league,at:row.at,goals:m?.condition.score,status:m?.condition.status,minute:m?.condition.minute,badge:row.recordedOnly?'HC · Mốc lịch sử':'HC · Thử nghiệm',now});
+ h+=matchIdentity({home:row.home,away:row.away,league:row.league,at:row.at,goals:m?.condition.score??row.context?.score,status:m?.condition.status??row.context?.status,minute:m?.condition.minute??row.context?.minute,badge:row.recordedOnly?'HC · Mốc lịch sử':'HC · Thử nghiệm',now});
  h+=outlook(data==='Chờ dữ liệu mới'?'CHỜ DỮ LIỆU MỚI':'HƯỚNG TRẬN · '+data,'Tách hướng dữ liệu khỏi luật và giá kèo');
  const pair=(key)=>fresh&&e?.fresh?`${e.home?.[key]==null?'—':num(e.home[key])} / ${e.away?.[key]==null?'—':num(e.away[key])}`:'—';
  h+=factTiles([['SOT · H / A',pair('sot'),'target'],['xG · H / A',pair('xg'),'trend'],['LIVE GAP',fresh?signed(row.legacy?.gap):'—','data']]);

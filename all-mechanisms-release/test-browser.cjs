@@ -100,7 +100,9 @@ const origin='https://shiny-silence-d892.ngophuonghuy.workers.dev',baseline=fals
     const clockBefore=await ft.locator('[data-ft-session-clock]').innerText();
     await page.waitForFunction(previous=>document.querySelector('#ftAIV2ReadOnly [data-ft-session-clock]')?.textContent!==previous,clockBefore);
     assert.equal(await fairLocator.innerText(),afterUpdate,'CLOCK_FABRICATED_MODEL_UPDATE');
-    await ft.locator('.fe-lsp-ft-change summary').click();
+    assert.equal(await ft.locator('.fe-lsp-ft-change').evaluate(e=>e.open),false,'COMPARISON_NOT_COLLAPSED_BY_DEFAULT');
+    await ft.locator('.fe-lsp-ft-change summary').click();assert.equal(await ft.locator('.fe-lsp-ft-change').evaluate(e=>e.open),true,'COMPARISON_CANNOT_OPEN');
+    await ft.locator('.fe-lsp-ft-change summary').click();assert.equal(await ft.locator('.fe-lsp-ft-change').evaluate(e=>e.open),false,'COMPARISON_CANNOT_CLOSE');
 
     await ft.scrollIntoViewIfNeeded();await page.screenshot({path:out+'/ft-valuation-'+width+'.png',fullPage:true});
     const ftOver=await ft.evaluate(e=>({bad:e.scrollWidth>e.clientWidth+1,root:[e.clientWidth,e.scrollWidth],children:[...e.querySelectorAll('*')].filter(x=>x.scrollWidth>x.clientWidth+2).slice(0,15).map(x=>({c:x.className,w:x.clientWidth,sw:x.scrollWidth}))}));if(ftOver.bad)console.log('FT_OVERFLOW_DIAGNOSTIC '+JSON.stringify(ftOver));assert.equal(ftOver.bad,false,'FT_OVERFLOW');
