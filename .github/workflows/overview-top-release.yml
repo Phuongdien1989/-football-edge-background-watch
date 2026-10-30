@@ -1,0 +1,77 @@
+name: Approved Overview TOP 5 dashboard
+on:
+  push:
+    branches: [feat/overview-top5-20261030]
+    paths: ['overview-top-release/**', 'ui-tabs/**', 'ft-overview/light-signal-pro.css', '.github/workflows/overview-top-release.yml']
+permissions: {contents: read, actions: read}
+concurrency:
+  group: fe-football-edge-mobile-production
+  cancel-in-progress: false
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    environment: football-edge-production
+    env: {WRANGLER_SEND_METRICS: 'false'}
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - uses: actions/download-artifact@v4
+        with:
+          name: all-mechanisms-release-proof
+          run-id: 40996050264
+          github-token: ${{ github.token }}
+          path: overview-top-baseline
+      - name: Overview source alignment, ranking and read-only view tests
+        run: |
+          node overview-top-release/test-view.mjs
+          node --check ui-tabs/integrated.mjs
+          node --check overview-top-release/release.mjs
+      - run: npm install --no-save --no-package-lock wrangler@4 playwright@1.58.2
+      - name: Verify current app and preserve all 50 assets and rollback
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node overview-top-release/release.mjs prepare
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pre-overview-top-mobile-backup
+          path: |
+            overview-top-package/backup/
+            overview-top-package/backup-version.json
+            overview-top-package/manifest.json
+          retention-days: 90
+      - name: Candidate all six tabs and existing HT retention at four widths
+        run: |
+          node overview-top-release/test-browser.cjs
+          node overview-top-release/test-overview.cjs
+      - run: npx --no-install wrangler deploy --dry-run --config overview-top-package/wrangler.json
+      - name: Publish complete Mobile bundle with approved Overview TOP 5
+        id: publish
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node overview-top-release/release.mjs deploy
+      - name: Verify published HT percentages, price independence, HT retention, FT and HC
+        run: |
+          node overview-top-release/test-browser.cjs --production
+          node overview-top-release/test-overview.cjs --production
+      - name: Verify all 51 hashes, backend, Desktop and scanner state
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node overview-top-release/release.mjs verify
+      - name: Restore Mobile if post-publish checks fail
+        if: failure() && steps.publish.outcome == 'success'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node overview-top-release/release.mjs rollback
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: overview-top-release-proof
+          path: overview-top-package/
+          retention-days: 90
