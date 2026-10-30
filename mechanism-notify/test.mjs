@@ -65,6 +65,7 @@ await check('restart, duplicate observations, stale observations and clock rollb
 await check('missing data does not rearm, but a confirmed negative price followed by a new positive observation does',()=>{
  const missing=planDelivery(first.state,[],{now:now+60000,observedAt:now+60000,results:{ht:{action:'WAIT_PRICE'}}});assert.equal(missing.state.records.ht.armed,false);
  const noEV=planDelivery(first.state,[],{now:now+60000,observedAt:now+60000,results:{ht:{action:'WAIT_PRICE',quote:{ev:-.1}}}});assert.equal(noEV.state.records.ht.armed,true);
+ const htWait=planDelivery(first.state,[],{now:now+60000,observedAt:now+60000,results:{ht:{state:'WAIT_PRICE',action:'WAIT',quote:{ev:-.1}}}});assert.equal(htWait.state.records.ht.armed,true,'REAL_HT_WAIT_ACTION_REARMS_FROM_PRICE_STATE');
  const next=planDelivery(noEV.state,candidates.map(c=>({...c,at:now+300001})),{now:now+300001,observedAt:now+300001});assert.deepEqual(next.send.map(c=>c.kind),['ht']);
 });
 await check('new contract and event can send only after the existing fixture hold, never for an older observation',()=>{

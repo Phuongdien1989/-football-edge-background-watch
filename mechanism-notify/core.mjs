@@ -46,7 +46,7 @@ export function planDelivery(previous,candidates,{now,observedAt,results={},lega
  for(const kind of ['ht','ftOverview','ftV2']) {
   const r=results[kind],old=state.records[kind];
   // Only a fresh, genuinely negative price rearms. Missing/stale data is not a crossing.
-  if(old&&r?.quote&&r.quote.ev<=0&&r.action==='WAIT_PRICE'&&observedAt>old.observedAt&&now-observedAt>=0&&now-observedAt<=55000)old.armed=true;
+  if(old&&r?.quote&&r.quote.ev<=0&&(r.action==='WAIT_PRICE'||r.state==='WAIT_PRICE')&&observedAt>old.observedAt&&now-observedAt>=0&&now-observedAt<=55000)old.armed=true;
  }
  const timeOK=finite(now)&&finite(observedAt)&&observedAt>0&&now>=observedAt&&now-observedAt<=60000;
  if(timeOK&&(!state.lastAttemptAt||now-state.lastAttemptAt>=HOLD_MS))for(const c of candidates) {

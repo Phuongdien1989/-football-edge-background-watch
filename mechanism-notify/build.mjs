@@ -13,7 +13,7 @@ import {mechanismPrefs,evaluateMechanisms,capabilities} from './mechanism-notify
 import {createFTContextCache} from './mechanism-notify/context.mjs';
 import {deliverMechanisms} from './mechanism-notify/deliver.mjs';`);
 patch(p,'    enabled:p.enabled!==false,','    ...mechanismPrefs(p),enabled:p.enabled!==false,');
-patch(p,'  async notifyStatusView(){','  mechanismCapabilities(){return capabilities();}\n\n  async notifyStatusView(){');
+patch(p,'  async notifyStatusView(){','  mechanismCapabilities(){return {...capabilities(),source:this.env.FE_DEPLOY_COMMIT||null};}\n\n  async notifyStatusView(){');
 patch(p,'return reply({...d,scan:{...(d.scan||{}),...(latest||{})}},r.status);','return reply({...d,mechanism_notifications:this.mechanismCapabilities(),scan:{...(d.scan||{}),...(latest||{})}},r.status);');
 patch(p,"const goalEstimates={};",`const goalEstimates={};
             this._ftMechanismHistory ||= createFTContextCache();

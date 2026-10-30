@@ -4,12 +4,13 @@ import {execFileSync} from 'node:child_process';
 import {createHash,randomBytes} from 'node:crypto';
 import {readPublicStatic} from '../ht-mechanism-recovery/public-read.mjs';
 const action=process.argv[2],account=process.env.CLOUDFLARE_ACCOUNT_ID,token=process.env.CLOUDFLARE_API_TOKEN,sha=process.env.GITHUB_SHA;
-assert(account&&token&&sha);assert(['prepare','backend','mobile','verify','probe','rollback'].includes(action));
+assert(account&&token&&sha);assert(['prepare','baseline','backend','mobile','verify','probe','rollback'].includes(action));
 const backend='football-edge-background-watch',mobile='shiny-silence-d892',desktop='football-edge-desktop-b2-test',origin='https://'+mobile+'.ngophuonghuy.workers.dev',api='https://api.cloudflare.com/client/v4/accounts/'+encodeURIComponent(account),backendBefore='e7d2090c-d0e1-4f58-9f5a-4360acd2ced3',mobileBefore='c9b86303-7031-4068-a4fe-808de4a0093a',desktopBefore='a332ee39-abb2-422d-a021-db78ef19cc10',backendSource='3cd210d2d74aff547de4587ab4a3c96b982a728c';
+const recoveredBackend='2e6dce00-1344-494e-853e-56bc0c549589',recoveredSource='a8cd4af5bd34c1db186ce4b7ed22145c4a4cd549';
 const output='mechanism-release/deployment.json',hash=x=>createHash('sha256').update(x).digest('hex'),sleep=ms=>new Promise(r=>setTimeout(r,ms));
 let report=existsSync(output)?JSON.parse(readFileSync(output)):{source_commit:sha,status:'PREPARING',backend_rollback:backendBefore,mobile_rollback:mobileBefore,scanner_enabled_by_release:false,provider_probe_call_cap:1,push_test_call_cap:1,physical_phone_receipt:'NOT_VERIFIED'};
 const save=()=>writeFileSync(output,JSON.stringify(report,null,2));
-async function cf(path,opts={}){const r=await fetch(api+path,{...opts,headers:{Authorization:'Bearer '+token,...opts.headers},signal:AbortSignal.timeout(30000)}),j=await r.json();assert(r.ok&&j.success,'CF_'+r.status+'_'+path);return j.result;}
+async function cf(path,opts={}){const r=await fetch(api+path,{...opts,headers:{Authorization:'Bearer '+token,...opts.headers},signal:AbortSignal.timeout(30000)}),j=await r.json();assert(r.ok&&j.success,'CF_'+r.status+'_'+path+'_'+JSON.stringify(j.errors||[]).slice(0,400));return j.result;}
 async function active(name){const rows=(await cf('/workers/scripts/'+name+'/deployments')).deployments?.[0]?.versions;assert.equal(rows?.length,1,'MULTIPLE_VERSIONS_'+name);assert.equal(rows[0].percentage,100);return rows[0].version_id;}
 async function health(){const r=await fetch('https://'+backend+'.ngophuonghuy.workers.dev/health',{signal:AbortSignal.timeout(20000)});assert(r.ok);return r.json();}
 function off(h){assert.equal(h.peak_status?.enabled,false,'SCANNER_ON');assert.equal(h.peak_status?.manualEnabled,false,'MANUAL_ON');assert.equal(h.next_alarm,null,'ALARM_PENDING');}
@@ -20,29 +21,37 @@ async function assets(which){const m=JSON.parse(readFileSync('mechanism-mobile/m
 }}
 function run(args){try{execFileSync('npx',['--no-install','wrangler',...args],{stdio:'pipe',timeout:180000,env:{...process.env,WRANGLER_SEND_METRICS:'false'}});}catch{throw Error('WRANGLER_'+args[0]+'_FAILED');}}
 async function setVersion(name,version){await cf('/workers/scripts/'+name+'/deployments',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({strategy:'percentage',versions:[{version_id:version,percentage:100}]})});}
+async function waitSource(source,{capability=false}={}){
+ let last;
+ for(let i=0;i<36;i++){const h=await health();off(h);last={edge:h.deploy_commit,runtime:h.notify_status?.mechanism_notifications?.source};if(h.deploy_commit===source&&(!capability||last.runtime===source))return h;await sleep(5000);}
+ throw Error('RUNTIME_CONVERGENCE_'+JSON.stringify(last));
+}
 async function restore(){
- off(await health());assert.equal(await active(desktop),desktopBefore);for(const [name,before,own]of [[mobile,mobileBefore,report.mobile_version],[backend,backendBefore,report.backend_version]]){
-  const current=await active(name);if(current===before)continue;
-  let owned=current===own;
-  if(!owned&&name===backend){const s=await cf('/workers/scripts/'+name+'/settings');owned=s.bindings?.some(b=>b.name==='FE_DEPLOY_COMMIT'&&b.text===sha);}
-  assert(owned,'UNOWNED_VERSION_REFUSE_ROLLBACK_'+name);await setVersion(name,before);
- }
- await guardVersions(backendBefore,mobileBefore);off(await health());await assets('backup');report.status='ROLLED_BACK_VERIFIED';save();
+ off(await health());assert.equal(await active(desktop),desktopBefore);
+ const mc=await active(mobile);if(mc!==mobileBefore){assert.equal(mc,report.mobile_version,'UNOWNED_MOBILE_REFUSE_ROLLBACK');try{await setVersion(mobile,mobileBefore);}catch{run(['deploy','--keep-vars','--config','mechanism-mobile/rollback-wrangler.json']);report.mobile_recovery_version=await active(mobile);}await assets('backup');}
+ const bc=await active(backend),allowed=[report.backend_version,report.compatible_backend_rollback,report.current_backend_before].filter(Boolean);assert(allowed.includes(bc)||bc===backendBefore,'UNOWNED_BACKEND_REFUSE_ROLLBACK');
+ // The legacy UUID cannot be activated (CF 10210). Restore its exact preserved
+ // source package with CURRENT runtime bindings/secrets; never force an old secret.
+ run(['deploy','--keep-vars','--config','mechanism-release/backup/.rollback.json']);report.backend_recovery_version=await active(backend);await waitSource(backendSource);
+ assert.equal(signature(await cf('/workers/scripts/'+backend+'/settings')),report.binding_signature);await assets('backup');report.status='ROLLED_BACK_CODE_VERIFIED';save();
 }
 try{
  if(action==='prepare'){
-  await guardVersions(backendBefore,mobileBefore);const h=await health();off(h);assert.equal(h.deploy_commit,backendSource);report.scanner_before={enabled:h.peak_status.enabled,manualEnabled:h.peak_status.manualEnabled,next_alarm:h.next_alarm};
+  const before=await active(backend);assert([backendBefore,recoveredBackend].includes(before),'UNOWNED_BACKEND_BASELINE');await guardVersions(before,mobileBefore);const h=await health();off(h);assert.equal(h.deploy_commit,before===backendBefore?backendSource:recoveredSource);report.current_backend_before=before;report.scanner_before={enabled:h.peak_status.enabled,manualEnabled:h.peak_status.manualEnabled,next_alarm:h.next_alarm};
   const settings=await cf('/workers/scripts/'+backend+'/settings'),bs=settings.bindings||[];assert(bs.every(b=>['plain_text','secret_text','d1','durable_object_namespace'].includes(b.type)));assert.equal(bs.find(b=>b.name==='APISPORTS_KEY')?.type,'secret_text');assert.equal(bs.find(b=>b.name==='FOOTBALL_DB')?.id||bs.find(b=>b.name==='FOOTBALL_DB')?.database_id,'0d12a7cc-12a9-4c71-b55b-61dfd2dac4d4');assert.equal(bs.find(b=>b.name==='BACKGROUND_WATCHER')?.namespace_id,'a401c5da72a54ec1ba485db1b46d89c9');
   const schedules=await cf('/workers/scripts/'+backend+'/schedules');assert.deepEqual(Array.isArray(schedules)?schedules:schedules.schedules,[]);report.binding_signature=signature(settings);
   for(const [name,id]of [[backend,backendBefore],[mobile,mobileBefore],[backend,'60781a4e-70cb-4c02-a036-2528c3048ed5']]){const v=await cf('/workers/scripts/'+name+'/versions/'+id);assert.equal(v.id,id);writeFileSync('mechanism-release/rollback-'+id+'.json',JSON.stringify(v,null,2));}
   const vm=await cf('/workers/scripts/'+mobile+'/versions/'+mobileBefore);assert(Array.isArray(vm.resources?.bindings)&&vm.resources.bindings.every(b=>b.type==='assets'));
   await assets('backup');
-  const cfg=JSON.parse(execFileSync('python3',['-c',"import json,tomllib;print(json.dumps(tomllib.load(open('mechanism-release/candidate/wrangler.toml','rb'))))"],{encoding:'utf8'}));assert.equal(cfg.main,'worker_notify_v138_peak_window.js');cfg.vars=Object.fromEntries(bs.filter(b=>b.type==='plain_text').map(b=>[b.name,b.text]));cfg.vars.FE_DEPLOY_COMMIT=sha;cfg.compatibility_date=settings.compatibility_date||cfg.compatibility_date;cfg.compatibility_flags=settings.compatibility_flags||cfg.compatibility_flags;writeFileSync('mechanism-release/candidate/.release.json',JSON.stringify(cfg));report.status='PREPARED_SCANNER_OFF';save();
+  const cfg=JSON.parse(execFileSync('python3',['-c',"import json,tomllib;print(json.dumps(tomllib.load(open('mechanism-release/candidate/wrangler.toml','rb'))))"],{encoding:'utf8'}));assert.equal(cfg.main,'worker_notify_v138_peak_window.js');cfg.vars=Object.fromEntries(bs.filter(b=>b.type==='plain_text').map(b=>[b.name,b.text]));cfg.vars.FE_DEPLOY_COMMIT=sha;cfg.compatibility_date=settings.compatibility_date||cfg.compatibility_date;cfg.compatibility_flags=settings.compatibility_flags||cfg.compatibility_flags;writeFileSync('mechanism-release/candidate/.release.json',JSON.stringify(cfg));const rollbackCfg=structuredClone(cfg);rollbackCfg.vars.FE_DEPLOY_COMMIT=backendSource;writeFileSync('mechanism-release/backup/.rollback.json',JSON.stringify(rollbackCfg));writeFileSync('mechanism-mobile/rollback-wrangler.json',JSON.stringify({name:mobile,compatibility_date:'2026-10-01',keep_vars:true,assets:{directory:'./backup'}}));report.status='PREPARED_SCANNER_OFF';save();
+ }else if(action==='baseline'){
+  assert.equal(report.status,'PREPARED_SCANNER_OFF');await guardVersions(report.current_backend_before,mobileBefore);off(await health());
+  report.baseline_attempted=true;save();run(['deploy','--keep-vars','--config','mechanism-release/backup/.rollback.json']);report.compatible_backend_rollback=await active(backend);save();await waitSource(backendSource);assert.equal(signature(await cf('/workers/scripts/'+backend+'/settings')),report.binding_signature);await guardVersions(report.compatible_backend_rollback,mobileBefore);report.rollback_code_recovery='VERIFIED_EXACT_PRESERVED_SOURCE_CURRENT_SECRETS';report.status='BASELINE_RECOVERY_VERIFIED';save();
  }else if(action==='backend'){
-  assert.equal(report.status,'PREPARED_SCANNER_OFF');await guardVersions(backendBefore,mobileBefore);off(await health());
+  assert.equal(report.status,'BASELINE_RECOVERY_VERIFIED');await guardVersions(report.compatible_backend_rollback,mobileBefore);off(await health());
   const m=JSON.parse(readFileSync('mechanism-release/manifest.json'));for(const f of m.candidate)assert.equal(hash(readFileSync('mechanism-release/candidate/'+f.path)),f.sha256);
   report.backend_attempted=true;save();run(['deploy','--keep-vars','--config','mechanism-release/candidate/.release.json']);report.backend_version=await active(backend);assert.notEqual(report.backend_version,backendBefore);save();
-  let ready=false;for(let i=0;i<12;i++){const h=await health();off(h);if(h.deploy_commit===sha&&h.notify_status?.mechanism_notifications?.schema==='FE_MECHANISM_NOTIFICATIONS_V1'){ready=true;break;}await sleep(3000);}assert(ready,'NEW_DURABLE_OBJECT_NOT_VERIFIED');
+  await waitSource(sha,{capability:true});
   assert.equal(signature(await cf('/workers/scripts/'+backend+'/settings')),report.binding_signature);await guardVersions(report.backend_version,mobileBefore);report.status='BACKEND_VERIFIED';save();
  }else if(action==='mobile'){
   assert.equal(report.status,'BACKEND_VERIFIED');await guardVersions(report.backend_version,mobileBefore);off(await health());report.mobile_attempted=true;save();run(['deploy','--keep-vars','--config','mechanism-mobile/wrangler.json']);report.mobile_version=await active(mobile);assert.notEqual(report.mobile_version,mobileBefore);save();await assets('candidate');report.status='MOBILE_PUBLISHED';save();
@@ -58,5 +67,5 @@ try{
   }finally{if(created){await cf('/workers/scripts/'+name,{method:'DELETE'});report.helper_removed=true;}save();}
   const h=await health();off(h);await guardVersions(report.backend_version,report.mobile_version);report.provider_after=h.notify_status?.provider?.latest??null;report.phone_acceptance='PENDING_USER_OBSERVATION';save();
  }else await restore();
-}catch(e){report.error=String(e.message||e).slice(0,240);report.failed_action=action;save();if(action!=='probe'&&(report.backend_attempted||report.mobile_attempted)&&action!=='rollback')try{await restore();}catch(re){report.rollback_error=String(re.message).slice(0,240);report.status='ROLLBACK_UNCONFIRMED';save();}process.exitCode=1;}
+}catch(e){report.error=String(e.message||e).slice(0,240);report.failed_action=action;save();if(action!=='probe'&&(report.baseline_attempted||report.backend_attempted||report.mobile_attempted)&&action!=='rollback')try{await restore();}catch(re){report.rollback_error=String(re.message).slice(0,240);report.status='ROLLBACK_UNCONFIRMED';save();}process.exitCode=1;}
 console.log(JSON.stringify(report));

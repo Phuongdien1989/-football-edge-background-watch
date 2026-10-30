@@ -9,7 +9,15 @@ artifact `scan-status-recovery-evidence`, run `39567549512`, version
 `3cd210d2d74aff547de4587ab4a3c96b982a728c`.
 Mobile source is all 54 verified assets from run `41014881913`, version
 `c9b86303-7031-4068-a4fe-808de4a0093a`.
-Both exact versions remain rollback targets. Desktop is unchanged.
+Original version metadata and exact source packages remain preserved. Desktop is unchanged.
+Cloudflare rejects activating original backend UUID e7d2090c with error 10210
+("Version not found") even though its version metadata can be read. The release
+therefore verifies recovery by redeploying the byte-verified original source
+package with current bindings/secrets, records its new compatible version, then
+deploys the candidate. It never forces secret rollback. A failed candidate can
+restore the exact original source through the already exercised upload path.
+Durable Object acceptance verifies the runtime source as well as edge source,
+with a bounded three-minute propagation window.
 
 ## Delivery policies
 
