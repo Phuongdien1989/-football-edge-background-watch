@@ -1,0 +1,119 @@
+{
+  "source_commit": "7c22543d019cbec05026974b0f3e43df39ee44a1",
+  "status": "VERIFIED_SCANNER_OFF",
+  "backend_rollback": "e7d2090c-d0e1-4f58-9f5a-4360acd2ced3",
+  "mobile_rollback": "c9b86303-7031-4068-a4fe-808de4a0093a",
+  "scanner_enabled_by_release": false,
+  "provider_probe_call_cap": 1,
+  "push_test_call_cap": 1,
+  "physical_phone_receipt": "NOT_VERIFIED",
+  "scanner_was_enabled_before_release": false,
+  "current_backend_before": "880db53d-aa17-4aed-9350-aa78e44edd56",
+  "scanner_before": {
+    "enabled": false,
+    "manualEnabled": false,
+    "next_alarm": null
+  },
+  "binding_signature": "236af40e98e3252589a869826b4570a2aecbf5786e0e9ce0e17958f1bb20f7be",
+  "baseline_attempted": true,
+  "compatible_backend_rollback": "880db53d-aa17-4aed-9350-aa78e44edd56",
+  "compatible_mobile_rollback": "1490e52a-bd7b-4490-a717-2f50425f1f69",
+  "rollback_code_recovery": "REUSED_VERIFIED_IMMUTABLE_EXACT_SOURCE",
+  "backend_attempted": true,
+  "backend_version": "fcf19574-3498-4ef3-9d08-d9fb575df365",
+  "mobile_attempted": true,
+  "mobile_version": "611a74b2-2a1d-43fc-80ae-1c2b920e6df9",
+  "scanner_after": {
+    "enabled": false,
+    "manualEnabled": false,
+    "next_alarm": null
+  },
+  "public_hashes_verified": 54,
+  "capabilities": {
+    "schema": "FE_MECHANISM_NOTIFICATIONS_V1",
+    "ht": "RESEARCH_PRICE",
+    "ftOverview": "RESEARCH_PRICE",
+    "ftV2": "RESEARCH_PRICE",
+    "goalFT": "LEGACY_SIGNAL",
+    "hc": "GAP_SIGNAL_ONLY",
+    "hcEntry": "NOT_AVAILABLE_NO_VERIFIED_ENTRY_POLICY",
+    "groupBy": "DEVICE_FIXTURE",
+    "holdMs": 300000,
+    "manualScannerOnly": true,
+    "source": "7c22543d019cbec05026974b0f3e43df39ee44a1"
+  },
+  "rollback": "AVAILABLE_VERIFIED",
+  "runtime_check": {
+    "capabilities": {
+      "schema": "FE_MECHANISM_NOTIFICATIONS_V1",
+      "ht": "RESEARCH_PRICE",
+      "ftOverview": "RESEARCH_PRICE",
+      "ftV2": "RESEARCH_PRICE",
+      "goalFT": "LEGACY_SIGNAL",
+      "hc": "GAP_SIGNAL_ONLY",
+      "hcEntry": "NOT_AVAILABLE_NO_VERIFIED_ENTRY_POLICY",
+      "groupBy": "DEVICE_FIXTURE",
+      "holdMs": 300000,
+      "manualScannerOnly": true,
+      "source": "7c22543d019cbec05026974b0f3e43df39ee44a1"
+    },
+    "enabled_devices": 2,
+    "apple_subscriptions": 1,
+    "settings": [
+      {
+        "transport": "web",
+        "h1": true,
+        "ftOverview": true,
+        "ftV2": true,
+        "goal": true,
+        "gap": true,
+        "goalThreshold": 70,
+        "gapThreshold": 70
+      },
+      {
+        "transport": "web",
+        "h1": true,
+        "ftOverview": true,
+        "ftV2": true,
+        "goal": true,
+        "gap": true,
+        "goalThreshold": 60,
+        "gapThreshold": 60
+      }
+    ],
+    "provider_probe": {
+      "logical_calls": 1,
+      "ok": true,
+      "live": 21
+    },
+    "push_test": {
+      "attempts": 1,
+      "accepted": true
+    },
+    "phone_display": "USER_CONFIRMATION_REQUIRED"
+  },
+  "helper_removed": true,
+  "provider_after": {
+    "at": 1793409143714,
+    "http": 200,
+    "code": "OK",
+    "limits": {
+      "daily_limit": 75000,
+      "daily_remaining": 73906,
+      "minute_limit": 450,
+      "minute_remaining": 418
+    },
+    "retry_after_ms": 0,
+    "rate_scope": "UNSPECIFIED",
+    "request_kind": "LIVE_WITH_TIMEZONE",
+    "cooldown_scope": null,
+    "response_count": 21,
+    "error_detail": null,
+    "cache": {
+      "age_seconds": null,
+      "status": "DYNAMIC",
+      "response_date": "2026-10-31T01:12:23.000Z"
+    }
+  },
+  "phone_acceptance": "PENDING_USER_OBSERVATION"
+}
