@@ -1,0 +1,41 @@
+name: PRE-MATCH AI V1 — isolated offline preview
+on:
+  push:
+    branches: [feat/prematch-ai-v1-preview-20261031]
+    paths: ['prematch-ai/**', '.github/workflows/prematch-ai-preview.yml']
+permissions: {contents: read, actions: read}
+jobs:
+  preview:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Pure model, pricing, as-of and evidence checks
+        run: |
+          set -e
+          node prematch-ai/test.mjs | tee prematch-tests.txt
+          node prematch-ai/build.mjs
+      - uses: actions/download-artifact@v4
+        with:
+          name: mechanism-notifications-evidence
+          run-id: 41154041190
+          github-token: ${{ github.token }}
+          path: verified-deployed
+      - name: Copy verified Mobile to local-only host preview
+        run: node prematch-ai/build-host.mjs verified-deployed/mechanism-mobile/site
+      - run: npm install --no-save --no-package-lock playwright@1.58.2
+      - name: Offline browser acceptance — no HTTP provider or production requests
+        run: |
+          node prematch-ai/test-browser.cjs
+          node prematch-ai/test-host.cjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: prematch-ai-v1-offline-preview
+          path: |
+            prematch-ai/generated/
+            prematch-tests.txt
+          retention-days: 90
