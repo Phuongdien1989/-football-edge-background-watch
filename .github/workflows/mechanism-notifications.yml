@@ -1,0 +1,99 @@
+name: Mechanism notifications — shared pricing, durable dedup and guarded release
+on:
+  push:
+    branches: [feat/mechanism-notifications-20261030]
+    paths: ['mechanism-notify/**', 'ft-overview/adapter.mjs', '.github/workflows/mechanism-notifications.yml']
+permissions: {contents: read, actions: read}
+concurrency:
+  group: fe-football-edge-mobile-production
+  cancel-in-progress: false
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    environment: football-edge-production
+    env:
+      WRANGLER_SEND_METRICS: 'false'
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - uses: actions/download-artifact@v4
+        with:
+          name: scan-status-recovery-evidence
+          run-id: 39567549512
+          github-token: ${{ github.token }}
+          path: previous-backend
+      - uses: actions/download-artifact@v4
+        with:
+          name: overview-scan-release-proof
+          run-id: 41014881913
+          github-token: ${{ github.token }}
+          path: previous-mobile
+      - uses: actions/download-artifact@v4
+        with:
+          name: mechanism-notifications-evidence
+          run-id: 41025635463
+          github-token: ${{ github.token }}
+          path: passed-candidate
+      - name: Build exact packages and reuse byte-identical verified model and browser evidence
+        run: |
+          set -e
+          node mechanism-notify/build.mjs
+          node mechanism-notify/build-mobile.mjs
+          node mechanism-notify/reuse-evidence.mjs
+          node --check mechanism-notify/release.mjs
+      - run: npm install --no-save --no-package-lock wrangler@4 playwright@1.58.2
+      - name: Pause background scanner for the guarded release, leave manual restart to user
+        run: node mechanism-notify/release.mjs pause
+      - name: Preserve both rollback versions, bindings, all 54 assets and scanner OFF
+        run: node mechanism-notify/release.mjs prepare
+      - name: Dry run both complete packages
+        run: |
+          npx --no-install wrangler deploy --dry-run --config mechanism-release/candidate/.release.json
+          npx --no-install wrangler deploy --dry-run --config mechanism-mobile/wrangler.json
+      - name: Verify source-equivalent rollback with current secrets before candidate deployment
+        id: baseline
+        run: node mechanism-notify/release.mjs baseline
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pre-mechanism-notifications-backup
+          path: |
+            mechanism-release/backup/
+            mechanism-release/manifest.json
+            mechanism-release/rollback-*.json
+            mechanism-mobile/backup/
+            mechanism-mobile/manifest.json
+          retention-days: 90
+      - name: Release backend with scanner still OFF
+        id: backend
+        run: node mechanism-notify/release.mjs backend
+      - name: Release full Mobile bundle
+        id: mobile
+        run: node mechanism-notify/release.mjs mobile
+      - name: Published app acceptance
+        run: |
+          set -e
+          node mechanism-mobile/test-browser.cjs --production
+          node mechanism-notify/test-preferences.cjs --production
+          node mechanism-notify/release.mjs verify
+      - name: Restore exact preceding versions if acceptance fails
+        if: failure() && (steps.baseline.outcome == 'success' || steps.backend.outcome == 'success' || steps.mobile.outcome == 'success')
+        run: node mechanism-notify/release.mjs rollback
+      - name: One bounded live-source check and one test Push to unique Apple subscription
+        if: success()
+        run: node mechanism-notify/release.mjs probe
+      - name: Remove generated runtime configuration
+        if: always()
+        run: rm -f mechanism-release/candidate/.release.json mechanism-release/backup/.rollback.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: mechanism-notifications-evidence
+          path: |
+            mechanism-release/
+            mechanism-mobile/
+          retention-days: 90

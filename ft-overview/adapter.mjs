@@ -41,7 +41,8 @@ export function readLegacy(bridge, bundleBridge,{conditionedFT=false}={}) {
     if(conditionedFT&&s.stats_presence?.red===true)snapshot.metrics.red=number(s.metrics?.total?.red);
     const rows=s.market_rows || it.serverRow?.snapshot?.market_rows || [];
     snapshot.market=marketFromRows(rows,snapshot) || (old?.at===at ? old.market:null);
-    const b=bundleById.get(id),n=b?.normalized || {},meta=b?.meta;
+    const shared=it.serverRow?.notification_context;
+    const b=shared?.fixtureId===id&&shared.observedAt===at&&shared.ftBundle?.meta?.fixture_id===id?shared.ftBundle:bundleById.get(id),n=b?.normalized || {},meta=b?.meta;
     if(meta){snapshot.contextAt=number(b.observed_at);const input={homeId:meta.teams?.home?.id,awayId:meta.teams?.away?.id,homeRecent:n.home_recent,awayRecent:n.away_recent,kickoff:time(meta.fixture?.timestamp || meta.fixture?.date),at,minute:snapshot.minute,status:snapshot.status};
      if(conditionedFT){const result=ftStateModel({...input,fixtureId:id,goals:snapshot.goals});snapshot.model=result.model||{waitReason:result.reason};}
      else snapshot.model=researchBaseline(input);
