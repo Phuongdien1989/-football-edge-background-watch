@@ -1,9 +1,10 @@
+import {normalizeMarkets} from '../prematch-ai/market-lines.mjs';
 // One user-initiated batch. I/O is injected, endpoints bounded by the host bridge.
 const stop=e=>/CANCELLED|BUDGET|QUOTA|COOLDOWN|rate.?limit|requests per minute|429/i.test(String(e.message||e));
 const vnDay=t=>new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Ho_Chi_Minh',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date(t));
 export const localVN=t=>{const p=Object.fromEntries(new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Ho_Chi_Minh',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).formatToParts(new Date(t)).map(x=>[x.type,x.value]));return `${p.year}-${p.month}-${p.day}T${p.hour}:${p.minute}`;};
 export const parseVN=s=>/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(s)?Date.parse(s+'+07:00'):NaN;
-const recent=rows=>(Array.isArray(rows)?rows:[]).map(r=>({date:r.fixture?.date,status:r.fixture?.status?.short,home_id:r.teams?.home?.id,away_id:r.teams?.away?.id,goals:r.goals}));
+const recent=rows=>(Array.isArray(rows)?rows:[]).map(r=>({fixture_id:r.fixture?.id,date:r.fixture?.date,halftime:r.score?.halftime??null,status:r.fixture?.status?.short,home_id:r.teams?.home?.id,away_id:r.teams?.away?.id,goals:r.goals}));
 export function createScan(bridge,{onProgress=()=>{},clock=Date.now}={}){
  let id=null,busy=false,catalog=null,windowKey=null,processed=new Set(),bundles=new Map(),evidence=[];
  const status=x=>onProgress({...x,stats:id?bridge.stats(id):null});
@@ -21,7 +22,7 @@ export function createScan(bridge,{onProgress=()=>{},clock=Date.now}={}){
     try{
      const h=await bridge.request(id,'/fixtures',{team:f.teams.home.id,last:8},1200000),a=await bridge.request(id,'/fixtures',{team:f.teams.away.id,last:8},1200000);b.normalized.home_recent=recent(h.data);b.normalized.away_recent=recent(a.data);b.observed_at=Math.max(receivedAt,h.receivedAt,a.receivedAt);
      // Forecast context is frozen before market acquisition.
-     try{const o=await bridge.request(id,'/odds',{fixture:f.fixture.id},300000);b.market_received_at=o.receivedAt;if(!Array.isArray(o.data)||o.data.some(row=>row.fixture?.id!==f.fixture.id))throw Error('ODDS_SOURCE_FIXTURE_MISMATCH');b.market_fixture_verified=true;b.normalized.market.prematch=bridge.normalize(o.data,f);}catch(e){if(stop(e))throw e;b.marketError=String(e.message).slice(0,160);}
+     try{const o=await bridge.request(id,'/odds',{fixture:f.fixture.id},300000);b.market_received_at=o.receivedAt;if(!Array.isArray(o.data)||o.data.some(row=>row.fixture?.id!==f.fixture.id))throw Error('ODDS_SOURCE_FIXTURE_MISMATCH');b.market_fixture_verified=true;b.normalized.market.prematch=normalizeMarkets(o.data,f);}catch(e){if(stop(e))throw e;b.marketError=String(e.message).slice(0,160);}
      let coverage=null;try{const c=await bridge.request(id,'/leagues',{id:f.league.id,season:f.league.season},86400000);coverage=c.data?.[0]?.coverage??null;}catch(e){if(stop(e))throw e;}
      for(const [path,module,allowed]of [['/injuries','Injury & Suspension',coverage?.injuries],['/fixtures/lineups','Lineup & Chemistry',coverage?.fixtures?.lineups]]){
       if(allowed===false){evidence.push({fixtureId:f.fixture.id,module,id:path+':'+f.fixture.id,kind:'UNKNOWN',text:'Nguồn báo không phủ dữ liệu này.'});continue;}
