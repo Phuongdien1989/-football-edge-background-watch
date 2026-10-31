@@ -28,3 +28,5 @@ finally{
  try{const h=await health();report.final={edge:h.deploy_commit,scanner:h.peak_status?.enabled,alarm:h.next_alarm};}catch{report.final_health_unavailable=true;}
  writeFileSync('tail-refresh.json',JSON.stringify(report,null,2));console.log(JSON.stringify(report));
 }
+
+process.exit(process.exitCode||0);

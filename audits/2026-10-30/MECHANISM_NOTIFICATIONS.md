@@ -109,3 +109,17 @@ Candidate runtime and all 54 assets are compared byte-for-byte to the PASS
 candidate reports from run 41025635463; only orchestration changes. Identical
 model and browser tests are reused rather than repeated. Published-app acceptance
 and actual runtime/phone checks still run after deployment.
+
+
+## Existing-object runtime refresh, 31 October
+
+Run 41153422032 proved that a short-lived Cloudflare Tail refreshes the existing
+football-edge-global object to the exact candidate source 632d7094, preserving
+its namespace and storage. The test then deleted the Tail and helper, restored
+immutable baseline 880db53d, and verified scanner OFF/no alarm. No provider or
+Push calls were requested. The job timed out only because the native WebSocket
+retained Node's event loop after cleanup; its JSON evidence was written at
+01:03:40 UTC and uploaded as artifact 13023684726. Treat the workflow conclusion
+as CANCELLED, not PASS. Release now explicitly exits after awaited cleanup/report
+writes and uses the proven Tail refresh for deployment and rollback convergence.
+Existing verified immutable rollback versions are reused, not uploaded again.

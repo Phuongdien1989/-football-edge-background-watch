@@ -6,7 +6,7 @@ import {readPublicStatic} from '../ht-mechanism-recovery/public-read.mjs';
 const action=process.argv[2],account=process.env.CLOUDFLARE_ACCOUNT_ID,token=process.env.CLOUDFLARE_API_TOKEN,sha=process.env.GITHUB_SHA;
 assert(account&&token&&sha);assert(['pause','prepare','baseline','backend','mobile','verify','probe','rollback'].includes(action));
 const backend='football-edge-background-watch',mobile='shiny-silence-d892',desktop='football-edge-desktop-b2-test',origin='https://'+mobile+'.ngophuonghuy.workers.dev',api='https://api.cloudflare.com/client/v4/accounts/'+encodeURIComponent(account),backendBefore='e7d2090c-d0e1-4f58-9f5a-4360acd2ced3',mobileBefore='c9b86303-7031-4068-a4fe-808de4a0093a',desktopBefore='a332ee39-abb2-422d-a021-db78ef19cc10',backendSource='3cd210d2d74aff547de4587ab4a3c96b982a728c';
-const recoveredBackend='438c2c72-09ed-499f-a47c-b8d6de09521b',recoveredSource=backendSource;
+const recoveredBackend='880db53d-aa17-4aed-9350-aa78e44edd56',recoveredSource=backendSource;
 const output='mechanism-release/deployment.json',hash=x=>createHash('sha256').update(x).digest('hex'),sleep=ms=>new Promise(r=>setTimeout(r,ms));
 let report=existsSync(output)?JSON.parse(readFileSync(output)):{source_commit:sha,status:'PREPARING',backend_rollback:backendBefore,mobile_rollback:mobileBefore,scanner_enabled_by_release:false,provider_probe_call_cap:1,push_test_call_cap:1,physical_phone_receipt:'NOT_VERIFIED'};
 const save=()=>writeFileSync(output,JSON.stringify(report,null,2));
@@ -26,6 +26,17 @@ async function uploadVersion(config,tag){
  return ids[0];
 }
 async function setVersion(name,version){await cf('/workers/scripts/'+name+'/deployments',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({strategy:'percentage',versions:[{version_id:version,percentage:100}],...(name===backend?{code_update_strategy:{mode:'immediate'}}:{})})});}
+async function refreshRuntime(source,options){
+ // Proven on the existing production object by run 41153422032. Tail frames
+ // are discarded. Deleting the Tail and closing the socket happen before exit.
+ let tail,ws;
+ try{
+  tail=await cf('/workers/scripts/'+backend+'/tails',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({filters:[]})});
+  ws=new WebSocket(tail.url,'trace-v1');
+  await new Promise((resolve,reject)=>{const timer=setTimeout(()=>reject(Error('TAIL_CONNECT_TIMEOUT')),15000);ws.addEventListener('open',()=>{clearTimeout(timer);ws.send(JSON.stringify({debug:false}));resolve();},{once:true});ws.addEventListener('error',()=>{clearTimeout(timer);reject(Error('TAIL_CONNECT_FAILED'));},{once:true});});
+  return await waitSource(source,options);
+ }finally{if(ws)ws.close();if(tail)await cf('/workers/scripts/'+backend+'/tails/'+tail.id,{method:'DELETE'});}
+}
 async function waitSource(source,{capability=false,expectLegacy=false}={}){
  let last;
  for(let i=0;i<36;i++){const h=await health();off(h);last={edge:h.deploy_commit,runtime:h.notify_status?.mechanism_notifications?.source};if(h.deploy_commit===source&&(!capability||last.runtime===source)&&(!expectLegacy||!h.notify_status?.mechanism_notifications))return h;await sleep(5000);}
@@ -38,7 +49,7 @@ async function restore(){
  const bc=await active(backend),allowed=[report.backend_version,report.compatible_backend_rollback,report.current_backend_before].filter(Boolean);assert(allowed.includes(bc)||bc===backendBefore,'UNOWNED_BACKEND_REFUSE_ROLLBACK');
  // The legacy UUID cannot be activated (CF 10210). Restore its exact preserved
  // source package with CURRENT runtime bindings/secrets; never force an old secret.
- report.backend_recovery_version=report.compatible_backend_rollback||await uploadVersion('mechanism-release/backup/.rollback.json','fe-prior-backend');await setVersion(backend,report.backend_recovery_version);await waitSource(backendSource,{expectLegacy:true});
+ report.backend_recovery_version=report.compatible_backend_rollback||await uploadVersion('mechanism-release/backup/.rollback.json','fe-prior-backend');await setVersion(backend,report.backend_recovery_version);await refreshRuntime(backendSource,{expectLegacy:true});
  assert.equal(signature(await cf('/workers/scripts/'+backend+'/settings')),report.binding_signature);await assets('backup');report.status='ROLLED_BACK_CODE_VERIFIED';save();
 }
 try{
@@ -61,12 +72,16 @@ try{
   const cfg=JSON.parse(execFileSync('python3',['-c',"import json,tomllib;print(json.dumps(tomllib.load(open('mechanism-release/candidate/wrangler.toml','rb'))))"],{encoding:'utf8'}));assert.equal(cfg.main,'worker_notify_v138_peak_window.js');cfg.vars=Object.fromEntries(bs.filter(b=>b.type==='plain_text').map(b=>[b.name,b.text]));cfg.vars.FE_DEPLOY_COMMIT=sha;cfg.compatibility_date=settings.compatibility_date||cfg.compatibility_date;cfg.compatibility_flags=settings.compatibility_flags||cfg.compatibility_flags;writeFileSync('mechanism-release/candidate/.release.json',JSON.stringify(cfg));const rollbackCfg=structuredClone(cfg);rollbackCfg.vars.FE_DEPLOY_COMMIT=backendSource;writeFileSync('mechanism-release/backup/.rollback.json',JSON.stringify(rollbackCfg));writeFileSync('mechanism-mobile/rollback-wrangler.json',JSON.stringify({name:mobile,compatibility_date:'2026-10-01',keep_vars:true,assets:{directory:'./backup'}}));report.status='PREPARED_SCANNER_OFF';save();
  }else if(action==='baseline'){
   assert.equal(report.status,'PREPARED_SCANNER_OFF');await guardVersions(report.current_backend_before,mobileBefore);off(await health());
-  report.baseline_attempted=true;save();report.compatible_backend_rollback=await uploadVersion('mechanism-release/backup/.rollback.json','fe-prior-backend');report.compatible_mobile_rollback=await uploadVersion('mechanism-mobile/rollback-wrangler.json','fe-prior-mobile');save();await setVersion(backend,report.compatible_backend_rollback);await waitSource(backendSource,{expectLegacy:true});assert.equal(signature(await cf('/workers/scripts/'+backend+'/settings')),report.binding_signature);await guardVersions(report.compatible_backend_rollback,mobileBefore);report.rollback_code_recovery='VERIFIED_EXACT_PRESERVED_SOURCE_CURRENT_SECRETS';report.status='BASELINE_RECOVERY_VERIFIED';save();
+  report.baseline_attempted=true;
+  report.compatible_backend_rollback=recoveredBackend;
+  report.compatible_mobile_rollback='1490e52a-bd7b-4490-a717-2f50425f1f69';
+  for(const [n,id] of [[backend,report.compatible_backend_rollback],[mobile,report.compatible_mobile_rollback]])assert.equal((await cf('/workers/scripts/'+n+'/versions/'+id)).id,id);
+  await waitSource(backendSource,{expectLegacy:true});assert.equal(signature(await cf('/workers/scripts/'+backend+'/settings')),report.binding_signature);await guardVersions(report.compatible_backend_rollback,mobileBefore);report.rollback_code_recovery='REUSED_VERIFIED_IMMUTABLE_EXACT_SOURCE';report.status='BASELINE_RECOVERY_VERIFIED';save();
  }else if(action==='backend'){
   assert.equal(report.status,'BASELINE_RECOVERY_VERIFIED');await guardVersions(report.compatible_backend_rollback,mobileBefore);off(await health());
   const m=JSON.parse(readFileSync('mechanism-release/manifest.json'));for(const f of m.candidate)assert.equal(hash(readFileSync('mechanism-release/candidate/'+f.path)),f.sha256);
   report.backend_attempted=true;save();report.backend_version=await uploadVersion('mechanism-release/candidate/.release.json','fe-mechanism-'+sha.slice(0,12));assert.notEqual(report.backend_version,backendBefore);save();await setVersion(backend,report.backend_version);
-  await waitSource(sha,{capability:true});
+  await refreshRuntime(sha,{capability:true});
   assert.equal(signature(await cf('/workers/scripts/'+backend+'/settings')),report.binding_signature);await guardVersions(report.backend_version,mobileBefore);report.status='BACKEND_VERIFIED';save();
  }else if(action==='mobile'){
   assert.equal(report.status,'BACKEND_VERIFIED');await guardVersions(report.backend_version,mobileBefore);off(await health());report.mobile_attempted=true;save();report.mobile_version=await uploadVersion('mechanism-mobile/wrangler.json','fe-mechanism-'+sha.slice(0,12));assert.notEqual(report.mobile_version,mobileBefore);save();await setVersion(mobile,report.mobile_version);await assets('candidate');report.status='MOBILE_PUBLISHED';save();
@@ -84,3 +99,7 @@ try{
  }else await restore();
 }catch(e){report.error=String(e.message||e).slice(0,240);report.failed_action=action;save();if(action!=='probe'&&(report.baseline_attempted||report.backend_attempted||report.mobile_attempted)&&action!=='rollback')try{await restore();}catch(re){report.rollback_error=String(re.message).slice(0,240);report.status='ROLLBACK_UNCONFIRMED';save();}process.exitCode=1;}
 console.log(JSON.stringify(report));
+
+// Native WebSocket close can retain the event loop after the Tail is deleted.
+// All operations, cleanup and synchronous report writes above are complete.
+process.exit(process.exitCode||0);
