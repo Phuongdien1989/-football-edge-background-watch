@@ -39,6 +39,7 @@ jobs:
           node prematch-release/test-browser.cjs
           cp -r verified/mechanism-mobile mechanism-mobile
           cp -r prematch-release/generated/site/. mechanism-mobile/site/
+          node prematch-release/adapt-regression.mjs
           node mechanism-mobile/test-browser.cjs
           node mechanism-mobile/test-controls.cjs
       - uses: actions/upload-artifact@v4

@@ -10,6 +10,6 @@ async function show(){if(document.body.dataset.feTabsTab!=='prematch'||opening)r
  controls.querySelector('[data-pm-confirm]').onclick=()=>{try{const r=app.getResult(),id=Number(node.querySelector('[data-pm-fixture]')?.dataset.pmFixture)||r?.rows?.[0]?.fixture.id;input=confirmFixtureQuotes(input,id);app.load(input);}catch(e){node.querySelector('.pm-state').textContent=String(e.message);}};
  await app.load(input);
  }catch(e){if(node)node.textContent='PRE-MATCH đang chờ dữ liệu: '+String(e.message);}finally{opening=false;}}
-function route(){if(document.body.dataset.feTabsTab!=='prematch'){app?.destroy();app=null;root=null;}else show();}
+function route(){if(!location.hash.startsWith('#fe-tabs/prematch')){app?.destroy();app=null;root=null;}else show();}
 window.addEventListener('fe-prematch-tab-open',show);window.addEventListener('hashchange',()=>queueMicrotask(route));window.addEventListener('pagehide',()=>{app?.destroy();});
 if(document.body.dataset.feTabsTab==='prematch')show();
