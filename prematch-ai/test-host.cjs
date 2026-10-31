@@ -1,0 +1,14 @@
+const {chromium}=require('playwright'),fs=require('node:fs'),path=require('node:path'),http=require('node:http'),assert=require('node:assert/strict');
+(async()=>{
+ const root=path.join(__dirname,'generated','host');if(!fs.existsSync(path.join(root,'index.html')))throw Error('HOST_PREVIEW_REQUIRED');
+ const server=http.createServer((req,res)=>{const name=decodeURIComponent(new URL(req.url,'http://localhost').pathname),p=path.resolve(root,'.'+(name==='/'?'/index.html':name));if(!p.startsWith(root+path.sep)){res.writeHead(403);return res.end();}if(!fs.existsSync(p)||fs.statSync(p).isDirectory()){res.writeHead(404);return res.end();}const type=p.endsWith('.mjs')||p.endsWith('.js')?'text/javascript':p.endsWith('.css')?'text/css':p.endsWith('.json')?'application/json':p.endsWith('.svg')?'image/svg+xml':p.endsWith('.html')?'text/html':'application/octet-stream';res.writeHead(200,{'Content-Type':type});fs.createReadStream(p).pipe(res);});
+ await new Promise(r=>server.listen(0,'127.0.0.1',r));const origin='http://127.0.0.1:'+server.address().port;
+ const browser=await chromium.launch({headless:true,...(process.env.CI?{channel:'chrome'}:{}),args:['--no-sandbox']}),reports=[];
+ try{for(const width of [390,1440]){const context=await browser.newContext({viewport:{width,height:1000}}),page=await context.newPage(),external=[];
+ await page.route('**/*',r=>{const u=r.request().url();if(/^https?:/.test(u)&&!u.startsWith(origin+'/')){external.push(u);return r.abort();}return r.continue();});
+ await page.goto(origin);await page.waitForSelector('[data-prematch-preview-toolbar] button');const before=await page.evaluate(()=>({route:location.hash,controls:document.querySelectorAll('[data-ftabs-tab]').length,root:document.getElementById('feTabsWorkspace').id}));
+ await page.getByRole('button',{name:'PRE-MATCH AI · PREVIEW',exact:true}).click();await page.getByRole('dialog').waitFor();await page.getByRole('button',{name:'Xem LAB mô phỏng'}).click();await page.locator('.pm-card').waitFor({timeout:20000});assert.equal(await page.locator('.pm-select').count(),5);
+ await page.getByRole('button',{name:'← Về giao diện LIVE hiện hành',exact:true}).click();assert.equal(await page.getByRole('dialog').count(),0);const after=await page.evaluate(()=>({route:location.hash,controls:document.querySelectorAll('[data-ftabs-tab]').length,root:document.getElementById('feTabsWorkspace').id}));assert.deepEqual(before,after);assert.equal(after.controls,6);assert.equal(external.length,0,external.join('\n'));reports.push({width,status:'PASS',sameHostRouteAndSixTabs:true,productionRequests:0,overlayClosed:true});await context.close();}
+ }finally{await browser.close();await new Promise(r=>server.close(r));}
+ fs.writeFileSync(path.join(__dirname,'generated','host-browser-report.json'),JSON.stringify({status:'PASS',reports},null,2));console.log(JSON.stringify({status:'PASS',reports}));
+})().catch(e=>{console.error(e);process.exit(1);});
