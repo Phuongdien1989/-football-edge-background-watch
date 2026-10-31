@@ -7,9 +7,9 @@ const fs=require('node:fs'),path=require('node:path'),assert=require('node:asser
   page.on('pageerror',e=>errors.push(e.message));page.on('request',r=>{if(/^https?:/.test(r.url()))requests.push(r.url());});
   await page.goto('file://'+path.join(out,'index.html'));await page.waitForSelector('.pm-empty');assert.equal(await page.locator('.pm-card').count(),0);
   await page.getByRole('button',{name:'Xem LAB mô phỏng'}).click();await page.waitForSelector('.pm-card',{timeout:20000});await page.waitForFunction(()=>window.PMPreview.read()?.rows?.length===5);
-  assert.equal(await page.locator('.pm-lab').count(),1);assert.equal(await page.locator('.pm-select').count(),5);assert(await page.locator('.pm-lab').innerText().then(t=>t.includes('Không phải trận thật')));
+  assert.equal(await page.locator('.pm-lab').count(),1);assert.equal(await page.locator('.pm-select').count(),5);assert.deepEqual(await page.locator('.pm-select .pm-rank').allTextContents(),['1','2','3','4','5']);assert(await page.locator('.pm-lab').innerText().then(t=>t.includes('Không phải trận thật')));
   const result=await page.evaluate(()=>window.PMPreview.read());assert.equal(result.providerRequests,0);assert(result.rows.every(r=>r.forecast.synthetic));
-  assert.equal(await page.locator('.pm-price-grid').count(),1);await page.locator('.pm-select').nth(3).click();assert.equal(await page.locator('.pm-card').getAttribute('data-pm-fixture'),String(result.rows[3].fixture.id));
+  assert.equal(await page.locator('.pm-price-grid').count(),1);await page.locator('.pm-select').nth(3).click();assert.equal(await page.locator('.pm-card').getAttribute('data-pm-fixture'),String(result.top[3].fixtureId));
   const metrics=await page.evaluate(()=>({overflow:document.documentElement.scrollWidth>innerWidth,heading:getComputedStyle(document.querySelector('.pm-team')).fontSize,bodyWidth:document.body.scrollWidth}));assert(!metrics.overflow,JSON.stringify(metrics));
   await page.locator('.pm-select').first().click();await page.screenshot({path:path.join(out,'preview-'+width+'.png'),fullPage:true});
   await page.getByRole('button',{name:'Lưu cục bộ',exact:true}).click();await page.waitForFunction(()=>document.querySelector('.pm-state').textContent.includes('Đã lưu')||document.querySelector('.pm-state').textContent.includes('UNAVAILABLE'));

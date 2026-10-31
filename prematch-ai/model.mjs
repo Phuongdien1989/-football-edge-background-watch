@@ -31,6 +31,7 @@ export async function predict(f,artifact,{now=Date.now()}={}){
  try{
   for(const phase of ['FT','HT','H2'])if(artifact.phases[phase]){
    const fit=artifact.phases[phase].primary;
+   requireValue(fit?.converged===true,'MODEL_FIT_NOT_CONVERGED');
    requireValue(fit&&Number.isFinite(fit.intercept)&&Number.isFinite(fit.homeAdvantage),'INVALID_MODEL_PARAMETERS');
    for(const t of Object.values(fit.teams))requireValue(Number.isFinite(t.attack)&&Number.isFinite(t.defenceWeakness),'INVALID_TEAM_PARAMETERS');
   }

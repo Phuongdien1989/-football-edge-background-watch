@@ -11,10 +11,11 @@ export async function openLedger(indexedDB=globalThis.indexedDB){
  const db=await new Promise((resolve,reject)=>{const r=indexedDB.open('fe_prematch_ai_v1',1);r.onupgradeneeded=()=>{r.result.createObjectStore('records',{keyPath:'id'});};r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(Error('LOCAL_LEDGER_UNAVAILABLE'));});
  return {async append(record){if(!await verifyRecord(record))throw Error('RECORD_HASH_INVALID');return new Promise((resolve,reject)=>{const tx=db.transaction('records','readwrite'),store=tx.objectStore('records'),get=store.get(record.id);let duplicate=false;get.onsuccess=()=>{if(get.result){if(canonical(get.result)!==canonical(record)){tx.abort();return;}duplicate=true;}else store.add(record);};tx.oncomplete=()=>resolve({duplicate});tx.onabort=()=>reject(Error('IMMUTABLE_RECORD_CONFLICT'));tx.onerror=()=>reject(Error('LEDGER_WRITE_FAILED'));});},async all(){return new Promise((resolve,reject)=>{const r=db.transaction('records').objectStore('records').getAll();r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(Error('LEDGER_READ_FAILED'));});},close(){db.close();}};
 }
-export function validateCohort(pairs,outcomes,{closingQuotes=[]}={}){
- const forecastRows=[],entries=[],excluded=[],seen=new Set();
+export async function validateCohort(pairs,outcomes,{closingQuotes=[]}={}){
+ const forecastRows=[],entries=[],excluded=[],seen=new Set(),validPairs=[];
+ for(const pair of pairs){if(pair?.payload){if(!await verifyRecord(pair)){excluded.push({fixtureId:pair.payload?.forecast?.fixtureId??null,reason:'RECORD_HASH_INVALID'});continue;}validPairs.push(pair.payload);}else if(pair?.forecast?.id)validPairs.push(pair);else excluded.push({fixtureId:null,reason:'INVALID_PAIR'});}
  // Fixed FIRST_FORECAST policy per fixture; no retrospective best-of revisions.
- const ordered=[...pairs].sort((a,b)=>a.forecast.cutoff-b.forecast.cutoff||a.forecast.id.localeCompare(b.forecast.id));
+ const ordered=validPairs.sort((a,b)=>a.forecast.cutoff-b.forecast.cutoff||a.forecast.id.localeCompare(b.forecast.id));
  for(const r of ordered){const f=r.forecast;if(seen.has(f.fixtureId))continue;seen.add(f.fixtureId);
   const os=outcomes.filter(o=>o.fixtureId===f.fixtureId&&o.verified===true&&time(o.recordedAt)&&o.recordedAt>=f.kickoff).sort((a,b)=>a.recordedAt-b.recordedAt||String(a.revision).localeCompare(String(b.revision)));
   const o=os.at(-1),score=o?.regulation;
@@ -25,7 +26,7 @@ export function validateCohort(pairs,outcomes,{closingQuotes=[]}={}){
   const e=r.evaluations.find(e=>e.id===r.topId);if(!e||e.status!=='OPEN_TRIAL')continue;
   const s=e.quote.period==='HT'?o.halftime:score;if(!s||![s.home,s.away].every(x=>Number.isSafeInteger(x)&&x>=0)){excluded.push({fixtureId:f.fixtureId,reason:'PERIOD_OUTCOME_MISSING'});continue;}
   const result=settleScore(e.quote,s.home,s.away),net=result>0?result*(e.quote.odds-1):result;
-  const closing=closingQuotes.filter(q=>marketKey(q)===marketKey(e.quote)&&time(q.receivedAt)&&q.receivedAt>=e.quote.receivedAt&&q.receivedAt<f.kickoff&&typeof q.odds==='number'&&q.odds>1).sort((a,b)=>b.receivedAt-a.receivedAt)[0];
+  const closing=closingQuotes.filter(q=>marketKey(q)===marketKey(e.quote)&&time(q.receivedAt)&&q.receivedAt>=e.quote.receivedAt&&q.receivedAt<f.kickoff&&q.ruleStatus==='VERIFIED'&&q.availability==='CONFIRMED'&&(q.sourceUpdatedAt==null||time(q.sourceUpdatedAt)&&q.sourceUpdatedAt<=q.receivedAt)&&typeof q.odds==='number'&&q.odds>1).sort((a,b)=>b.receivedAt-a.receivedAt)[0];
   entries.push({fixtureId:f.fixtureId,market:e.quote.type,period:e.quote.period,result,netUnits:net,estimatedEV:e.price.ev,clvSameContractPriceRatio:closing?e.quote.odds/closing.odds-1:null});
  }
  const avg=(a,k)=>a.length?a.reduce((s,r)=>s+r[k],0)/a.length:null;
