@@ -1,0 +1,70 @@
+name: PRE-MATCH — explicit one-shot scan Mobile release
+on:
+  push:
+    branches: [feat/prematch-one-shot-scan-20261031]
+    paths: ['prematch-scan/**', 'prematch-release/production.mjs', 'prematch-ai/**', 'prematch-release/data.mjs', '.github/workflows/prematch-one-shot-scan.yml']
+permissions: {contents: read, actions: read}
+concurrency:
+  group: fe-football-edge-mobile-production
+  cancel-in-progress: false
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    environment: football-edge-production
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      WRANGLER_SEND_METRICS: 'false'
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - uses: actions/download-artifact@v4
+        with:
+          name: prematch-scan-release-evidence
+          run-id: 41178852691
+          github-token: ${{ github.token }}
+          path: prematch-scan/previous
+      - uses: actions/download-artifact@v4
+        with:
+          name: mechanism-notifications-evidence
+          run-id: 41154041190
+          github-token: ${{ github.token }}
+          path: verified
+      - run: |
+          node prematch-scan/test-horizon.mjs
+          npm install --no-save --no-package-lock wrangler@4 playwright@1.58.2
+      - name: Preserve current 70 assets and prepare candidate
+        run: node prematch-scan/release.mjs prepare
+      - name: Candidate scan, cancellation and old mechanisms
+        run: |
+          set -e
+          node prematch-scan/test-browser.cjs
+          cp -r verified/mechanism-mobile mechanism-mobile
+          cp -r prematch-scan/generated/site/. mechanism-mobile/site/
+          node prematch-release/adapt-regression.mjs
+          node mechanism-mobile/test-browser.cjs
+          node mechanism-mobile/test-controls.cjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: prematch-scan-before-deploy
+          path: prematch-scan/generated/
+          retention-days: 90
+      - name: Deploy authorized Mobile change only
+        id: deploy
+        run: node prematch-scan/release.mjs deploy
+      - name: Published scan UI acceptance and all public hashes
+        run: |
+          node prematch-scan/test-browser.cjs --production
+          node prematch-scan/release.mjs verify
+      - name: Restore preceding Mobile if acceptance fails
+        if: failure() && steps.deploy.outcome != 'skipped'
+        run: node prematch-scan/release.mjs rollback
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: prematch-scan-release-evidence
+          path: prematch-scan/generated/
+          retention-days: 90
