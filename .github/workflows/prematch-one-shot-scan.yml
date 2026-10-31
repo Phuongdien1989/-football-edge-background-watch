@@ -23,8 +23,8 @@ jobs:
         with: {node-version: '22'}
       - uses: actions/download-artifact@v4
         with:
-          name: prematch-trial-release-evidence
-          run-id: 41166325361
+          name: prematch-scan-release-evidence
+          run-id: 41167882710
           github-token: ${{ github.token }}
           path: prematch-scan/previous
       - uses: actions/download-artifact@v4
@@ -38,7 +38,7 @@ jobs:
           node prematch-release/test.mjs
           node prematch-scan/test.mjs
           npm install --no-save --no-package-lock wrangler@4 playwright@1.58.2
-      - name: Preserve current 68 assets and prepare candidate
+      - name: Preserve current 69 assets and prepare candidate
         run: node prematch-scan/release.mjs prepare
       - name: Candidate scan, cancellation and old mechanisms
         run: |

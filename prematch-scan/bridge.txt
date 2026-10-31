@@ -1,6 +1,6 @@
   // PREMATCH_ONE_SHOT_V1: explicit foreground-only acquisition. No LIVE setter.
   (()=>{
-    let active=null;
+    let active=null,minuteSeenAt=0;
     const allowed={ '/fixtures':['date','timezone','team','last'], '/leagues':['id','season'], '/odds':['fixture'], '/injuries':['fixture'], '/fixtures/lineups':['fixture'] };
     const done=()=>{if(active?.cancelled)throw Error('PRE_SCAN_CANCELLED');};
     Object.defineProperty(window,'FEPreMatchScanBridge',{value:Object.freeze({
@@ -19,11 +19,11 @@
         const entry=cacheGetEntry(path,params);if(entry&&Date.now()>=entry.ts&&Date.now()-entry.ts<=ttl){active.hits++;return {data:feUICopy(entry.data),receivedAt:entry.ts,cached:true};}
         const key=cacheKey(path,params);if(API_INFLIGHT.has(key)){active.hits++;const data=await API_INFLIGHT.get(key);done();return {data:feUICopy(data),receivedAt:cacheGetEntry(path,params)?.ts||Date.now(),cached:true};}
         if(active.calls>=40)throw Error('PRE_SCAN_REQUEST_BUDGET_40');
-        const q=apiUsageSnapshot();if(typeof q.remaining_header==='number'&&q.remaining_header<=0)throw Error('PRE_SCAN_DAILY_QUOTA');if(typeof q.minute_remaining_header==='number'&&q.minute_remaining_header<=5)throw Error('PRE_SCAN_MINUTE_QUOTA');
+        const q=apiUsageSnapshot();if(typeof q.remaining_header==='number'&&q.remaining_header<=0)throw Error('PRE_SCAN_DAILY_QUOTA');if(minuteSeenAt&&Date.now()-minuteSeenAt<60000&&typeof q.minute_remaining_header==='number'&&q.minute_remaining_header<=5)throw Error('PRE_SCAN_MINUTE_QUOTA');
         const wait=750-(Date.now()-active.lastStart);if(wait>0)await new Promise(r=>setTimeout(r,wait));done();active.calls++;active.lastStart=Date.now();
         const task=football(path,params,false);API_INFLIGHT.set(key,task);
         try{const data=await task;const receivedAt=Date.now();if(!(path==='/fixtures/lineups'&&Array.isArray(data)&&!data.length))cachePut(path,params,data,ttl);done();return {data:feUICopy(data),receivedAt,cached:false};}
-        finally{if(API_INFLIGHT.get(key)===task)API_INFLIGHT.delete(key);}
+        finally{minuteSeenAt=Date.now();if(API_INFLIGHT.get(key)===task)API_INFLIGHT.delete(key);}
       }
     }),writable:false,configurable:false});
   })();
