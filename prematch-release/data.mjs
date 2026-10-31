@@ -9,7 +9,7 @@ export function fromCachedBundles(bundles,seed,now=Date.now()){
    for(const v of market.values||[]){if(v.suspended)continue;const label=String(v.value||''),selection=type[0]==='OU'?/^over\b/i.test(label)?'OVER':/^under\b/i.test(label)?'UNDER':null:String(v.selection_outcome||v.selection_side||(/^(home|away|draw)$/i.test(label)?label:'')).toUpperCase();
     if(!(type[0]==='OU'?['OVER','UNDER']:type[0]==='1X2'?['HOME','DRAW','AWAY']:['HOME','AWAY']).includes(selection))continue;
     const odds=num(v.odd),line=type[0]==='1X2'?null:num(v.handicap??label.match(/([+-]?\d+(?:\.\d+)?)\s*$/)?.[1]);if(!odds||odds<=1||type[0]!=='1X2'&&line===null)continue;
-    const updated=market.update==null?null:Date.parse(market.update);quotes.push({fixtureId:id,source:'API_FOOTBALL_EXISTING_DEEP',bookmaker:market.bookmaker||'Nguồn DEEP',marketId:String(market.bet_id??market.bet),type:type[0],period:type[1],selection,line,odds,basis:'REGULATION',ruleStatus:'UNKNOWN',ruleReference:'',receivedAt:b.market_received_at??at,sourceUpdatedAt:Number.isFinite(updated)?updated:null,availability:'INDICATIVE',suspended:false});
+    const updated=market.update==null?null:Date.parse(market.update);quotes.push({fixtureId:id,source:'API_FOOTBALL_EXISTING_DEEP',sourceSelection:label,sourceFixtureId:b.market_fixture_verified===true?id:null,sourceMarketName:market.feed_bet_name||market.bet||null,bookmaker:market.bookmaker||'Nguồn DEEP',marketId:String(market.bet_id??market.bet),type:type[0],period:type[1],selection,line,odds,basis:'REGULATION',ruleStatus:'UNKNOWN',ruleReference:'',receivedAt:b.market_received_at??at,sourceUpdatedAt:Number.isFinite(updated)?updated:null,availability:'INDICATIVE',suspended:false});
    }
   }
  }

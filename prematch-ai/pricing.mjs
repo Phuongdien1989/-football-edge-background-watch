@@ -29,13 +29,14 @@ export async function evaluate(forecast,q,{now=Date.now()}={}){
  const out={schema:'FE_PREMATCH_EVALUATION_V1',forecastId:forecast?.id??null,fixtureId:q?.fixtureId??null,at:now,quote:structuredClone(q),status:'WAIT_RULE',reason:null,price:null,sensitivity:null,experimental:true};
  if(!forecast){out.status='MODEL_WAIT';out.reason='FORECAST_REQUIRED';}
  else if(q.fixtureId!==forecast.fixtureId){out.reason='FIXTURE_MISMATCH';}
+ else if(q.sourceFixtureId!=null&&q.sourceFixtureId!==q.fixtureId){out.reason='QUOTE_SOURCE_FIXTURE_MISMATCH';}
  else if(now>=forecast.kickoff){out.status='CLOSED_PRE';out.reason='KICKOFF_REACHED';}
  else if(!time(now)||!time(q.receivedAt)||q.receivedAt>now||q.receivedAt>=forecast.kickoff||q.sourceUpdatedAt!=null&&(!time(q.sourceUpdatedAt)||q.sourceUpdatedAt>q.receivedAt))out.reason='INVALID_QUOTE_CLOCK';
  else if(contractError(q)&&contractError(q)!=='SETTLEMENT_RULE_REQUIRED'){out.reason=contractError(q);}
  else if(q.basis!=='REGULATION'){out.reason='SETTLEMENT_RULE_REQUIRED';}
  else if(q.period==='HT'&&!forecast.distributions.HT){out.status='MODEL_WAIT';out.reason='TRUE_HT_HISTORY_REQUIRED';}
  else{
-  const assumed=contractError(q)==='SETTLEMENT_RULE_REQUIRED';const mathQuote=assumed?{...q,ruleStatus:'VERIFIED',ruleReference:'CONDITIONAL_REGULATION_ASSUMPTION_FOR_MATH_ONLY'}:q;out.indicativeAssumption=assumed;
+  const assumed=contractError(q)==='SETTLEMENT_RULE_REQUIRED';const mathQuote=assumed?{...q,ruleStatus:'VERIFIED',ruleReference:'CONDITIONAL_REGULATION_ASSUMPTION_FOR_MATH_ONLY'}:q;out.indicativeAssumption=assumed;out.modelReviewRequired=forecast.applicability==='LIMITED_RECENT_HISTORY'&&forecast.uncertainty?.validated!==true;out.modelReviewReason=out.modelReviewRequired?'RECENT_HISTORY_NOT_OPPONENT_ADJUSTED_OR_CALIBRATED':null;
   out.price=priceMatrix(forecast.distributions[q.period],mathQuote);
   if(!out.price){out.status='WAIT_PRICE';out.reason='INVALID_PRICE';}
   else{
@@ -45,6 +46,7 @@ export async function evaluate(forecast,q,{now=Date.now()}={}){
    if(assumed){out.status='WAIT_RULE';out.reason='CONDITIONAL_REGULATION_PRICE_NOT_VERIFIED';}
    else if(!available){out.status='WAIT_PRICE';out.reason='INDICATIVE_OR_UNAVAILABLE_QUOTE';}
    else if(out.price.ev<=0){out.status='NO_ENTRY';out.reason='NONPOSITIVE_MODEL_EV';}
+   else if(out.modelReviewRequired){out.status='WAIT_MODEL_REVIEW';out.reason=out.modelReviewReason;}
    else if(out.sensitivity.signDisagreement){out.status='WAIT_MODEL_REVIEW';out.reason='EV_SIGN_DIFFERS_BETWEEN_MODELS';}
    else {out.status='OPEN_TRIAL';out.reason='POSITIVE_UNCALIBRATED_MODEL_EV';}
   }
@@ -52,15 +54,15 @@ export async function evaluate(forecast,q,{now=Date.now()}={}){
  out.id=await digest(out);return out;
 }
 export function noVigPairs(quotes){
- const groups=new Map();for(const q of quotes){if(contractError(q)||n(q.odds)===null||q.odds<=1)continue;const k=JSON.stringify([q.fixtureId,q.source,q.bookmaker,q.marketId,q.period,q.type,q.line??null,q.receivedAt,q.sourceUpdatedAt??null]);const g=groups.get(k)||[];g.push(q);groups.set(k,g);}
+ const groups=new Map();for(const q of quotes){const mathQuote={...q,ruleStatus:'VERIFIED',ruleReference:'CONDITIONAL_REGULATION_MATH_ONLY'};if(contractError(mathQuote)||n(q.odds)===null||q.odds<=1||q.suspended===true||q.sourceFixtureId!=null&&q.sourceFixtureId!==q.fixtureId)continue;const k=JSON.stringify([q.fixtureId,q.source,q.bookmaker,q.marketId,q.period,q.type,q.line??null,q.receivedAt,q.sourceUpdatedAt??null]);const g=groups.get(k)||[];g.push(q);groups.set(k,g);}
  const out=[];for(const group of groups.values()){
   const q=group[0],sides=q.type==='1X2'?['HOME','DRAW','AWAY']:q.type==='OU'&&Math.abs(q.line%1-.5)<1e-8?['OVER','UNDER']:null;
   if(!sides||group.length!==sides.length||new Set(group.map(x=>x.selection)).size!==sides.length||!sides.every(s=>group.some(q=>q.selection===s)))continue;
-  const inv=group.reduce((s,q)=>s+1/q.odds,0);out.push({fixtureId:q.fixtureId,type:q.type,period:q.period,method:'PROPORTIONAL_MATCHED_SOURCE',overround:inv-1,probabilities:Object.fromEntries(group.map(q=>[q.selection,1/q.odds/inv])),contracts:group.map(marketKey)});
+  const inv=group.reduce((s,q)=>s+1/q.odds,0);out.push({fixtureId:q.fixtureId,type:q.type,period:q.period,method:'PROPORTIONAL_MATCHED_SOURCE',ruleVerified:group.every(q=>!contractError(q)),quotes:group.map(q=>({selection:q.selection,odds:q.odds,sourceSelection:q.sourceSelection??null})),overround:inv-1,probabilities:Object.fromEntries(group.map(q=>[q.selection,1/q.odds/inv])),contracts:group.map(marketKey)});
  }return out;
 }
 export function rankFixtures(rows){
- const leaders=rows.map(r=>{const candidates=r.evaluations.filter(e=>e.status==='OPEN_TRIAL').sort((a,b)=>b.price.ev-a.price.ev||a.id.localeCompare(b.id));const indicative=r.evaluations.filter(e=>['WAIT_RULE','WAIT_PRICE'].includes(e.status)&&e.price?.ev>0&&e.quote.suspended!==true).sort((a,b)=>b.price.ev-a.price.ev||a.id.localeCompare(b.id));return {...r,top:candidates[0]??null,candidate:candidates.length?null:indicative[0]??null,backups:candidates.length?candidates.slice(1,3):indicative.slice(1,3),rank:null};});
+ const leaders=rows.map(r=>{const candidates=r.evaluations.filter(e=>e.status==='OPEN_TRIAL').sort((a,b)=>b.price.ev-a.price.ev||a.id.localeCompare(b.id));const indicative=r.evaluations.filter(e=>['WAIT_RULE','WAIT_PRICE','WAIT_MODEL_REVIEW'].includes(e.status)&&e.price?.ev>0&&e.quote.suspended!==true).sort((a,b)=>b.price.ev-a.price.ev||a.id.localeCompare(b.id));return {...r,top:candidates[0]??null,candidate:candidates.length?null:indicative[0]??null,backups:candidates.length?candidates.slice(1,3):indicative.slice(1,3),rank:null};});
  const sorted=leaders.filter(r=>r.top||r.candidate).sort((a,b)=>(b.top||b.candidate).price.ev-(a.top||a.candidate).price.ev||a.fixture.id-b.fixture.id).slice(0,5);
- sorted.forEach((r,i)=>{r.rank=i+1;r.role=(i===0?'TOP 1':i<3?'BACKUP':'WATCHLIST')+(r.candidate?' · CHỜ XÁC NHẬN':'');});return {rows:leaders,top:sorted};
+ sorted.forEach((r,i)=>{r.rank=i+1;r.role=(i===0?'TOP 1':i<3?'BACKUP':'WATCHLIST')+(r.candidate?(r.candidate.modelReviewRequired?' · NGHIÊN CỨU · CHỜ XÁC NHẬN':' · CHỜ XÁC NHẬN'):'');});return {rows:leaders,top:sorted};
 }

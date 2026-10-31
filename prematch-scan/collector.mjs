@@ -21,7 +21,7 @@ export function createScan(bridge,{onProgress=()=>{},clock=Date.now}={}){
     try{
      const h=await bridge.request(id,'/fixtures',{team:f.teams.home.id,last:8},1200000),a=await bridge.request(id,'/fixtures',{team:f.teams.away.id,last:8},1200000);b.normalized.home_recent=recent(h.data);b.normalized.away_recent=recent(a.data);b.observed_at=Math.max(receivedAt,h.receivedAt,a.receivedAt);
      // Forecast context is frozen before market acquisition.
-     try{const o=await bridge.request(id,'/odds',{fixture:f.fixture.id},300000);b.market_received_at=o.receivedAt;b.normalized.market.prematch=bridge.normalize(o.data,f);}catch(e){if(stop(e))throw e;b.marketError=String(e.message).slice(0,160);}
+     try{const o=await bridge.request(id,'/odds',{fixture:f.fixture.id},300000);b.market_received_at=o.receivedAt;if(!Array.isArray(o.data)||o.data.some(row=>row.fixture?.id!==f.fixture.id))throw Error('ODDS_SOURCE_FIXTURE_MISMATCH');b.market_fixture_verified=true;b.normalized.market.prematch=bridge.normalize(o.data,f);}catch(e){if(stop(e))throw e;b.marketError=String(e.message).slice(0,160);}
      let coverage=null;try{const c=await bridge.request(id,'/leagues',{id:f.league.id,season:f.league.season},86400000);coverage=c.data?.[0]?.coverage??null;}catch(e){if(stop(e))throw e;}
      for(const [path,module,allowed]of [['/injuries','Injury & Suspension',coverage?.injuries],['/fixtures/lineups','Lineup & Chemistry',coverage?.fixtures?.lineups]]){
       if(allowed===false){evidence.push({fixtureId:f.fixture.id,module,id:path+':'+f.fixture.id,kind:'UNKNOWN',text:'Nguồn báo không phủ dữ liệu này.'});continue;}
