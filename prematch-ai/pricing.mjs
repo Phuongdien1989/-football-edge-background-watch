@@ -31,16 +31,19 @@ export async function evaluate(forecast,q,{now=Date.now()}={}){
  else if(q.fixtureId!==forecast.fixtureId){out.reason='FIXTURE_MISMATCH';}
  else if(now>=forecast.kickoff){out.status='CLOSED_PRE';out.reason='KICKOFF_REACHED';}
  else if(!time(now)||!time(q.receivedAt)||q.receivedAt>now||q.receivedAt>=forecast.kickoff||q.sourceUpdatedAt!=null&&(!time(q.sourceUpdatedAt)||q.sourceUpdatedAt>q.receivedAt))out.reason='INVALID_QUOTE_CLOCK';
- else if(contractError(q)){out.reason=contractError(q);}
+ else if(contractError(q)&&contractError(q)!=='SETTLEMENT_RULE_REQUIRED'){out.reason=contractError(q);}
+ else if(q.basis!=='REGULATION'){out.reason='SETTLEMENT_RULE_REQUIRED';}
  else if(q.period==='HT'&&!forecast.distributions.HT){out.status='MODEL_WAIT';out.reason='TRUE_HT_HISTORY_REQUIRED';}
  else{
-  out.price=priceMatrix(forecast.distributions[q.period],q);
+  const assumed=contractError(q)==='SETTLEMENT_RULE_REQUIRED';const mathQuote=assumed?{...q,ruleStatus:'VERIFIED',ruleReference:'CONDITIONAL_REGULATION_ASSUMPTION_FOR_MATH_ONLY'}:q;out.indicativeAssumption=assumed;
+  out.price=priceMatrix(forecast.distributions[q.period],mathQuote);
   if(!out.price){out.status='WAIT_PRICE';out.reason='INVALID_PRICE';}
   else{
-   const variants=forecast.variants.map(v=>({name:v.name,price:priceMatrix(v.distributions[q.period],q)})).filter(v=>v.price);
+   const variants=forecast.variants.map(v=>({name:v.name,price:priceMatrix(v.distributions[q.period],mathQuote)})).filter(v=>v.price);
    const evs=[out.price.ev,...variants.map(v=>v.price.ev)];out.sensitivity={kind:'MODEL_VARIATION_NOT_CONFIDENCE_INTERVAL',variants:variants.map(v=>({name:v.name,ev:v.price.ev,fairOdds:v.price.fairOdds})),minEV:Math.min(...evs),maxEV:Math.max(...evs),signDisagreement:Math.min(...evs)<0&&Math.max(...evs)>0};
    const available=q.availability==='CONFIRMED'&&time(q.checkedAt)&&q.checkedAt>=q.receivedAt&&q.checkedAt<=now&&time(q.validUntil)&&q.validUntil>now&&q.validUntil<=forecast.kickoff&&q.suspended!==true;
-   if(!available){out.status='WAIT_PRICE';out.reason='INDICATIVE_OR_UNAVAILABLE_QUOTE';}
+   if(assumed){out.status='WAIT_RULE';out.reason='CONDITIONAL_REGULATION_PRICE_NOT_VERIFIED';}
+   else if(!available){out.status='WAIT_PRICE';out.reason='INDICATIVE_OR_UNAVAILABLE_QUOTE';}
    else if(out.price.ev<=0){out.status='NO_ENTRY';out.reason='NONPOSITIVE_MODEL_EV';}
    else if(out.sensitivity.signDisagreement){out.status='WAIT_MODEL_REVIEW';out.reason='EV_SIGN_DIFFERS_BETWEEN_MODELS';}
    else {out.status='OPEN_TRIAL';out.reason='POSITIVE_UNCALIBRATED_MODEL_EV';}
@@ -57,7 +60,7 @@ export function noVigPairs(quotes){
  }return out;
 }
 export function rankFixtures(rows){
- const leaders=rows.map(r=>{const candidates=r.evaluations.filter(e=>e.status==='OPEN_TRIAL').sort((a,b)=>b.price.ev-a.price.ev||a.id.localeCompare(b.id));return {...r,top:candidates[0]??null,backups:candidates.slice(1,3),rank:null};});
- const sorted=leaders.filter(r=>r.top).sort((a,b)=>b.top.price.ev-a.top.price.ev||a.fixture.id-b.fixture.id).slice(0,5);
- sorted.forEach((r,i)=>{r.rank=i+1;r.role=i===0?'TOP 1':i<3?'BACKUP':'WATCHLIST';});return {rows:leaders,top:sorted};
+ const leaders=rows.map(r=>{const candidates=r.evaluations.filter(e=>e.status==='OPEN_TRIAL').sort((a,b)=>b.price.ev-a.price.ev||a.id.localeCompare(b.id));const indicative=r.evaluations.filter(e=>['WAIT_RULE','WAIT_PRICE'].includes(e.status)&&e.price?.ev>0&&e.quote.suspended!==true).sort((a,b)=>b.price.ev-a.price.ev||a.id.localeCompare(b.id));return {...r,top:candidates[0]??null,candidate:candidates.length?null:indicative[0]??null,backups:candidates.length?candidates.slice(1,3):indicative.slice(1,3),rank:null};});
+ const sorted=leaders.filter(r=>r.top||r.candidate).sort((a,b)=>(b.top||b.candidate).price.ev-(a.top||a.candidate).price.ev||a.fixture.id-b.fixture.id).slice(0,5);
+ sorted.forEach((r,i)=>{r.rank=i+1;r.role=(i===0?'TOP 1':i<3?'BACKUP':'WATCHLIST')+(r.candidate?' · CHỜ XÁC NHẬN':'');});return {rows:leaders,top:sorted};
 }

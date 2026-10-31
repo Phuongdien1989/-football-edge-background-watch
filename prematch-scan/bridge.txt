@@ -1,0 +1,29 @@
+  // PREMATCH_ONE_SHOT_V1: explicit foreground-only acquisition. No LIVE setter.
+  (()=>{
+    let active=null;
+    const allowed={ '/fixtures':['date','timezone','team','last'], '/leagues':['id','season'], '/odds':['fixture'], '/injuries':['fixture'], '/fixtures/lineups':['fixture'] };
+    const done=()=>{if(active?.cancelled)throw Error('PRE_SCAN_CANCELLED');};
+    Object.defineProperty(window,'FEPreMatchScanBridge',{value:Object.freeze({
+      ready:()=>!!els.fkey.value.trim(),
+      begin:()=>{if(active)throw Error('PRE_SCAN_BUSY');active={id:crypto.randomUUID(),calls:0,hits:0,cancelled:false,lastStart:0};return active.id;},
+      cancel:id=>{if(active?.id===id)active.cancelled=true;},
+      quota:()=>{const q=apiUsageSnapshot();return {dayRemaining:q.remaining_header,minuteRemaining:q.minute_remaining_header};},
+      stats:id=>active?.id===id?{calls:active.calls,hits:active.hits,limit:40}:null,
+      end:id=>{if(active?.id===id){const r={calls:active.calls,hits:active.hits,limit:40};active=null;return r;}return null;},
+      normalize:(raw,f)=>normalizePrematchMarkets(raw,{homeName:f.teams.home.name,awayName:f.teams.away.name}),
+      request:async(id,path,params={},ttl=60000)=>{
+        if(!active||active.id!==id)throw Error('PRE_SCAN_NOT_ACTIVE');done();
+        if(!allowed[path]||Object.keys(params).some(k=>!allowed[path].includes(k)))throw Error('PRE_SCAN_ENDPOINT_NOT_ALLOWED');
+        if(path==='/fixtures'&&!params.date&&!(Number.isSafeInteger(params.team)&&params.team>0&&params.last===8))throw Error('PRE_SCAN_FIXTURE_PARAMS');
+        if(params.fixture!=null&&(!Number.isSafeInteger(params.fixture)||params.fixture<=0))throw Error('PRE_SCAN_FIXTURE_ID');
+        const entry=cacheGetEntry(path,params);if(entry&&Date.now()>=entry.ts&&Date.now()-entry.ts<=ttl){active.hits++;return {data:feUICopy(entry.data),receivedAt:entry.ts,cached:true};}
+        const key=cacheKey(path,params);if(API_INFLIGHT.has(key)){active.hits++;const data=await API_INFLIGHT.get(key);done();return {data:feUICopy(data),receivedAt:cacheGetEntry(path,params)?.ts||Date.now(),cached:true};}
+        if(active.calls>=40)throw Error('PRE_SCAN_REQUEST_BUDGET_40');
+        const q=apiUsageSnapshot();if(typeof q.remaining_header==='number'&&q.remaining_header<=0)throw Error('PRE_SCAN_DAILY_QUOTA');if(typeof q.minute_remaining_header==='number'&&q.minute_remaining_header<=5)throw Error('PRE_SCAN_MINUTE_QUOTA');
+        const wait=750-(Date.now()-active.lastStart);if(wait>0)await new Promise(r=>setTimeout(r,wait));done();active.calls++;active.lastStart=Date.now();
+        const task=football(path,params,false);API_INFLIGHT.set(key,task);
+        try{const data=await task;const receivedAt=Date.now();if(!(path==='/fixtures/lineups'&&Array.isArray(data)&&!data.length))cachePut(path,params,data,ttl);done();return {data:feUICopy(data),receivedAt,cached:false};}
+        finally{if(API_INFLIGHT.get(key)===task)API_INFLIGHT.delete(key);}
+      }
+    }),writable:false,configurable:false});
+  })();

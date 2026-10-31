@@ -1,15 +1,25 @@
-// Lazy official PRE tab. Reads existing bridges; no collection, Push or D1 writes.
+// Explicit, foreground PRE acquisition. Existing LIVE/Push controls are never called.
 import {fromCachedBundles,confirmFixtureQuotes} from './data.mjs';
-let app=null,opening=false,root=null,seed=null,workerUrl=null;
+import {createScan,localVN,parseVN} from '../prematch-scan/collector.mjs';
+let app=null,opening=false,root=null,scan=null;
 async function show(){if(document.body.dataset.feTabsTab!=='prematch'||opening)return;const node=document.getElementById('fePrematchOfficial');if(!node||root===node)return;opening=true;
- try{app?.destroy();const [{mount},response]=await Promise.all([import('../prematch-ai/view.mjs'),fetch(new URL('./seed.json',import.meta.url),{cache:'no-cache'})]);if(!response.ok)throw Error('PRE_SEED_UNAVAILABLE');seed=await response.json();if(document.body.dataset.feTabsTab!=='prematch')return;
- root=node;app=mount(node,{production:true,workerFactory:()=>new Worker(new URL('../prematch-ai/worker.mjs',import.meta.url),{type:'module'})});
- const controls=document.createElement('div');controls.className='pm-tools';controls.innerHTML='<button type="button" class="pm-btn primary" data-pm-refresh>Đọc dữ liệu đang có</button><button type="button" class="pm-btn" data-pm-confirm>Đã đối chiếu kỳ kèo & giá</button><span class="pm-inline-note">Giá chỉ đọc từ PRE/DEEP đã mở. Không tải thêm API. Xác nhận đúng kỳ HT/FT, không tính hiệp phụ. Hiệu lực tối đa 5 phút, đóng trước kickoff.</span>';node.querySelector('.pm-tools').before(controls);
- let input=fromCachedBundles(window.FEPreMatchReadBridge?.read?.()||window.FEOverviewInputBridge?.read?.()||[],seed);
- controls.querySelector('[data-pm-refresh]').onclick=()=>{input=fromCachedBundles(window.FEPreMatchReadBridge?.read?.()||window.FEOverviewInputBridge?.read?.()||[],seed);app.load(input);};
- controls.querySelector('[data-pm-confirm]').onclick=()=>{try{const r=app.getResult(),id=Number(node.querySelector('[data-pm-fixture]')?.dataset.pmFixture)||r?.rows?.[0]?.fixture.id;input=confirmFixtureQuotes(input,id);app.load(input);}catch(e){node.querySelector('.pm-state').textContent=String(e.message);}};
- await app.load(input);
+ try{const [{mount},response]=await Promise.all([import('../prematch-ai/view.mjs'),fetch(new URL('./seed.json',import.meta.url),{cache:'no-cache'})]);if(!response.ok)throw Error('PRE_SEED_UNAVAILABLE');const seed=await response.json();if(document.body.dataset.feTabsTab!=='prematch')return;
+ root=node;const current=app=mount(node,{production:true,workerFactory:()=>new Worker(new URL('../prematch-ai/worker.mjs',import.meta.url),{type:'module'})});
+ const controls=document.createElement('section');controls.className='pm-scan';controls.setAttribute('aria-label','Quét PRE-MATCH theo khung giờ');controls.innerHTML='<div class="pm-eye">QUÉT TRƯỚC TRẬN · GIỜ VIỆT NAM</div><div class="pm-scan-range"><label>Từ<input type="datetime-local" data-pm-from></label><label>Đến<input type="datetime-local" data-pm-to></label></div><div class="pm-tools"><button type="button" class="pm-btn primary" data-pm-start>Quét PRE-MATCH</button><button type="button" class="pm-btn" data-pm-stop disabled>Dừng</button><button type="button" class="pm-btn" data-pm-next disabled>Quét tiếp 5 trận</button></div><div data-pm-scan-status role="status">Mỗi lượt tối đa 5 trận / 40 request mới. Dùng lại cache; chỉ quét khi ông bấm nút.</div><p class="pm-inline-note">TOP chỉ so sánh các trận đã phân tích. Giá nguồn là tham khảo; xác nhận kỳ kèo và giá khả dụng trước khi đưa vào danh sách thử nghiệm.</p><div class="pm-tools"><button type="button" class="pm-btn" data-pm-cache>Đọc cache</button><button type="button" class="pm-btn" data-pm-confirm>Đã đối chiếu kỳ kèo & giá</button></div>';node.querySelector('.pm-tools').before(controls);
+ const from=controls.querySelector('[data-pm-from]'),to=controls.querySelector('[data-pm-to]'),start=controls.querySelector('[data-pm-start]'),next=controls.querySelector('[data-pm-next]'),stop=controls.querySelector('[data-pm-stop]'),note=controls.querySelector('[data-pm-scan-status]');from.value=localVN(Date.now());to.value=localVN(Date.now()+4*3600000);
+ let collected=[],facts=[],input=null,remaining=0;
+ const read=()=>{const cache=window.FEPreMatchReadBridge?.read?.()||window.FEOverviewInputBridge?.read?.()||[];const all=[...new Map([...cache,...collected].map(b=>[b.meta?.fixture_id,b])).values()];input=fromCachedBundles(all,seed);input.evidence=facts;current.load(input);};
+ const text=p=>`${p.completed??0}/${p.total??0} trận đã xử lý · ${p.stats?.calls??0}/40 request mới · ${p.stats?.hits??0} cache · ${p.message||''}`;
+ const controller=scan=createScan(window.FEPreMatchScanBridge||{ready:()=>false},{onProgress:p=>{if(root!==node)return;note.textContent=text(p);if(p.bundles){collected=p.bundles;facts=p.evidence;read();}}});
+ const buttons=busy=>{start.disabled=busy;next.disabled=busy||!remaining;stop.disabled=!busy;from.disabled=to.disabled=busy;controls.querySelector('[data-pm-cache]').disabled=busy;controls.querySelector('[data-pm-confirm]').disabled=busy;};
+ async function run(more){buttons(true);try{const r=await controller.run({from:parseVN(from.value),to:parseVN(to.value),next:more});if(root!==node)return;collected=r.bundles;facts=r.evidence;remaining=r.remaining;read();note.textContent=text(r)+(r.error?' · Đã dừng: '+r.error:r.total?' · Còn '+remaining+' trận chưa phân tích.':' · Không có trận sắp đá trong khung giờ này.');}catch(e){if(root===node)note.textContent=String(e.message)+' Mở Cài đặt kết nối để kiểm tra API Key.';}finally{if(root===node)buttons(false);}}
+ start.onclick=()=>run(false);next.onclick=()=>run(true);stop.onclick=()=>{controller.cancel();stop.disabled=true;note.textContent='Đang dừng. Request đã gửi có thể hoàn tất; không gửi thêm request.';};
+ for(const field of [from,to])field.onchange=()=>{remaining=0;next.disabled=true;};
+ controls.querySelector('[data-pm-cache]').onclick=read;
+ controls.querySelector('[data-pm-confirm]').onclick=()=>{try{const r=current.getResult(),id=Number(node.querySelector('[data-pm-fixture]')?.dataset.pmFixture)||r?.rows?.[0]?.fixture.id;input=confirmFixtureQuotes(input,id);current.load(input);}catch(e){note.textContent=String(e.message);}};
+ read();
  }catch(e){if(node)node.textContent='PRE-MATCH đang chờ dữ liệu: '+String(e.message);}finally{opening=false;}}
-function route(){if(!location.hash.startsWith('#fe-tabs/prematch')){app?.destroy();app=null;root=null;}else show();}
-window.addEventListener('fe-prematch-tab-open',show);window.addEventListener('hashchange',()=>queueMicrotask(route));window.addEventListener('pagehide',()=>{app?.destroy();});
+function close(){scan?.cancel();scan=null;app?.destroy();app=null;root=null;}
+function route(){if(!location.hash.startsWith('#fe-tabs/prematch'))close();else show();}
+window.addEventListener('fe-prematch-tab-open',show);window.addEventListener('hashchange',()=>queueMicrotask(route));window.addEventListener('pagehide',close);
 if(document.body.dataset.feTabsTab==='prematch')show();

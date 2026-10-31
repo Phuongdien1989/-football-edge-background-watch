@@ -1,0 +1,10 @@
+import assert from 'node:assert/strict';
+import {readFileSync,writeFileSync,mkdirSync,cpSync,readdirSync} from 'node:fs';
+import {createHash} from 'node:crypto';
+export const root='prematch-scan/generated';
+export function hashes(dir){const rows=[];function walk(p,rel=''){for(const f of readdirSync(p,{withFileTypes:true})){if(f.isDirectory())walk(p+'/'+f.name,rel+f.name+'/');else rows.push({path:rel+f.name,sha256:createHash('sha256').update(readFileSync(p+'/'+f.name)).digest('hex')});}}walk(dir);return rows;}
+export function build(){mkdirSync(root,{recursive:true});const previous='prematch-scan/previous/site',backup=hashes(previous),manifest=JSON.parse(readFileSync('prematch-scan/previous/release.json'));assert.equal(backup.length,68);assert.deepEqual(backup,manifest.candidate);cpSync(previous,root+'/backup',{recursive:true});cpSync(previous,root+'/site',{recursive:true});
+ const site=root+'/site';for(const [dir,files]of Object.entries({'prematch-release':['production.mjs'],'prematch-ai':['pricing.mjs','runtime.mjs','view.mjs','view.css'],'prematch-scan':['collector.mjs']})){mkdirSync(site+'/'+dir,{recursive:true});for(const f of files)writeFileSync(site+'/'+dir+'/'+f,readFileSync(dir+'/'+f));}
+ let html=readFileSync(site+'/index.html','utf8');assert(!html.includes('PREMATCH_ONE_SHOT_V1'));const marker='// FE_OVERVIEW_INPUT_BRIDGE_END';assert.equal(html.split(marker).length,2);html=html.replace(marker,marker+'\n'+readFileSync('prematch-scan/bridge.txt','utf8'));writeFileSync(site+'/index.html',html);
+ const candidate=hashes(site),changed=backup.filter(x=>candidate.find(y=>y.path===x.path)?.sha256!==x.sha256).map(x=>x.path).sort();assert.deepEqual(changed,['index.html','prematch-ai/pricing.mjs','prematch-ai/runtime.mjs','prematch-ai/view.css','prematch-ai/view.mjs','prematch-release/production.mjs']);assert.equal(candidate.length,69);return {backup,candidate,changed};}
+if(process.argv[1]?.endsWith('/build.mjs')){const r=build();writeFileSync(root+'/manifest.json',JSON.stringify(r,null,2));console.log(JSON.stringify({status:'BUILT',assets:r.candidate.length,changed:r.changed,unchangedOriginalMechanisms:true}));}
