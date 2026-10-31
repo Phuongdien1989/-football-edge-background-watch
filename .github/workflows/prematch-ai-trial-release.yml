@@ -1,0 +1,65 @@
+name: PRE-MATCH AI — authorized Mobile trial release
+on:
+  push:
+    branches: [release/prematch-ai-v1-trial-20261031]
+    paths: ['prematch-release/**', 'prematch-ai/view.mjs', '.github/workflows/prematch-ai-trial-release.yml']
+permissions: {contents: read, actions: read}
+concurrency:
+  group: fe-football-edge-mobile-production
+  cancel-in-progress: false
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: football-edge-production
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      WRANGLER_SEND_METRICS: 'false'
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - uses: actions/download-artifact@v4
+        with:
+          name: mechanism-notifications-evidence
+          run-id: 41154041190
+          github-token: ${{ github.token }}
+          path: verified
+      - run: |
+          node prematch-ai/test.mjs
+          node prematch-release/test.mjs
+          npm install --no-save --no-package-lock wrangler@4 playwright@1.58.2
+      - name: Read-only real history snapshot, preserve current Mobile and build candidate
+        run: node prematch-release/release.mjs prepare
+      - name: Candidate PRE and existing mechanisms regression
+        run: |
+          set -e
+          node prematch-release/test-browser.cjs
+          cp -r verified/mechanism-mobile mechanism-mobile
+          cp -r prematch-release/generated/site/. mechanism-mobile/site/
+          node prematch-release/adapt-regression.mjs
+          node mechanism-mobile/test-browser.cjs
+          node mechanism-mobile/test-controls.cjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: prematch-trial-before-deploy
+          path: prematch-release/generated/
+          retention-days: 90
+      - name: Deploy Mobile only — backend and scanner untouched
+        id: deploy
+        run: node prematch-release/release.mjs deploy
+      - name: Published tab and all public assets acceptance
+        run: |
+          node prematch-release/test-browser.cjs --production
+          node prematch-release/release.mjs verify
+      - name: Restore preceding Mobile on failed acceptance
+        if: failure() && steps.deploy.outcome != 'skipped'
+        run: node prematch-release/release.mjs rollback
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: prematch-trial-release-evidence
+          path: prematch-release/generated/
+          retention-days: 90

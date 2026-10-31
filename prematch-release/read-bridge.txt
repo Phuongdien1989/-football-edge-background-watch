@@ -1,0 +1,8 @@
+  // PREMATCH_V1_READ_ONLY_CACHE_BRIDGE — no fetch, queue or engine setter.
+  Object.defineProperty(window,'FEPreMatchReadBridge',{value:Object.freeze({read:()=>{
+    const now=Date.now(),bundles=window.FEOverviewInputBridge?.read?.()||[],known=new Set(bundles.map(b=>b.meta.fixture_id));
+    for(const f of state.fixtures||[]){if(f.fixture?.status?.short!=='NS'||f.fixture.timestamp*1000<=now||known.has(f.fixture.id))continue;
+      const h=cacheGetEntry('/fixtures',{team:f.teams.home.id,last:8}),a=cacheGetEntry('/fixtures',{team:f.teams.away.id,last:8}),o=cacheGetEntry('/odds',{fixture:f.fixture.id});
+      bundles.push({observed_at:now,market_received_at:o?.ts??now,meta:{fixture_id:f.fixture.id,fixture:f.fixture,teams:f.teams,league:f.league},normalized:{home_recent:recentCompact(h?.data),away_recent:recentCompact(a?.data),market:{prematch:normalizePrematchMarkets(o?.data,{homeName:f.teams.home.name,awayName:f.teams.away.name})}}});
+    }return feUICopy(bundles);
+  }}),writable:false,configurable:false});
