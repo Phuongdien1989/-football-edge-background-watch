@@ -51,3 +51,9 @@ Published browser checks PASS at 320, 390, 1440px with provider mocked. Only ind
 
 Use: https://shiny-silence-d892.ngophuonghuy.workers.dev/#fe-tabs/prematch
 Select a future Vietnamese-time window, press Quét PRE-MATCH, then Quét tiếp 5 trận if needed. Reload the app to load the new frontend. Existing API key configuration is reused; a missing key produces an explicit configuration error. No DEEP opening per fixture is required for the new acquisition flow.
+
+## Resumed source check — 13:06 Vietnam time
+
+After more than one hour, one bounded source recheck was performed (same workflow 41167964665, attempt 2, job 124461207555). At 06:06:23 UTC / 13:06:23 Vietnam, the very first backend provider call returned API_PROVIDER_RATE_LIMIT. Status remains SOURCE_BLOCKED, with no fixture or forecast received. No retries or extra calls were made; the authenticated helper was deleted. Current proof artifact: 13032568803, SHA256 49829690f2062869f3094eabedb88a8338b272f9319e5445aee2207976481f18. The workflow execution succeeded, but source acceptance did not; do not report it as a real-data end-to-end PASS.
+
+This backend result does not establish whether the independently configured direct API call in the Mobile PRE tab succeeds. A user-initiated bounded PRE scan on the phone is the remaining direct-path check. No backend infrastructure or subscription changes were made.
