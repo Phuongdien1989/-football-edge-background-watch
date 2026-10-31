@@ -1,3 +1,4 @@
+export function rollingWindow(hours,now=Date.now()){if(![1,2,3].includes(hours)||!Number.isSafeInteger(now)||now<=0)throw Error('PRE_HORIZON_INVALID');return {from:now,to:now+hours*3600000};}
 import {normalizeMarkets} from '../prematch-ai/market-lines.mjs';
 // One user-initiated batch. I/O is injected, endpoints bounded by the host bridge.
 const stop=e=>/CANCELLED|BUDGET|QUOTA|COOLDOWN|rate.?limit|requests per minute|429/i.test(String(e.message||e));
